@@ -29,12 +29,7 @@ let camera;
 let controls;
 let raycaster;
 let selectedStation = null;
-let handGroup;
-let handBasePosition;
-let handBaseRotation;
-let handCollisionOffset = new THREE.Vector3();
 let playerVelocity = new THREE.Vector3();
-let walkBlend = 0;
 let animationFrame = 0;
 const movementKeys = new Set();
 const stationGroups = [];
@@ -54,30 +49,6 @@ const PLAYER = {
   minZ: -16.25,
   maxZ: 16.25
 };
-
-const HAND_COLLISION_SPHERES = [
-  // Wrist and coat cuff are covered by one larger probe so the sleeve edge
-  // cannot slip through the front lip of a workbench.
-  { center: new THREE.Vector3(0, -0.19, 0.025), radius: 0.19 },
-  { center: new THREE.Vector3(0, 0.155, 0), radius: 0.18 },
-  // This probe spans the four fingers, including the longest fingertip.
-  { center: new THREE.Vector3(0, 0.38, 0), radius: 0.135 },
-  { center: new THREE.Vector3(-0.14, 0.13, 0.005), radius: 0.095 }
-];
-
-const handCollisionWorldCenters = HAND_COLLISION_SPHERES.map(() => new THREE.Vector3());
-
-// Full transformed hand bounds complement the spherical probes. The union AABB
-// catches fingertip, cuff and palm geometry that a sparse set of spheres can miss.
-const handWorldBounds = new THREE.Box3();
-const handObstacleBounds = new THREE.Box3();
-
-function handBoundsTouchesAabb(minX, minY, minZ, maxX, maxY, maxZ) {
-  handObstacleBounds.min.set(minX, minY, minZ);
-  handObstacleBounds.max.set(maxX, maxY, maxZ);
-  handObstacleBounds.expandByScalar(0.025);
-  return handWorldBounds.intersectsBox(handObstacleBounds);
-}
 
 const mats = {
   floor: new THREE.MeshStandardMaterial({ color: 0xc8d5d0, roughness: 0.82 }),
@@ -296,21 +267,6 @@ function addStation(number, x, z) {
   counterTop.material.emissiveIntensity = 0;
   group.userData.top = counterTop;
 
-  // Local-space collision boxes for the equipment sitting on this workbench.
-  // These stop the glove from passing through the glassware as well as the table.
-  group.userData.handColliders = [
-    // Test-tube rack and raised tubes.
-    { minX: -0.84, minY: 1.46, minZ: -1.05, maxX: 0.72, maxY: 2.40, maxZ: -0.43 },
-    // Erlenmeyer flask and neck.
-    { minX: -2.06, minY: 1.46, minZ: -1.02, maxX: -1.38, maxY: 2.27, maxZ: -0.24 },
-    // Beaker and glass rim.
-    { minX: 1.40, minY: 1.48, minZ: -0.96, maxX: 1.89, maxY: 2.06, maxZ: -0.39 },
-    // Reagent bottle and cap.
-    { minX: 1.95, minY: 1.47, minZ: 0.17, maxX: 2.37, maxY: 2.17, maxZ: 0.59 },
-    // Microscope or burner, depending on the station.
-    { minX: -2.60, minY: 1.45, minZ: 0.02, maxX: -1.65, maxY: 2.49, maxZ: 0.91 }
-  ];
-
   stationGroups.push(group);
   addStool(x, z + 2.55);
 }
@@ -500,7 +456,6 @@ function init() {
   }
 
   raycaster = new THREE.Raycaster();
-  createPlayerHand();
 
   controls.addEventListener('lock', () => {
     document.body.classList.add('player-locked');
@@ -567,16 +522,6 @@ function circleTouchesAabb2D(x, z, radius, minX, minZ, maxX, maxZ) {
   const dx = x - closestX;
   const dz = z - closestZ;
   return dx * dx + dz * dz < radius * radius;
-}
-
-function sphereTouchesAabb(center, radius, minX, minY, minZ, maxX, maxY, maxZ) {
-  const closestX = THREE.MathUtils.clamp(center.x, minX, maxX);
-  const closestY = THREE.MathUtils.clamp(center.y, minY, maxY);
-  const closestZ = THREE.MathUtils.clamp(center.z, minZ, maxZ);
-  const dx = center.x - closestX;
-  const dy = center.y - closestY;
-  const dz = center.z - closestZ;
-  return dx * dx + dy * dy + dz * dz < radius * radius;
 }
 
 function canOccupy(x, z) {
@@ -678,244 +623,6 @@ function updatePlayerMovement(delta) {
   return playerVelocity.lengthSq() > 0.025;
 }
 
-function handPoseCollides() {
-  camera.updateMatrixWorld(true);
-  handGroup.updateWorldMatrix(true, false);
-
-  // Use the actual transformed mesh bounds of the entire glove and sleeve.
-  // This is intentionally conservative: a slight early recoil is preferable
-  // to any visible finger or cuff intersection with a hard surface.
-  handWorldBounds.setFromObject(handGroup, true);
-  handWorldBounds.expandByScalar(0.025);
-
-  if (handWorldBounds.min.y < -0.015) return true;
-
-  for (const station of stationGroups) {
-    const sx = station.position.x;
-    const sz = station.position.z;
-
-    // Workbench cabinet body and the complete counter slab.
-    if (handBoundsTouchesAabb(
-      sx - 2.625, 0.26, sz - 1.44,
-      sx + 2.625, 1.18, sz + 1.44
-    )) return true;
-    if (handBoundsTouchesAabb(
-      sx - 2.86, 1.18, sz - 1.66,
-      sx + 2.86, 1.38, sz + 1.66
-    )) return true;
-
-    // Equipment collision boxes are in station-local coordinates.
-    const equipment = station.userData.handColliders || [];
-    for (const obstacle of equipment) {
-      if (handBoundsTouchesAabb(
-        sx + obstacle.minX, obstacle.minY, sz + obstacle.minZ,
-        sx + obstacle.maxX, obstacle.maxY, sz + obstacle.maxZ
-      )) return true;
-    }
-
-    const stoolZ = sz + 2.55;
-    if (handBoundsTouchesAabb(
-      sx - 0.38, 0.68, stoolZ - 0.38,
-      sx + 0.38, 1.02, stoolZ + 0.38
-    )) return true;
-  }
-
-  // Rear storage, shelves and surrounding room walls.
-  if (handBoundsTouchesAabb(-9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
-  if (handBoundsTouchesAabb(-8.0, 2.35, -16.45, 8.0, 2.72, -15.65)) return true;
-  if (handBoundsTouchesAabb(-8.0, 3.48, -16.45, 8.0, 3.85, -15.65)) return true;
-  if (handBoundsTouchesAabb(-12.22, 0, -17.2, -11.78, 9.2, 17.2)) return true;
-  if (handBoundsTouchesAabb(11.78, 0, -17.2, 12.22, 9.2, 17.2)) return true;
-  if (handBoundsTouchesAabb(-12.2, 0, -17.22, 12.2, 9.2, -16.78)) return true;
-
-  // Keep the original sphere probes as a second collision layer for curved
-  // contact points and narrow gaps between the individual hand meshes.
-  const matrix = handGroup.matrixWorld;
-  for (let i = 0; i < HAND_COLLISION_SPHERES.length; i += 1) {
-    const shape = HAND_COLLISION_SPHERES[i];
-    const center = handCollisionWorldCenters[i];
-    center.copy(shape.center).applyMatrix4(matrix);
-
-    if (center.y - shape.radius < -0.015) return true;
-
-    for (const station of stationGroups) {
-      const sx = station.position.x;
-      const sz = station.position.z;
-
-      if (sphereTouchesAabb(
-        center, shape.radius + 0.018,
-        sx - 2.625, 0.26, sz - 1.44,
-        sx + 2.625, 1.18, sz + 1.44
-      )) return true;
-      if (sphereTouchesAabb(
-        center, shape.radius + 0.018,
-        sx - 2.86, 1.18, sz - 1.66,
-        sx + 2.86, 1.38, sz + 1.66
-      )) return true;
-
-      const equipment = station.userData.handColliders || [];
-      for (const obstacle of equipment) {
-        if (sphereTouchesAabb(
-          center, shape.radius + 0.012,
-          sx + obstacle.minX, obstacle.minY, sz + obstacle.minZ,
-          sx + obstacle.maxX, obstacle.maxY, sz + obstacle.maxZ
-        )) return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function testHandOffset(bobPosition, offset) {
-  handGroup.position.copy(bobPosition).add(offset);
-  return !handPoseCollides();
-}
-
-function findSafeHandOffset(bobPosition, startOffset) {
-  // Search incrementally from the current contact pose. This guarantees that
-  // retraction always moves away from the obstacle instead of jumping toward it.
-  const candidates = [];
-  const baseOffset = startOffset.clone();
-  const maxRetraction = 1.08;
-  const remainingRetraction = Math.max(0, maxRetraction - Math.max(0, baseOffset.z));
-  const retractSteps = Math.floor(remainingRetraction / 0.03);
-
-  // First choice: withdraw the wrist naturally toward the camera.
-  for (let i = 1; i <= retractSteps; i += 1) {
-    candidates.push(baseOffset.clone().add(new THREE.Vector3(0, 0, i * 0.03)));
-  }
-
-  // Second choice: a modest wrist lift while continuing to retreat.
-  for (let lift = 1; lift <= 10; lift += 1) {
-    for (let retract = 0; retract <= 24; retract += 1) {
-      const offset = baseOffset.clone().add(new THREE.Vector3(0, lift * 0.025, retract * 0.03));
-      if (offset.z <= maxRetraction) candidates.push(offset);
-    }
-  }
-
-  // Last resort: raise the glove only when a backward movement cannot clear contact.
-  for (let lift = 1; lift <= 20; lift += 1) {
-    candidates.push(baseOffset.clone().add(new THREE.Vector3(0, lift * 0.03, 0)));
-  }
-
-  for (const targetOffset of candidates) {
-    if (!testHandOffset(bobPosition, targetOffset)) continue;
-
-    // Binary-search the first safe point between the previous and clear poses.
-    let unsafeT = 0;
-    let safeT = 1;
-    const candidateOffset = new THREE.Vector3();
-
-    for (let iteration = 0; iteration < 10; iteration += 1) {
-      const middleT = (unsafeT + safeT) * 0.5;
-      candidateOffset.copy(baseOffset).lerp(targetOffset, middleT);
-      if (testHandOffset(bobPosition, candidateOffset)) safeT = middleT;
-      else unsafeT = middleT;
-    }
-
-    // Keep a small physical gap so the glove never visually touches or clips the surface.
-    const finalT = Math.min(1, safeT + 0.018);
-    return baseOffset.clone().lerp(targetOffset, finalT);
-  }
-
-  return null;
-}
-
-function resolveHandCollision(delta, bobPosition) {
-  const currentOffset = handCollisionOffset.clone();
-
-  if (!testHandOffset(bobPosition, currentOffset)) {
-    // Smoothly relax the wrist back to its natural resting pose when contact ends.
-    const recovery = Math.exp(-7.5 * delta);
-    const recoveredOffset = currentOffset.clone().multiplyScalar(recovery);
-
-    if (testHandOffset(bobPosition, recoveredOffset)) {
-      handCollisionOffset.copy(recoveredOffset);
-      handGroup.visible = true;
-    } else {
-      handGroup.position.copy(bobPosition).add(currentOffset);
-      handGroup.visible = true;
-    }
-    return;
-  }
-
-  const safeOffset = findSafeHandOffset(bobPosition, currentOffset);
-  if (safeOffset) {
-    handCollisionOffset.copy(safeOffset);
-    handGroup.position.copy(bobPosition).add(safeOffset);
-    handGroup.visible = true;
-    return;
-  }
-
-  // If no safe pose exists, hide the glove for this frame rather than render it
-  // through a solid bench, cabinet or wall.
-  handGroup.visible = false;
-}
-
-function createPlayerHand() {
-  const glove = new THREE.MeshPhysicalMaterial({
-    color: 0xc8e7df,
-    roughness: 0.38,
-    metalness: 0,
-    clearcoat: 0.18,
-    clearcoatRoughness: 0.42
-  });
-  const gloveShade = new THREE.MeshStandardMaterial({ color: 0x9ccfc3, roughness: 0.46 });
-  const coat = new THREE.MeshStandardMaterial({ color: 0xf1f4ed, roughness: 0.72 });
-  const cuff = new THREE.MeshStandardMaterial({ color: 0x72cbbb, roughness: 0.42 });
-
-  handGroup = new THREE.Group();
-  handGroup.name = 'PLAYER_VISIBLE_RIGHT_HAND';
-  handGroup.position.set(0.49, -0.46, -0.92);
-  handGroup.rotation.set(-0.05, -0.18, -0.16);
-  handBasePosition = handGroup.position.clone();
-  handBaseRotation = handGroup.rotation.clone();
-
-  const addPart = (geometry, material, position, scale = [1, 1, 1], rotation = [0, 0, 0]) => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(position[0], position[1], position[2]);
-    mesh.scale.set(scale[0], scale[1], scale[2]);
-    mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-    handGroup.add(mesh);
-    return mesh;
-  };
-
-  // A short white lab-coat cuff; no torso, head, legs or full arms are created.
-  addPart(new THREE.CylinderGeometry(0.105, 0.135, 0.34, 24, 1), coat, [0, -0.19, 0.025]);
-  addPart(new THREE.CylinderGeometry(0.117, 0.117, 0.065, 24, 1), cuff, [0, -0.015, 0.025]);
-  const cuffRing = addPart(new THREE.TorusGeometry(0.113, 0.009, 8, 28), glove, [0, 0.02, 0.025]);
-  cuffRing.rotation.x = Math.PI / 2;
-
-  // Palm and five separate, softly rounded gloved fingers.
-  addPart(new THREE.SphereGeometry(0.15, 28, 22), glove, [0, 0.155, 0], [1.12, 1.35, 0.48], [0, 0, -0.06]);
-  const fingerXs = [-0.105, -0.035, 0.04, 0.11];
-  const fingerLengths = [0.16, 0.205, 0.19, 0.15];
-  for (let i = 0; i < fingerXs.length; i += 1) {
-    const radius = i === 1 ? 0.039 : 0.036;
-    const length = fingerLengths[i];
-    const baseY = 0.285;
-    addPart(
-      new THREE.CapsuleGeometry(radius, length, 5, 12),
-      glove,
-      [fingerXs[i], baseY + (length + radius * 2) / 2 - 0.01, 0],
-      [1, 1, 0.82],
-      [0, 0, (i - 1.5) * -0.045]
-    );
-    addPart(new THREE.SphereGeometry(radius * 0.92, 14, 12), gloveShade, [fingerXs[i], baseY + 0.015, 0.002], [1, 0.72, 0.78]);
-  }
-
-  // Thumb angles naturally away from the palm.
-  addPart(new THREE.CapsuleGeometry(0.043, 0.13, 5, 12), glove, [-0.155, 0.105, 0.005], [1, 1, 0.85], [0, 0, 0.82]);
-  addPart(new THREE.SphereGeometry(0.047, 16, 14), glove, [-0.13, 0.19, 0.005], [1, 1, 0.82]);
-
-  // Fine raised glove seam detail gives the hand a finished silhouette.
-  addPart(new THREE.SphereGeometry(0.012, 10, 8), gloveShade, [0.02, 0.095, 0.071], [1.1, 0.65, 0.5]);
-  camera.add(handGroup);
-}
-
 function onResize() {
   if (!renderer || !camera) return;
   const width = root.clientWidth;
@@ -931,26 +638,6 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
   const moving = updatePlayerMovement(delta);
-  walkBlend = THREE.MathUtils.damp(walkBlend, moving ? 1 : 0, 9, delta);
-
-  if (handGroup) {
-    const phase = elapsed * 9.5;
-    const bobPosition = new THREE.Vector3(
-      handBasePosition.x + Math.sin(phase * 0.5) * 0.009 * walkBlend,
-      handBasePosition.y + Math.abs(Math.sin(phase)) * 0.025 * walkBlend + Math.sin(elapsed * 1.1) * 0.003,
-      handBasePosition.z
-    );
-    handGroup.rotation.set(
-      handBaseRotation.x + Math.sin(phase) * 0.012 * walkBlend,
-      handBaseRotation.y,
-      handBaseRotation.z
-        + Math.sin(phase * 0.5) * 0.022 * walkBlend
-        + Math.sin(elapsed * 0.8) * 0.004
-        + Math.min(handCollisionOffset.z * 0.055, 0.07)
-    );
-    resolveHandCollision(delta, bobPosition);
-  }
-
   // Subtle instrument glints bring a little life to the otherwise calm workspace.
   for (let i = 0; i < stationGroups.length; i += 1) {
     const top = stationGroups[i].userData.top;
