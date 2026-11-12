@@ -48,8 +48,9 @@ const PLAYER = {
   acceleration: 20,
   deceleration: 24,
   maxSubstep: 0.055,
-  minX: -11.45,
-  maxX: 11.45,
+  // Side-wall inner faces are at +/-11.79. Keep the entire player radius clear.
+  minX: -11.40,
+  maxX: 11.40,
   minZ: -16.25,
   maxZ: 16.25
 };
@@ -279,6 +280,21 @@ function addStation(number, x, z) {
   counterTop.material.emissive = new THREE.Color(0x000000);
   counterTop.material.emissiveIntensity = 0;
   group.userData.top = counterTop;
+
+  // Local-space collision boxes for the equipment sitting on this workbench.
+  // These stop the glove from passing through the glassware as well as the table.
+  group.userData.handColliders = [
+    // Test-tube rack and raised tubes.
+    { minX: -0.84, minY: 1.46, minZ: -1.05, maxX: 0.72, maxY: 2.40, maxZ: -0.43 },
+    // Erlenmeyer flask and neck.
+    { minX: -2.06, minY: 1.46, minZ: -1.02, maxX: -1.38, maxY: 2.27, maxZ: -0.24 },
+    // Beaker and glass rim.
+    { minX: 1.40, minY: 1.48, minZ: -0.96, maxX: 1.89, maxY: 2.06, maxZ: -0.39 },
+    // Reagent bottle and cap.
+    { minX: 1.95, minY: 1.47, minZ: 0.17, maxX: 2.37, maxY: 2.17, maxZ: 0.59 },
+    // Microscope or burner, depending on the station.
+    { minX: -2.60, minY: 1.45, minZ: 0.02, maxX: -1.65, maxY: 2.49, maxZ: 0.91 }
+  ];
 
   stationGroups.push(group);
   addStool(x, z + 2.55);
@@ -657,39 +673,49 @@ function handPoseCollides() {
     const center = handCollisionWorldCenters[i];
     center.copy(shape.center).applyMatrix4(matrix);
 
-    // The glove cannot pass through the floor.
     if (center.y - shape.radius < -0.015) return true;
 
-    // The top, fascia and cabinet volume of every workbench are physical obstacles.
     for (const station of stationGroups) {
       const sx = station.position.x;
       const sz = station.position.z;
-      // Cabinet carcass and counter slab are separate colliders. This lets the glove
-      // rise above the work surface instead of being pushed all the way back to the camera.
+
+      // Exact workbench carcass and counter-slab bounds with a small contact margin.
       if (sphereTouchesAabb(
-        center, shape.radius,
+        center, shape.radius + 0.018,
         sx - 2.625, 0.26, sz - 1.44,
         sx + 2.625, 1.18, sz + 1.44
       )) return true;
       if (sphereTouchesAabb(
-        center, shape.radius,
+        center, shape.radius + 0.018,
         sx - 2.86, 1.18, sz - 1.66,
         sx + 2.86, 1.38, sz + 1.66
       )) return true;
 
-      // The stools also stop the hand from passing through their seats and supports.
+      // Individual equipment colliders are stored in the station's local coordinates.
+      const equipment = station.userData.handColliders || [];
+      for (const obstacle of equipment) {
+        if (sphereTouchesAabb(
+          center, shape.radius + 0.012,
+          sx + obstacle.minX, obstacle.minY, sz + obstacle.minZ,
+          sx + obstacle.maxX, obstacle.maxY, sz + obstacle.maxZ
+        )) return true;
+      }
+
+      // Stool seat and central support.
       const stoolZ = sz + 2.55;
       if (sphereTouchesAabb(
-        center, shape.radius,
+        center, shape.radius + 0.015,
         sx - 0.38, 0.68, stoolZ - 0.38,
         sx + 0.38, 1.02, stoolZ + 0.38
       )) return true;
     }
 
-    // Rear cabinet and counter.
-    if (sphereTouchesAabb(center, shape.radius, -9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
+    // Rear storage and shelf supports.
+    if (sphereTouchesAabb(center, shape.radius + 0.015, -9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
+    if (sphereTouchesAabb(center, shape.radius + 0.01, -8.0, 2.35, -16.45, 8.0, 2.72, -15.65)) return true;
+    if (sphereTouchesAabb(center, shape.radius + 0.01, -8.0, 3.48, -16.45, 8.0, 3.85, -15.65)) return true;
 
-    // Side walls and the rear wall.
+    // Side and rear walls.
     if (sphereTouchesAabb(center, shape.radius, -12.22, 0, -17.2, -11.78, 9.2, 17.2)) return true;
     if (sphereTouchesAabb(center, shape.radius, 11.78, 0, -17.2, 12.22, 9.2, 17.2)) return true;
     if (sphereTouchesAabb(center, shape.radius, -12.2, 0, -17.22, 12.2, 9.2, -16.78)) return true;
@@ -698,62 +724,83 @@ function handPoseCollides() {
   return false;
 }
 
+function testHandOffset(bobPosition, offset) {
+  handGroup.position.copy(bobPosition).add(offset);
+  return !handPoseCollides();
+}
+
+function findSafeHandOffset(bobPosition, startOffset) {
+  // Retract first: a hand approaching a workbench naturally comes back toward the wrist.
+  const candidates = [];
+  for (let i = 1; i <= 36; i += 1) {
+    candidates.push(new THREE.Vector3(0, 0, i * 0.03));
+  }
+
+  // If the surface is above or beside the hand, combine a small lift with retraction.
+  for (let lift = 1; lift <= 10; lift += 1) {
+    for (let retract = 1; retract <= 30; retract += 1) {
+      candidates.push(new THREE.Vector3(0, lift * 0.025, retract * 0.03));
+    }
+  }
+
+  // Last resort: move the hand upward, but do not prefer this over a natural retreat.
+  for (let lift = 1; lift <= 20; lift += 1) {
+    candidates.push(new THREE.Vector3(0, lift * 0.03, 0));
+  }
+
+  for (const targetOffset of candidates) {
+    if (!testHandOffset(bobPosition, targetOffset)) continue;
+
+    // Find the first non-penetrating point between the previous and safe poses.
+    // This prevents the collision solver from snapping the hand a large distance.
+    let unsafeT = 0;
+    let safeT = 1;
+    const candidateOffset = new THREE.Vector3();
+
+    for (let iteration = 0; iteration < 9; iteration += 1) {
+      const middleT = (unsafeT + safeT) * 0.5;
+      candidateOffset.copy(startOffset).lerp(targetOffset, middleT);
+      if (testHandOffset(bobPosition, candidateOffset)) safeT = middleT;
+      else unsafeT = middleT;
+    }
+
+    // A tiny extra clearance avoids z-fighting and visual contact at the exact boundary.
+    const finalT = Math.min(1, safeT + 0.012);
+    return startOffset.clone().lerp(targetOffset, finalT);
+  }
+
+  return null;
+}
+
 function resolveHandCollision(delta, bobPosition) {
   const currentOffset = handCollisionOffset.clone();
-  const desiredPosition = bobPosition.clone().add(currentOffset);
-  handGroup.position.copy(desiredPosition);
 
-  if (!handPoseCollides()) {
-    // Recover the hand smoothly only while its complete collision envelope stays clear.
-    const recovery = 1 - Math.exp(-10 * delta);
-    const recoveredOffset = currentOffset.clone().multiplyScalar(1 - recovery);
-    const candidate = bobPosition.clone().add(recoveredOffset);
-    handGroup.position.copy(candidate);
+  if (!testHandOffset(bobPosition, currentOffset)) {
+    // Smoothly relax the wrist back to its natural resting pose when contact ends.
+    const recovery = Math.exp(-7.5 * delta);
+    const recoveredOffset = currentOffset.clone().multiplyScalar(recovery);
 
-    if (!handPoseCollides()) {
+    if (testHandOffset(bobPosition, recoveredOffset)) {
       handCollisionOffset.copy(recoveredOffset);
+      handGroup.visible = true;
     } else {
-      handGroup.position.copy(desiredPosition);
-      handCollisionOffset.copy(currentOffset);
+      handGroup.position.copy(bobPosition).add(currentOffset);
+      handGroup.visible = true;
     }
+    return;
+  }
+
+  const safeOffset = findSafeHandOffset(bobPosition, currentOffset);
+  if (safeOffset) {
+    handCollisionOffset.copy(safeOffset);
+    handGroup.position.copy(bobPosition).add(safeOffset);
     handGroup.visible = true;
     return;
   }
 
-  // Prefer lifting the glove above a tabletop. Retraction is used for walls and
-  // vertical faces, where a vertical adjustment cannot solve the contact.
-  let resolved = false;
-
-  const tryHandOffset = (offset) => {
-    handGroup.position.copy(bobPosition).add(offset);
-    if (handPoseCollides()) return false;
-    handCollisionOffset.copy(offset);
-    resolved = true;
-    return true;
-  };
-
-  // A small upward movement gives the palm and cuff clearance above the bench top.
-  for (let liftIndex = 1; liftIndex <= 18 && !resolved; liftIndex += 1) {
-    tryHandOffset(new THREE.Vector3(0, liftIndex * 0.035, 0));
-  }
-
-  // For vertical obstacles, move the hand back toward the player's camera.
-  for (let retractIndex = 1; retractIndex <= 30 && !resolved; retractIndex += 1) {
-    tryHandOffset(new THREE.Vector3(0, 0, retractIndex * 0.035));
-  }
-
-  // A combined lift and retraction handles corners where two surfaces meet.
-  for (let liftIndex = 1; liftIndex <= 14 && !resolved; liftIndex += 1) {
-    for (let retractIndex = 1; retractIndex <= 20; retractIndex += 1) {
-      if (tryHandOffset(new THREE.Vector3(0, liftIndex * 0.035, retractIndex * 0.035))) break;
-    }
-  }
-
-  handGroup.visible = resolved;
-  if (!resolved) {
-    // Never render the hand intersecting solid geometry if no safe pose can be found.
-    handGroup.position.copy(bobPosition).add(new THREE.Vector3(0, 0.63, 1.05));
-  }
+  // If no safe pose exists, hide the glove for this frame rather than render it
+  // through a solid bench, cabinet or wall.
+  handGroup.visible = false;
 }
 
 function createPlayerHand() {
@@ -846,7 +893,10 @@ function animate() {
     handGroup.rotation.set(
       handBaseRotation.x + Math.sin(phase) * 0.012 * walkBlend,
       handBaseRotation.y,
-      handBaseRotation.z + Math.sin(phase * 0.5) * 0.022 * walkBlend + Math.sin(elapsed * 0.8) * 0.004
+      handBaseRotation.z
+        + Math.sin(phase * 0.5) * 0.022 * walkBlend
+        + Math.sin(elapsed * 0.8) * 0.004
+        + Math.min(handCollisionOffset.z * 0.055, 0.07)
     );
     resolveHandCollision(delta, bobPosition);
   }
