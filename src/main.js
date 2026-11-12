@@ -32,6 +32,8 @@ let selectedStation = null;
 let handGroup;
 let handBasePosition;
 let handBaseRotation;
+let handCollisionOffset = new THREE.Vector3();
+let playerVelocity = new THREE.Vector3();
 let walkBlend = 0;
 let animationFrame = 0;
 const movementKeys = new Set();
@@ -40,14 +42,26 @@ const clock = new THREE.Clock();
 
 const PLAYER = {
   eyeHeight: 1.72,
-  radius: 0.38,
-  walkSpeed: 4.4,
-  sprintSpeed: 6.8,
+  radius: 0.36,
+  walkSpeed: 3.9,
+  sprintSpeed: 6.1,
+  acceleration: 20,
+  deceleration: 24,
+  maxSubstep: 0.055,
   minX: -11.45,
   maxX: 11.45,
   minZ: -16.25,
   maxZ: 16.25
 };
+
+const HAND_COLLISION_SPHERES = [
+  { center: new THREE.Vector3(0, -0.17, 0.025), radius: 0.145 },
+  { center: new THREE.Vector3(0, 0.155, 0), radius: 0.18 },
+  { center: new THREE.Vector3(0, 0.38, 0), radius: 0.135 },
+  { center: new THREE.Vector3(-0.14, 0.13, 0.005), radius: 0.095 }
+];
+
+const handCollisionWorldCenters = HAND_COLLISION_SPHERES.map(() => new THREE.Vector3());
 
 const mats = {
   floor: new THREE.MeshStandardMaterial({ color: 0xc8d5d0, roughness: 0.82 }),
@@ -465,6 +479,7 @@ function init() {
     document.body.classList.remove('player-locked');
     document.getElementById('entry-overlay').classList.remove('is-hidden');
     movementKeys.clear();
+    playerVelocity.set(0, 0, 0);
   });
 
   document.getElementById('enter-lab').addEventListener('click', () => controls.lock());
@@ -472,7 +487,10 @@ function init() {
   renderer.domElement.addEventListener('click', onCanvasClick);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('blur', () => movementKeys.clear());
+  window.addEventListener('blur', () => {
+    movementKeys.clear();
+    playerVelocity.set(0, 0, 0);
+  });
   window.addEventListener('resize', onResize);
 
   window.setTimeout(() => loadingScreen.classList.add('is-hidden'), 520);
@@ -512,27 +530,57 @@ function onKeyUp(event) {
   movementKeys.delete(event.key.toLowerCase());
 }
 
-function canOccupy(x, z) {
-  const r = PLAYER.radius;
-  if (x < PLAYER.minX || x > PLAYER.maxX || z < PLAYER.minZ || z > PLAYER.maxZ) return false;
+function circleTouchesAabb2D(x, z, radius, minX, minZ, maxX, maxZ) {
+  const closestX = THREE.MathUtils.clamp(x, minX, maxX);
+  const closestZ = THREE.MathUtils.clamp(z, minZ, maxZ);
+  const dx = x - closestX;
+  const dz = z - closestZ;
+  return dx * dx + dz * dz < radius * radius;
+}
 
-  // Workbench cabinets and counters are solid obstacles.
+function sphereTouchesAabb(center, radius, minX, minY, minZ, maxX, maxY, maxZ) {
+  const closestX = THREE.MathUtils.clamp(center.x, minX, maxX);
+  const closestY = THREE.MathUtils.clamp(center.y, minY, maxY);
+  const closestZ = THREE.MathUtils.clamp(center.z, minZ, maxZ);
+  const dx = center.x - closestX;
+  const dy = center.y - closestY;
+  const dz = center.z - closestZ;
+  return dx * dx + dy * dy + dz * dz < radius * radius;
+}
+
+function canOccupy(x, z) {
+  const radius = PLAYER.radius;
+  if (
+    x < PLAYER.minX || x > PLAYER.maxX ||
+    z < PLAYER.minZ || z > PLAYER.maxZ
+  ) return false;
+
+  // The player's horizontal capsule footprint checks the real workbench bounds.
   for (const station of stationGroups) {
     const sx = station.position.x;
     const sz = station.position.z;
-    if (Math.abs(x - sx) < 2.86 + r && Math.abs(z - sz) < 1.66 + r) return false;
+    if (circleTouchesAabb2D(x, z, radius, sx - 2.86, sz - 1.66, sx + 2.86, sz + 1.66)) {
+      return false;
+    }
 
-    // Each bench has a stool on its approach side.
-    if (Math.abs(x - sx) < 0.43 + r && Math.abs(z - (sz + 2.55)) < 0.43 + r) return false;
+    // Round stools are tested as circles instead of oversized square hit areas.
+    const stoolZ = sz + 2.55;
+    const stoolRadius = radius + 0.36;
+    const stoolDX = x - sx;
+    const stoolDZ = z - stoolZ;
+    if (stoolDX * stoolDX + stoolDZ * stoolDZ < stoolRadius * stoolRadius) return false;
   }
 
-  // Rear storage units and their counter.
-  if (Math.abs(x) < 9.1 + r && Math.abs(z + 15.45) < 0.63 + r) return false;
+  // Rear storage counter and cabinet footprint.
+  if (circleTouchesAabb2D(x, z, radius, -9.1, -16.08, 9.1, -14.82)) return false;
   return true;
 }
 
 function updatePlayerMovement(delta) {
-  if (!controls || !controls.isLocked) return false;
+  if (!controls || !controls.isLocked) {
+    playerVelocity.set(0, 0, 0);
+    return false;
+  }
 
   const forwardInput =
     (movementKeys.has('w') || movementKeys.has('arrowup') ? 1 : 0) -
@@ -541,29 +589,156 @@ function updatePlayerMovement(delta) {
     (movementKeys.has('d') || movementKeys.has('arrowright') ? 1 : 0) -
     (movementKeys.has('a') || movementKeys.has('arrowleft') ? 1 : 0);
 
-  if (forwardInput === 0 && sideInput === 0) return false;
+  const hasInput = forwardInput !== 0 || sideInput !== 0;
+  const desiredVelocity = new THREE.Vector3();
 
-  const forward = new THREE.Vector3();
-  camera.getWorldDirection(forward);
-  forward.y = 0;
-  forward.normalize();
-  const right = new THREE.Vector3(-forward.z, 0, forward.x);
-  const move = forward.multiplyScalar(forwardInput).add(right.multiplyScalar(sideInput));
-  if (move.lengthSq() === 0) return false;
-  move.normalize();
+  if (hasInput) {
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
 
-  const sprinting = movementKeys.has('shift');
-  const distance = (sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed) * delta;
-  const dx = move.x * distance;
-  const dz = move.z * distance;
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
+    desiredVelocity.copy(forward).multiplyScalar(forwardInput).addScaledVector(right, sideInput);
+    if (desiredVelocity.lengthSq() > 1) desiredVelocity.normalize();
 
-  // Resolve axes independently so the player can slide along a table or wall.
-  const nextX = camera.position.x + dx;
-  if (canOccupy(nextX, camera.position.z)) camera.position.x = nextX;
-  const nextZ = camera.position.z + dz;
-  if (canOccupy(camera.position.x, nextZ)) camera.position.z = nextZ;
+    const speed = movementKeys.has('shift') ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
+    desiredVelocity.multiplyScalar(speed);
+  }
 
-  return Math.abs(camera.position.x - (nextX - dx)) + Math.abs(camera.position.z - (nextZ - dz)) > 0.0001;
+  // Acceleration and deceleration make starts and stops feel weighty rather than instantaneous.
+  const response = hasInput ? PLAYER.acceleration : PLAYER.deceleration;
+  const blend = 1 - Math.exp(-response * delta);
+  playerVelocity.x += (desiredVelocity.x - playerVelocity.x) * blend;
+  playerVelocity.z += (desiredVelocity.z - playerVelocity.z) * blend;
+
+  if (!hasInput && playerVelocity.lengthSq() < 0.0025) playerVelocity.set(0, 0, 0);
+
+  const totalDistance = Math.hypot(playerVelocity.x * delta, playerVelocity.z * delta);
+  const steps = Math.max(1, Math.ceil(totalDistance / PLAYER.maxSubstep));
+  const stepDelta = delta / steps;
+
+  for (let i = 0; i < steps; i += 1) {
+    const stepX = playerVelocity.x * stepDelta;
+    const stepZ = playerVelocity.z * stepDelta;
+    const axes = Math.abs(stepX) >= Math.abs(stepZ) ? ['x', 'z'] : ['z', 'x'];
+
+    for (const axis of axes) {
+      if (axis === 'x' && Math.abs(stepX) > 0.000001) {
+        const candidateX = camera.position.x + stepX;
+        if (canOccupy(candidateX, camera.position.z)) {
+          camera.position.x = candidateX;
+        } else {
+          playerVelocity.x = 0;
+        }
+      }
+
+      if (axis === 'z' && Math.abs(stepZ) > 0.000001) {
+        const candidateZ = camera.position.z + stepZ;
+        if (canOccupy(camera.position.x, candidateZ)) {
+          camera.position.z = candidateZ;
+        } else {
+          playerVelocity.z = 0;
+        }
+      }
+    }
+  }
+
+  return playerVelocity.lengthSq() > 0.025;
+}
+
+function handPoseCollides() {
+  camera.updateMatrixWorld(true);
+  handGroup.updateWorldMatrix(true, false);
+  const matrix = handGroup.matrixWorld;
+
+  for (let i = 0; i < HAND_COLLISION_SPHERES.length; i += 1) {
+    const shape = HAND_COLLISION_SPHERES[i];
+    const center = handCollisionWorldCenters[i];
+    center.copy(shape.center).applyMatrix4(matrix);
+
+    // The glove cannot pass through the floor.
+    if (center.y - shape.radius < -0.015) return true;
+
+    // The top, fascia and cabinet volume of every workbench are physical obstacles.
+    for (const station of stationGroups) {
+      const sx = station.position.x;
+      const sz = station.position.z;
+      if (sphereTouchesAabb(
+        center, shape.radius,
+        sx - 2.9, 0.22, sz - 1.76,
+        sx + 2.9, 1.62, sz + 1.76
+      )) return true;
+
+      // The stools also stop the hand from passing through their seats and supports.
+      const stoolZ = sz + 2.55;
+      if (sphereTouchesAabb(
+        center, shape.radius,
+        sx - 0.38, 0.68, stoolZ - 0.38,
+        sx + 0.38, 1.02, stoolZ + 0.38
+      )) return true;
+    }
+
+    // Rear cabinet and counter.
+    if (sphereTouchesAabb(center, shape.radius, -9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
+
+    // Side walls and the rear wall.
+    if (sphereTouchesAabb(center, shape.radius, -12.22, 0, -17.2, -11.78, 9.2, 17.2)) return true;
+    if (sphereTouchesAabb(center, shape.radius, 11.78, 0, -17.2, 12.22, 9.2, 17.2)) return true;
+    if (sphereTouchesAabb(center, shape.radius, -12.2, 0, -17.22, 12.2, 9.2, -16.78)) return true;
+  }
+
+  return false;
+}
+
+function resolveHandCollision(delta, bobPosition) {
+  const currentOffset = handCollisionOffset.clone();
+  const desiredPosition = bobPosition.clone().add(currentOffset);
+  handGroup.position.copy(desiredPosition);
+
+  if (!handPoseCollides()) {
+    // Recover the hand smoothly only while its complete collision envelope stays clear.
+    const recovery = 1 - Math.exp(-10 * delta);
+    const recoveredOffset = currentOffset.clone().multiplyScalar(1 - recovery);
+    const candidate = bobPosition.clone().add(recoveredOffset);
+    handGroup.position.copy(candidate);
+
+    if (!handPoseCollides()) {
+      handCollisionOffset.copy(recoveredOffset);
+    } else {
+      handGroup.position.copy(desiredPosition);
+      handCollisionOffset.copy(currentOffset);
+    }
+    handGroup.visible = true;
+    return;
+  }
+
+  // Pull the hand back from the obstacle. If needed, lift it slightly while maintaining
+  // the player's view and keeping the visible hand outside the table's collision volume.
+  let resolved = false;
+  const liftSteps = 9;
+  const retractSteps = 30;
+
+  for (let liftIndex = 0; liftIndex <= liftSteps && !resolved; liftIndex += 1) {
+    const lift = liftIndex * 0.035;
+    for (let retractIndex = 1; retractIndex <= retractSteps; retractIndex += 1) {
+      const retract = retractIndex * 0.035;
+      const candidateOffset = new THREE.Vector3(0, lift, retract);
+      handGroup.position.copy(bobPosition).add(candidateOffset);
+
+      if (!handPoseCollides()) {
+        handCollisionOffset.copy(candidateOffset);
+        resolved = true;
+        break;
+      }
+    }
+  }
+
+  handGroup.visible = resolved;
+  if (!resolved) {
+    // Never render the hand intersecting solid geometry if no safe pose can be found.
+    handGroup.position.copy(bobPosition).add(new THREE.Vector3(0, 0.315, 1.05));
+  }
 }
 
 function createPlayerHand() {
@@ -648,7 +823,7 @@ function animate() {
 
   if (handGroup) {
     const phase = elapsed * 9.5;
-    handGroup.position.set(
+    const bobPosition = new THREE.Vector3(
       handBasePosition.x + Math.sin(phase * 0.5) * 0.009 * walkBlend,
       handBasePosition.y + Math.abs(Math.sin(phase)) * 0.025 * walkBlend + Math.sin(elapsed * 1.1) * 0.003,
       handBasePosition.z
@@ -658,6 +833,7 @@ function animate() {
       handBaseRotation.y,
       handBaseRotation.z + Math.sin(phase * 0.5) * 0.022 * walkBlend + Math.sin(elapsed * 0.8) * 0.004
     );
+    resolveHandCollision(delta, bobPosition);
   }
 
   // Subtle instrument glints bring a little life to the otherwise calm workspace.
