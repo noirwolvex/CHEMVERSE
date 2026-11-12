@@ -56,8 +56,11 @@ const PLAYER = {
 };
 
 const HAND_COLLISION_SPHERES = [
-  { center: new THREE.Vector3(0, -0.17, 0.025), radius: 0.145 },
+  // Wrist and coat cuff are covered by one larger probe so the sleeve edge
+  // cannot slip through the front lip of a workbench.
+  { center: new THREE.Vector3(0, -0.19, 0.025), radius: 0.19 },
   { center: new THREE.Vector3(0, 0.155, 0), radius: 0.18 },
+  // This probe spans the four fingers, including the longest fingertip.
   { center: new THREE.Vector3(0, 0.38, 0), radius: 0.135 },
   { center: new THREE.Vector3(-0.14, 0.13, 0.005), radius: 0.095 }
 ];
@@ -730,43 +733,50 @@ function testHandOffset(bobPosition, offset) {
 }
 
 function findSafeHandOffset(bobPosition, startOffset) {
-  // Retract first: a hand approaching a workbench naturally comes back toward the wrist.
+  // Search incrementally from the current contact pose. This guarantees that
+  // retraction always moves away from the obstacle instead of jumping toward it.
   const candidates = [];
-  for (let i = 1; i <= 36; i += 1) {
-    candidates.push(new THREE.Vector3(0, 0, i * 0.03));
+  const baseOffset = startOffset.clone();
+  const maxRetraction = 1.08;
+  const remainingRetraction = Math.max(0, maxRetraction - Math.max(0, baseOffset.z));
+  const retractSteps = Math.floor(remainingRetraction / 0.03);
+
+  // First choice: withdraw the wrist naturally toward the camera.
+  for (let i = 1; i <= retractSteps; i += 1) {
+    candidates.push(baseOffset.clone().add(new THREE.Vector3(0, 0, i * 0.03)));
   }
 
-  // If the surface is above or beside the hand, combine a small lift with retraction.
+  // Second choice: a modest wrist lift while continuing to retreat.
   for (let lift = 1; lift <= 10; lift += 1) {
-    for (let retract = 1; retract <= 30; retract += 1) {
-      candidates.push(new THREE.Vector3(0, lift * 0.025, retract * 0.03));
+    for (let retract = 0; retract <= 24; retract += 1) {
+      const offset = baseOffset.clone().add(new THREE.Vector3(0, lift * 0.025, retract * 0.03));
+      if (offset.z <= maxRetraction) candidates.push(offset);
     }
   }
 
-  // Last resort: move the hand upward, but do not prefer this over a natural retreat.
+  // Last resort: raise the glove only when a backward movement cannot clear contact.
   for (let lift = 1; lift <= 20; lift += 1) {
-    candidates.push(new THREE.Vector3(0, lift * 0.03, 0));
+    candidates.push(baseOffset.clone().add(new THREE.Vector3(0, lift * 0.03, 0)));
   }
 
   for (const targetOffset of candidates) {
     if (!testHandOffset(bobPosition, targetOffset)) continue;
 
-    // Find the first non-penetrating point between the previous and safe poses.
-    // This prevents the collision solver from snapping the hand a large distance.
+    // Binary-search the first safe point between the previous and clear poses.
     let unsafeT = 0;
     let safeT = 1;
     const candidateOffset = new THREE.Vector3();
 
-    for (let iteration = 0; iteration < 9; iteration += 1) {
+    for (let iteration = 0; iteration < 10; iteration += 1) {
       const middleT = (unsafeT + safeT) * 0.5;
-      candidateOffset.copy(startOffset).lerp(targetOffset, middleT);
+      candidateOffset.copy(baseOffset).lerp(targetOffset, middleT);
       if (testHandOffset(bobPosition, candidateOffset)) safeT = middleT;
       else unsafeT = middleT;
     }
 
-    // A tiny extra clearance avoids z-fighting and visual contact at the exact boundary.
-    const finalT = Math.min(1, safeT + 0.012);
-    return startOffset.clone().lerp(targetOffset, finalT);
+    // Keep a small physical gap so the glove never visually touches or clips the surface.
+    const finalT = Math.min(1, safeT + 0.018);
+    return baseOffset.clone().lerp(targetOffset, finalT);
   }
 
   return null;
