@@ -177,6 +177,20 @@ button { font: inherit; }
 .system-status { display: inline-flex; align-items: center; gap: 8px; color: #9cc7bd; }
 .system-status i { width: 5px; height: 5px; }
 
+.scene-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  color: #eaf2f2;
+  background: rgba(16, 29, 39, .94);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+  z-index: 20;
+}
+
 @media (max-width: 900px) {
   .scene-heading { display: none; }
   .intro-card { width: 280px; }
