@@ -5,18 +5,16 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 ## Current environment
 
 - Rectangular laboratory room with six workbenches in two columns and three rows.
-- First-person movement with mouse-look.
+- First-person movement with mouse-look, walking, sprinting and acceleration/deceleration.
 - One visible right hand wearing a laboratory glove and a short lab-coat cuff.
 - No visible head, torso, legs or full player body.
-- Hand sway while moving, with physical retraction when the glove approaches solid geometry.
-- Player capsule-footprint collision against workbenches, stools, rear storage and room boundaries.
-- Rounded circle-to-AABB collision checks around bench corners.
-- Sub-stepped movement to reduce tunnelling through obstacles at sprint speed.
-- Acceleration, deceleration, diagonal movement normalization and sprint speed.
-- Hand collision probes for the palm, fingertips, thumb and cuff.
-- Hand collision against workbench surfaces/cabinets, stools, rear storage, room walls and floor.
-- The hand smoothly returns to its normal view position after leaving an obstacle.
+- Hand collision probes cover the wrist/cuff, palm, fingers and thumb.
+- Hand collision includes workbench cabinets, counter slabs, glassware, reagent bottles, test-tube racks, microscopes, burners, stools, room walls and floor.
+- The hand retracts toward the camera before lifting, and uses a safe-position search with a small clearance margin to avoid visible surface penetration.
+- Player collision uses a circular capsule footprint, rounded bench-corner checks and sub-stepped movement to reduce tunnelling.
+- The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
+- Storage cabinetry, shelves, safety point, windows and overhead lighting.
 - Aim at a workbench and press E, or click while the pointer is locked, to inspect it.
 
 ## Run locally
