@@ -220,3 +220,150 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+
+/* First-person player experience */
+.intro-card {
+  top: 34px;
+  width: min(250px, 30vw);
+  transition: opacity .22s ease;
+}
+.intro-card h1 {
+  font-size: clamp(26px, 2.8vw, 38px);
+  margin: 12px 0 9px;
+  letter-spacing: -.055em;
+}
+.intro-card p { font-size: 10px; line-height: 1.65; }
+.intro-meta { margin-top: 15px; font-size: 7px; }
+body.player-locked .intro-card { opacity: 0; }
+
+.lab-key {
+  gap: 11px;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+.lab-key b { color: #a5eadc; }
+
+.crosshair {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.crosshair::before, .crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(224, 248, 241, .86);
+  border-radius: 2px;
+  box-shadow: 0 0 5px rgba(20, 52, 49, .55);
+}
+.crosshair::before { width: 1px; height: 15px; }
+.crosshair::after { width: 15px; height: 1px; }
+.crosshair span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #72deca;
+  box-shadow: 0 0 7px rgba(114, 222, 202, .9);
+}
+body.player-locked .crosshair { opacity: 1; }
+body.player-locked #scene-root canvas { cursor: none; }
+
+.entry-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 22, 29, .13);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .25s ease, visibility .25s ease;
+}
+.entry-overlay.is-hidden,
+body.player-locked .entry-overlay {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.entry-card {
+  width: min(390px, 100%);
+  padding: 28px 30px 23px;
+  border: 1px solid rgba(154, 224, 210, .26);
+  border-radius: 10px;
+  background: rgba(14, 31, 39, .91);
+  box-shadow: 0 22px 75px rgba(5, 17, 23, .3);
+  backdrop-filter: blur(18px);
+  text-align: left;
+}
+.entry-card h2 {
+  margin: 13px 0 8px;
+  color: #f1f7f4;
+  font: 600 27px/1.1 "Space Grotesk", sans-serif;
+  letter-spacing: -.05em;
+}
+.entry-card p {
+  margin: 0;
+  max-width: 300px;
+  color: #a7bcba;
+  font-size: 11px;
+  line-height: 1.75;
+}
+.enter-button {
+  width: 100%;
+  margin-top: 22px;
+  padding: 13px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(126, 227, 208, .65);
+  border-radius: 5px;
+  color: #102a2d;
+  background: linear-gradient(110deg, #8ce4d3, #5bc8b6);
+  cursor: pointer;
+  font: 700 9px "Space Grotesk", sans-serif;
+  letter-spacing: .15em;
+  transition: filter .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.enter-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 7px 24px rgba(77, 199, 177, .2);
+}
+.enter-button span { font-size: 17px; font-weight: 400; }
+.entry-hint {
+  margin-top: 15px;
+  color: #78918f;
+  font: 600 7px "Space Grotesk", sans-serif;
+  letter-spacing: .11em;
+}
+.entry-hint span { color: #6ed5c2; margin: 0 5px; }
+
+.station-panel { z-index: 6; }
+
+@media (max-width: 700px) {
+  .intro-card { top: 22px; left: 18px; width: 200px; }
+  .intro-card h1 { font-size: 27px; }
+  .lab-key {
+    left: 50%;
+    bottom: 12px;
+    max-width: calc(100% - 22px);
+    overflow: hidden;
+    gap: 8px;
+    padding: 9px 10px;
+    font-size: 6px;
+    letter-spacing: .04em;
+  }
+  .lab-key .key-divider { display: block; height: 9px; }
+  .entry-card { padding: 23px 21px 19px; }
+  .entry-card h2 { font-size: 24px; }
+}
