@@ -4,15 +4,19 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 
 ## Current environment
 
-- Rectangular laboratory room with a wide, readable floor plan.
-- Six workbenches arranged in two columns and three rows.
-- First-person movement with mouse-look and keyboard controls.
-- One visible right hand wearing a laboratory glove, with a short lab-coat cuff.
-- No visible player head, torso, legs or full body.
-- Walking hand-bob and sprint movement.
-- Collision boundaries around the walls, workbenches, stools and rear storage.
+- Rectangular laboratory room with six workbenches in two columns and three rows.
+- First-person movement with mouse-look.
+- One visible right hand wearing a laboratory glove and a short lab-coat cuff.
+- No visible head, torso, legs or full player body.
+- Hand sway while moving, with physical retraction when the glove approaches solid geometry.
+- Player capsule-footprint collision against workbenches, stools, rear storage and room boundaries.
+- Rounded circle-to-AABB collision checks around bench corners.
+- Sub-stepped movement to reduce tunnelling through obstacles at sprint speed.
+- Acceleration, deceleration, diagonal movement normalization and sprint speed.
+- Hand collision probes for the palm, fingertips, thumb and cuff.
+- Hand collision against workbench surfaces/cabinets, stools, rear storage, room walls and floor.
+- The hand smoothly returns to its normal view position after leaving an obstacle.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
-- Storage cabinetry, shelves, safety point, windows and overhead lighting.
 - Aim at a workbench and press E, or click while the pointer is locked, to inspect it.
 
 ## Run locally
@@ -38,8 +42,8 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 
 - **index.html** — application shell, first-person HUD and import map.
 - **styles.css** — responsive interface styling.
-- **src/main.js** — Three.js room, furniture, equipment, player hand, movement, collisions and interactions.
+- **src/main.js** — Three.js room, furniture, equipment, player hand, movement, collision and interaction logic.
 
 ## Next development stage
 
-The next stage can add hand interaction animations, object pickup and placement, experiment objectives, safe experiment logic, scoring and a C++ / WebAssembly chemistry simulation core.
+The next stage can add object pickup and placement, animated hand poses, interaction with glassware, safe experiment logic, scoring and a C++ / WebAssembly chemistry simulation core.
