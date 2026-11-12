@@ -8,8 +8,8 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 - First-person movement with mouse-look, walking, sprinting and acceleration/deceleration.
 - One visible right hand wearing a laboratory glove and a short lab-coat cuff.
 - No visible head, torso, legs or full player body.
-- Hand collision probes cover the wrist/cuff, palm, fingers and thumb.
-- Hand collision includes workbench cabinets, counter slabs, glassware, reagent bottles, test-tube racks, microscopes, burners, stools, room walls and floor.
+- Hand collision checks the transformed world-space bounds of the complete glove and sleeve, in addition to spherical probes for curved contact points.
+- The hand collision layer covers workbench cabinets, counter slabs, glassware, reagent bottles, test-tube racks, microscopes, burners, stools, room walls and floor, with a small clearance margin.
 - The hand retracts toward the camera before lifting, and uses a safe-position search with a small clearance margin to avoid visible surface penetration.
 - Player collision uses a circular capsule footprint, rounded bench-corner checks and sub-stepped movement to reduce tunnelling.
 - The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
