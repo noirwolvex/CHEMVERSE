@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101d27">
+  <meta name="description" content="CHEMVERSE — an interactive 3D chemistry laboratory.">
+  <title>CHEMVERSE | Chemistry Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="CHEMVERSE home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy">
+          <strong>CHEMVERSE</strong>
+          <small>SCIENCE / EXPLORE / DISCOVER</small>
+        </span>
+      </a>
+      <div class="scene-heading">
+        <span class="live-dot"></span>
+        <span>LABORATORY <b>01</b></span>
+        <i></i>
+        <span class="scene-state">INTERACTIVE ENVIRONMENT</span>
+      </div>
+      <div class="topbar-right">
+        <span class="environment-tag"><span class="environment-icon">✳</span> CHEMISTRY LAB</span>
+      </div>
+    </header>
+
+    <section class="viewport" aria-label="Interactive 3D chemistry laboratory">
+      <div id="scene-root"></div>
+      <div class="viewport-vignette"></div>
+
+      <div class="intro-card">
+        <span class="eyebrow">YOUR SCIENCE SPACE</span>
+        <h1>Welcome to the<br><em>Laboratory.</em></h1>
+        <p>A purpose-built space for discovery, experiments and learning.</p>
+        <div class="intro-meta"><span class="meta-line"></span> 6 EXPERIMENT STATIONS <span class="meta-separator">/</span> 3D SPACE</div>
+      </div>
+
+      <div class="view-controls" aria-label="Camera controls">
+        <button class="icon-button" id="reset-view" type="button" title="Reset camera" aria-label="Reset camera">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10a7.5 7.5 0 1 1 .8 5.2M4.5 4.8V10h5.2"/></svg>
+        </button>
+        <button class="icon-button" id="top-view" type="button" title="Top view" aria-label="Top view">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5 12 4l8 4.5-8 4.5L4 8.5Z"/><path d="M4 12.5 12 17l8-4.5M4 16.5 12 21l8-4.5"/></svg>
+        </button>
+      </div>
+
+      <div class="lab-key">
+        <span class="key-icon"><span></span></span>
+        <span><b>DRAG</b> to rotate</span>
+        <span class="key-divider"></span>
+        <span><b>SCROLL</b> to zoom</span>
+        <span class="key-divider"></span>
+        <span><b>CLICK</b> a table to inspect</span>
+      </div>
+
+      <aside class="station-panel" id="station-panel" aria-live="polite" aria-hidden="true">
+        <button class="panel-close" id="close-panel" type="button" aria-label="Close station details">×</button>
+        <span class="eyebrow">EXPERIMENT STATION</span>
+        <div class="station-number" id="station-number">01</div>
+        <h2 id="station-title">Chemistry station</h2>
+        <p id="station-description">A dedicated workspace for practical chemistry activities.</p>
+        <div class="station-divider"></div>
+        <div class="station-detail"><span>WORKSPACE</span><b>LAB BENCH</b></div>
+        <div class="station-detail"><span>STATUS</span><b class="station-ready"><i></i> READY</b></div>
+      </aside>
+
+      <div class="loading-screen" id="loading-screen">
+        <div class="loader-mark"><span></span><span></span><span></span></div>
+        <p>PREPARING YOUR LABORATORY</p>
+        <div class="loading-track"><span></span></div>
+      </div>
+
+      <div class="bottom-caption"><span>CV / ENVIRONMENT SERIES</span><span>DESIGNED FOR DISCOVERY</span></div>
+    </section>
+
+    <footer class="footer-bar">
+      <span>CHEMVERSE <span class="footer-muted">© 2026</span></span>
+      <span class="footer-center">A PLACE TO QUESTION. A SPACE TO DISCOVER.</span>
+      <span class="system-status"><i></i> SYSTEM OPERATIONAL</span>
+    </footer>
+  </main>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
