@@ -67,6 +67,18 @@ const HAND_COLLISION_SPHERES = [
 
 const handCollisionWorldCenters = HAND_COLLISION_SPHERES.map(() => new THREE.Vector3());
 
+// Full transformed hand bounds complement the spherical probes. The union AABB
+// catches fingertip, cuff and palm geometry that a sparse set of spheres can miss.
+const handWorldBounds = new THREE.Box3();
+const handObstacleBounds = new THREE.Box3();
+
+function handBoundsTouchesAabb(minX, minY, minZ, maxX, maxY, maxZ) {
+  handObstacleBounds.min.set(minX, minY, minZ);
+  handObstacleBounds.max.set(maxX, maxY, maxZ);
+  handObstacleBounds.expandByScalar(0.025);
+  return handWorldBounds.intersectsBox(handObstacleBounds);
+}
+
 const mats = {
   floor: new THREE.MeshStandardMaterial({ color: 0xc8d5d0, roughness: 0.82 }),
   wall: new THREE.MeshStandardMaterial({ color: 0xe4e9e3, roughness: 0.92 }),
@@ -669,8 +681,56 @@ function updatePlayerMovement(delta) {
 function handPoseCollides() {
   camera.updateMatrixWorld(true);
   handGroup.updateWorldMatrix(true, false);
-  const matrix = handGroup.matrixWorld;
 
+  // Use the actual transformed mesh bounds of the entire glove and sleeve.
+  // This is intentionally conservative: a slight early recoil is preferable
+  // to any visible finger or cuff intersection with a hard surface.
+  handWorldBounds.setFromObject(handGroup, true);
+  handWorldBounds.expandByScalar(0.025);
+
+  if (handWorldBounds.min.y < -0.015) return true;
+
+  for (const station of stationGroups) {
+    const sx = station.position.x;
+    const sz = station.position.z;
+
+    // Workbench cabinet body and the complete counter slab.
+    if (handBoundsTouchesAabb(
+      sx - 2.625, 0.26, sz - 1.44,
+      sx + 2.625, 1.18, sz + 1.44
+    )) return true;
+    if (handBoundsTouchesAabb(
+      sx - 2.86, 1.18, sz - 1.66,
+      sx + 2.86, 1.38, sz + 1.66
+    )) return true;
+
+    // Equipment collision boxes are in station-local coordinates.
+    const equipment = station.userData.handColliders || [];
+    for (const obstacle of equipment) {
+      if (handBoundsTouchesAabb(
+        sx + obstacle.minX, obstacle.minY, sz + obstacle.minZ,
+        sx + obstacle.maxX, obstacle.maxY, sz + obstacle.maxZ
+      )) return true;
+    }
+
+    const stoolZ = sz + 2.55;
+    if (handBoundsTouchesAabb(
+      sx - 0.38, 0.68, stoolZ - 0.38,
+      sx + 0.38, 1.02, stoolZ + 0.38
+    )) return true;
+  }
+
+  // Rear storage, shelves and surrounding room walls.
+  if (handBoundsTouchesAabb(-9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
+  if (handBoundsTouchesAabb(-8.0, 2.35, -16.45, 8.0, 2.72, -15.65)) return true;
+  if (handBoundsTouchesAabb(-8.0, 3.48, -16.45, 8.0, 3.85, -15.65)) return true;
+  if (handBoundsTouchesAabb(-12.22, 0, -17.2, -11.78, 9.2, 17.2)) return true;
+  if (handBoundsTouchesAabb(11.78, 0, -17.2, 12.22, 9.2, 17.2)) return true;
+  if (handBoundsTouchesAabb(-12.2, 0, -17.22, 12.2, 9.2, -16.78)) return true;
+
+  // Keep the original sphere probes as a second collision layer for curved
+  // contact points and narrow gaps between the individual hand meshes.
+  const matrix = handGroup.matrixWorld;
   for (let i = 0; i < HAND_COLLISION_SPHERES.length; i += 1) {
     const shape = HAND_COLLISION_SPHERES[i];
     const center = handCollisionWorldCenters[i];
@@ -682,7 +742,6 @@ function handPoseCollides() {
       const sx = station.position.x;
       const sz = station.position.z;
 
-      // Exact workbench carcass and counter-slab bounds with a small contact margin.
       if (sphereTouchesAabb(
         center, shape.radius + 0.018,
         sx - 2.625, 0.26, sz - 1.44,
@@ -694,7 +753,6 @@ function handPoseCollides() {
         sx + 2.86, 1.38, sz + 1.66
       )) return true;
 
-      // Individual equipment colliders are stored in the station's local coordinates.
       const equipment = station.userData.handColliders || [];
       for (const obstacle of equipment) {
         if (sphereTouchesAabb(
@@ -703,25 +761,7 @@ function handPoseCollides() {
           sx + obstacle.maxX, obstacle.maxY, sz + obstacle.maxZ
         )) return true;
       }
-
-      // Stool seat and central support.
-      const stoolZ = sz + 2.55;
-      if (sphereTouchesAabb(
-        center, shape.radius + 0.015,
-        sx - 0.38, 0.68, stoolZ - 0.38,
-        sx + 0.38, 1.02, stoolZ + 0.38
-      )) return true;
     }
-
-    // Rear storage and shelf supports.
-    if (sphereTouchesAabb(center, shape.radius + 0.015, -9.1, 0.1, -16.1, 9.1, 1.55, -14.75)) return true;
-    if (sphereTouchesAabb(center, shape.radius + 0.01, -8.0, 2.35, -16.45, 8.0, 2.72, -15.65)) return true;
-    if (sphereTouchesAabb(center, shape.radius + 0.01, -8.0, 3.48, -16.45, 8.0, 3.85, -15.65)) return true;
-
-    // Side and rear walls.
-    if (sphereTouchesAabb(center, shape.radius, -12.22, 0, -17.2, -11.78, 9.2, 17.2)) return true;
-    if (sphereTouchesAabb(center, shape.radius, 11.78, 0, -17.2, 12.22, 9.2, 17.2)) return true;
-    if (sphereTouchesAabb(center, shape.radius, -12.2, 0, -17.22, 12.2, 9.2, -16.78)) return true;
   }
 
   return false;
