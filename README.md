@@ -6,11 +6,6 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 
 - Rectangular laboratory room with six workbenches in two columns and three rows.
 - First-person movement with mouse-look, walking, sprinting and acceleration/deceleration.
-- One visible right hand wearing a laboratory glove and a short lab-coat cuff.
-- No visible head, torso, legs or full player body.
-- Hand collision checks the transformed world-space bounds of the complete glove and sleeve, in addition to spherical probes for curved contact points.
-- The hand collision layer covers workbench cabinets, counter slabs, glassware, reagent bottles, test-tube racks, microscopes, burners, stools, room walls and floor, with a small clearance margin.
-- The hand retracts toward the camera before lifting, and uses a safe-position search with a small clearance margin to avoid visible surface penetration.
 - Player collision uses a circular capsule footprint, rounded bench-corner checks and sub-stepped movement to reduce tunnelling.
 - The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
@@ -40,8 +35,8 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 
 - **index.html** — application shell, first-person HUD and import map.
 - **styles.css** — responsive interface styling.
-- **src/main.js** — Three.js room, furniture, equipment, player hand, movement, collision and interaction logic.
+- **src/main.js** — Three.js room, furniture, equipment, first-person movement, player collision and interaction logic.
 
 ## Next development stage
 
-The next stage can add object pickup and placement, animated hand poses, interaction with glassware, safe experiment logic, scoring and a C++ / WebAssembly chemistry simulation core.
+The next stage can add object selection and placement, interaction with glassware, safe experiment logic, scoring and a C++ / WebAssembly chemistry simulation core.
