@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const root = document.getElementById('scene-root');
@@ -28,12 +28,26 @@ let scene;
 let camera;
 let controls;
 let raycaster;
-let pointer;
-let hoveredStation = null;
 let selectedStation = null;
+let handGroup;
+let handBasePosition;
+let handBaseRotation;
+let walkBlend = 0;
 let animationFrame = 0;
+const movementKeys = new Set();
 const stationGroups = [];
 const clock = new THREE.Clock();
+
+const PLAYER = {
+  eyeHeight: 1.72,
+  radius: 0.38,
+  walkSpeed: 4.4,
+  sprintSpeed: 6.8,
+  minX: -11.45,
+  maxX: 11.45,
+  minZ: -16.25,
+  maxZ: 16.25
+};
 
 const mats = {
   floor: new THREE.MeshStandardMaterial({ color: 0xc8d5d0, roughness: 0.82 }),
@@ -394,19 +408,14 @@ function findStation(object) {
   return null;
 }
 
-function setCamera(position, target = new THREE.Vector3(0, 0.8, 0)) {
-  camera.position.copy(position);
-  controls.target.copy(target);
-  controls.update();
-}
-
 function init() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xb8c9c6);
   scene.fog = new THREE.Fog(0xb8c9c6, 43, 86);
 
-  camera = new THREE.PerspectiveCamera(42, root.clientWidth / root.clientHeight, 0.1, 150);
-  camera.position.set(29, 25, 34);
+  camera = new THREE.PerspectiveCamera(70, root.clientWidth / root.clientHeight, 0.1, 120);
+  camera.position.set(0, PLAYER.eyeHeight, 15.2);
+  scene.add(camera);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -418,16 +427,11 @@ function init() {
   renderer.toneMappingExposure = 1.13;
   root.appendChild(renderer.domElement);
 
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 0.9, 0);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.055;
-  controls.minDistance = 22;
-  controls.maxDistance = 65;
-  controls.maxPolarAngle = Math.PI * 0.47;
-  controls.minPolarAngle = Math.PI * 0.12;
-  controls.enablePan = true;
-  controls.screenSpacePanning = true;
+  controls = new PointerLockControls(camera, renderer.domElement);
+  controls.pointerSpeed = 0.75;
+  controls.minPolarAngle = 0.2;
+  controls.maxPolarAngle = Math.PI - 0.2;
+  renderer.domElement.style.cursor = 'pointer';
 
   scene.add(new THREE.HemisphereLight(0xf3fbf5, 0x6e8a84, 2.0));
   const keyLight = new THREE.DirectionalLight(0xfff4dd, 3.2);
@@ -451,63 +455,178 @@ function init() {
   }
 
   raycaster = new THREE.Raycaster();
-  pointer = new THREE.Vector2();
+  createPlayerHand();
 
-  renderer.domElement.addEventListener('pointermove', onPointerMove);
-  renderer.domElement.addEventListener('pointerleave', onPointerLeave);
-  renderer.domElement.addEventListener('click', onCanvasClick);
-  document.getElementById('reset-view').addEventListener('click', resetCamera);
-  document.getElementById('top-view').addEventListener('click', topCamera);
+  controls.addEventListener('lock', () => {
+    document.body.classList.add('player-locked');
+    document.getElementById('entry-overlay').classList.add('is-hidden');
+  });
+  controls.addEventListener('unlock', () => {
+    document.body.classList.remove('player-locked');
+    document.getElementById('entry-overlay').classList.remove('is-hidden');
+    movementKeys.clear();
+  });
+
+  document.getElementById('enter-lab').addEventListener('click', () => controls.lock());
   document.getElementById('close-panel').addEventListener('click', () => selectStation(null));
-
+  renderer.domElement.addEventListener('click', onCanvasClick);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', () => movementKeys.clear());
   window.addEventListener('resize', onResize);
-  animate();
+
   window.setTimeout(() => loadingScreen.classList.add('is-hidden'), 520);
+  animate();
 }
 
-function updateRaycaster(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  return raycaster.intersectObjects(stationGroups, true);
+function inspectStationAtCrosshair() {
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hits = raycaster.intersectObjects(stationGroups, true);
+  const station = hits.length ? findStation(hits[0].object) : null;
+  if (station) {
+    selectStation(station);
+    return true;
+  }
+  selectStation(null);
+  return false;
 }
 
-function onPointerMove(event) {
-  const hits = updateRaycaster(event);
-  const nextStation = hits.length ? findStation(hits[0].object) : null;
-  if (hoveredStation !== nextStation) {
-    if (hoveredStation && hoveredStation !== selectedStation) setStationHighlight(hoveredStation, false);
-    hoveredStation = nextStation;
-    if (hoveredStation && hoveredStation !== selectedStation) setStationHighlight(hoveredStation, true);
-    renderer.domElement.style.cursor = hoveredStation ? 'pointer' : 'grab';
+function onCanvasClick() {
+  if (controls && controls.isLocked) inspectStationAtCrosshair();
+}
+
+function onKeyDown(event) {
+  const key = event.key.toLowerCase();
+  const movement = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'];
+  if (movement.includes(key)) {
+    event.preventDefault();
+    movementKeys.add(key);
+  }
+  if (key === 'e' && !event.repeat && controls && controls.isLocked) {
+    event.preventDefault();
+    inspectStationAtCrosshair();
   }
 }
 
-function onPointerLeave() {
-  if (hoveredStation && hoveredStation !== selectedStation) setStationHighlight(hoveredStation, false);
-  hoveredStation = null;
-  renderer.domElement.style.cursor = 'grab';
+function onKeyUp(event) {
+  movementKeys.delete(event.key.toLowerCase());
 }
 
-function onCanvasClick(event) {
-  const hits = updateRaycaster(event);
-  const station = hits.length ? findStation(hits[0].object) : null;
-  if (station) selectStation(station);
+function canOccupy(x, z) {
+  const r = PLAYER.radius;
+  if (x < PLAYER.minX || x > PLAYER.maxX || z < PLAYER.minZ || z > PLAYER.maxZ) return false;
+
+  // Workbench cabinets and counters are solid obstacles.
+  for (const station of stationGroups) {
+    const sx = station.position.x;
+    const sz = station.position.z;
+    if (Math.abs(x - sx) < 2.86 + r && Math.abs(z - sz) < 1.66 + r) return false;
+
+    // Each bench has a stool on its approach side.
+    if (Math.abs(x - sx) < 0.43 + r && Math.abs(z - (sz + 2.55)) < 0.43 + r) return false;
+  }
+
+  // Rear storage units and their counter.
+  if (Math.abs(x) < 9.1 + r && Math.abs(z + 15.45) < 0.63 + r) return false;
+  return true;
 }
 
-function resetCamera() {
-  camera.up.set(0, 1, 0);
-  setCamera(new THREE.Vector3(29, 25, 34));
-  controls.minPolarAngle = Math.PI * 0.12;
+function updatePlayerMovement(delta) {
+  if (!controls || !controls.isLocked) return false;
+
+  const forwardInput =
+    (movementKeys.has('w') || movementKeys.has('arrowup') ? 1 : 0) -
+    (movementKeys.has('s') || movementKeys.has('arrowdown') ? 1 : 0);
+  const sideInput =
+    (movementKeys.has('d') || movementKeys.has('arrowright') ? 1 : 0) -
+    (movementKeys.has('a') || movementKeys.has('arrowleft') ? 1 : 0);
+
+  if (forwardInput === 0 && sideInput === 0) return false;
+
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  const right = new THREE.Vector3(-forward.z, 0, forward.x);
+  const move = forward.multiplyScalar(forwardInput).add(right.multiplyScalar(sideInput));
+  if (move.lengthSq() === 0) return false;
+  move.normalize();
+
+  const sprinting = movementKeys.has('shift');
+  const distance = (sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed) * delta;
+  const dx = move.x * distance;
+  const dz = move.z * distance;
+
+  // Resolve axes independently so the player can slide along a table or wall.
+  const nextX = camera.position.x + dx;
+  if (canOccupy(nextX, camera.position.z)) camera.position.x = nextX;
+  const nextZ = camera.position.z + dz;
+  if (canOccupy(camera.position.x, nextZ)) camera.position.z = nextZ;
+
+  return Math.abs(camera.position.x - (nextX - dx)) + Math.abs(camera.position.z - (nextZ - dz)) > 0.0001;
 }
 
-function topCamera() {
-  camera.up.set(0, 0, -1);
-  controls.minPolarAngle = 0.001;
-  camera.position.set(0, 42, 0.01);
-  controls.target.set(0, 0, 0);
-  controls.update();
+function createPlayerHand() {
+  const glove = new THREE.MeshPhysicalMaterial({
+    color: 0xc8e7df,
+    roughness: 0.38,
+    metalness: 0,
+    clearcoat: 0.18,
+    clearcoatRoughness: 0.42
+  });
+  const gloveShade = new THREE.MeshStandardMaterial({ color: 0x9ccfc3, roughness: 0.46 });
+  const coat = new THREE.MeshStandardMaterial({ color: 0xf1f4ed, roughness: 0.72 });
+  const cuff = new THREE.MeshStandardMaterial({ color: 0x72cbbb, roughness: 0.42 });
+
+  handGroup = new THREE.Group();
+  handGroup.name = 'PLAYER_VISIBLE_RIGHT_HAND';
+  handGroup.position.set(0.49, -0.46, -0.92);
+  handGroup.rotation.set(-0.05, -0.18, -0.16);
+  handBasePosition = handGroup.position.clone();
+  handBaseRotation = handGroup.rotation.clone();
+
+  const addPart = (geometry, material, position, scale = [1, 1, 1], rotation = [0, 0, 0]) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.scale.set(scale[0], scale[1], scale[2]);
+    mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    handGroup.add(mesh);
+    return mesh;
+  };
+
+  // A short white lab-coat cuff; no torso, head, legs or full arms are created.
+  addPart(new THREE.CylinderGeometry(0.105, 0.135, 0.34, 24, 1), coat, [0, -0.19, 0.025]);
+  addPart(new THREE.CylinderGeometry(0.117, 0.117, 0.065, 24, 1), cuff, [0, -0.015, 0.025]);
+  const cuffRing = addPart(new THREE.TorusGeometry(0.113, 0.009, 8, 28), glove, [0, 0.02, 0.025]);
+  cuffRing.rotation.x = Math.PI / 2;
+
+  // Palm and five separate, softly rounded gloved fingers.
+  addPart(new THREE.SphereGeometry(0.15, 28, 22), glove, [0, 0.155, 0], [1.12, 1.35, 0.48], [0, 0, -0.06]);
+  const fingerXs = [-0.105, -0.035, 0.04, 0.11];
+  const fingerLengths = [0.16, 0.205, 0.19, 0.15];
+  for (let i = 0; i < fingerXs.length; i += 1) {
+    const radius = i === 1 ? 0.039 : 0.036;
+    const length = fingerLengths[i];
+    const baseY = 0.285;
+    addPart(
+      new THREE.CapsuleGeometry(radius, length, 5, 12),
+      glove,
+      [fingerXs[i], baseY + (length + radius * 2) / 2 - 0.01, 0],
+      [1, 1, 0.82],
+      [0, 0, (i - 1.5) * -0.045]
+    );
+    addPart(new THREE.SphereGeometry(radius * 0.92, 14, 12), gloveShade, [fingerXs[i], baseY + 0.015, 0.002], [1, 0.72, 0.78]);
+  }
+
+  // Thumb angles naturally away from the palm.
+  addPart(new THREE.CapsuleGeometry(0.043, 0.13, 5, 12), glove, [-0.155, 0.105, 0.005], [1, 1, 0.85], [0, 0, 0.82]);
+  addPart(new THREE.SphereGeometry(0.047, 16, 14), glove, [-0.13, 0.19, 0.005], [1, 1, 0.82]);
+
+  // Fine raised glove seam detail gives the hand a finished silhouette.
+  addPart(new THREE.SphereGeometry(0.012, 10, 8), gloveShade, [0.02, 0.095, 0.071], [1.1, 0.65, 0.5]);
+  camera.add(handGroup);
 }
 
 function onResize() {
@@ -522,12 +641,29 @@ function onResize() {
 
 function animate() {
   animationFrame = window.requestAnimationFrame(animate);
-  controls.update();
-  const elapsed = clock.getElapsedTime();
+  const delta = Math.min(clock.getDelta(), 0.05);
+  const elapsed = clock.elapsedTime;
+  const moving = updatePlayerMovement(delta);
+  walkBlend = THREE.MathUtils.damp(walkBlend, moving ? 1 : 0, 9, delta);
+
+  if (handGroup) {
+    const phase = elapsed * 9.5;
+    handGroup.position.set(
+      handBasePosition.x + Math.sin(phase * 0.5) * 0.009 * walkBlend,
+      handBasePosition.y + Math.abs(Math.sin(phase)) * 0.025 * walkBlend + Math.sin(elapsed * 1.1) * 0.003,
+      handBasePosition.z
+    );
+    handGroup.rotation.set(
+      handBaseRotation.x + Math.sin(phase) * 0.012 * walkBlend,
+      handBaseRotation.y,
+      handBaseRotation.z + Math.sin(phase * 0.5) * 0.022 * walkBlend + Math.sin(elapsed * 0.8) * 0.004
+    );
+  }
+
   // Subtle instrument glints bring a little life to the otherwise calm workspace.
   for (let i = 0; i < stationGroups.length; i += 1) {
     const top = stationGroups[i].userData.top;
-    if (top && stationGroups[i] !== selectedStation && stationGroups[i] !== hoveredStation) {
+    if (top && stationGroups[i] !== selectedStation) {
       top.material.emissiveIntensity = 0.012 + (Math.sin(elapsed * 0.8 + i) + 1) * 0.004;
     }
   }
@@ -548,5 +684,6 @@ try {
 window.addEventListener('beforeunload', () => {
   if (animationFrame) window.cancelAnimationFrame(animationFrame);
   if (controls) controls.dispose();
+  movementKeys.clear();
   if (renderer) renderer.dispose();
 });
