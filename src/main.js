@@ -223,7 +223,7 @@ function addStation(number, x, z) {
   scene.add(group);
 
   roundedBox(group, mats.cabinet, [5.25, 0.92, 2.88], [0, 0.72, 0], 0.1, 4);
-  roundedBox(group, mats.counterTop, [5.72, 0.2, 3.32], [0, 1.28, 0], 0.09, 4);
+  const counterTop = roundedBox(group, mats.counterTop, [5.72, 0.2, 3.32], [0, 1.28, 0], 0.09, 4);
   roundedBox(group, mats.darkTrim, [5.58, 0.045, 3.2], [0, 1.165, 0], 0.025);
 
   // Cabinet doors and fine metal pulls on the student-facing side.
@@ -245,15 +245,12 @@ function addStation(number, x, z) {
   if (number % 2 === 0) addMicroscope(group, -2.12, 0.43);
   else addBurner(group, -2.12, 0.43);
 
-  // Highlightable top surface, kept as a dedicated mesh for clean selection feedback.
-  const top = group.children.find((child) => child.geometry && child.geometry.type === 'RoundedBoxGeometry' && Math.abs(child.position.y - 1.28) < 0.01);
-  if (top) {
-    top.userData.stationNumber = number;
-    top.material = mats.counterTop.clone();
-    top.material.emissive = new THREE.Color(0x000000);
-    top.material.emissiveIntensity = 0;
-    group.userData.top = top;
-  }
+  // Keep a direct reference to the workbench surface for reliable hover and selection feedback.
+  counterTop.userData.stationNumber = number;
+  counterTop.material = mats.counterTop.clone();
+  counterTop.material.emissive = new THREE.Color(0x000000);
+  counterTop.material.emissiveIntensity = 0;
+  group.userData.top = counterTop;
 
   stationGroups.push(group);
   addStool(x, z + 2.55);
