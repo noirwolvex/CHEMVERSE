@@ -664,10 +664,17 @@ function handPoseCollides() {
     for (const station of stationGroups) {
       const sx = station.position.x;
       const sz = station.position.z;
+      // Cabinet carcass and counter slab are separate colliders. This lets the glove
+      // rise above the work surface instead of being pushed all the way back to the camera.
       if (sphereTouchesAabb(
         center, shape.radius,
-        sx - 2.9, 0.22, sz - 1.76,
-        sx + 2.9, 1.62, sz + 1.76
+        sx - 2.625, 0.26, sz - 1.44,
+        sx + 2.625, 1.18, sz + 1.44
+      )) return true;
+      if (sphereTouchesAabb(
+        center, shape.radius,
+        sx - 2.86, 1.18, sz - 1.66,
+        sx + 2.86, 1.38, sz + 1.66
       )) return true;
 
       // The stools also stop the hand from passing through their seats and supports.
@@ -713,31 +720,39 @@ function resolveHandCollision(delta, bobPosition) {
     return;
   }
 
-  // Pull the hand back from the obstacle. If needed, lift it slightly while maintaining
-  // the player's view and keeping the visible hand outside the table's collision volume.
+  // Prefer lifting the glove above a tabletop. Retraction is used for walls and
+  // vertical faces, where a vertical adjustment cannot solve the contact.
   let resolved = false;
-  const liftSteps = 9;
-  const retractSteps = 30;
 
-  for (let liftIndex = 0; liftIndex <= liftSteps && !resolved; liftIndex += 1) {
-    const lift = liftIndex * 0.035;
-    for (let retractIndex = 1; retractIndex <= retractSteps; retractIndex += 1) {
-      const retract = retractIndex * 0.035;
-      const candidateOffset = new THREE.Vector3(0, lift, retract);
-      handGroup.position.copy(bobPosition).add(candidateOffset);
+  const tryHandOffset = (offset) => {
+    handGroup.position.copy(bobPosition).add(offset);
+    if (handPoseCollides()) return false;
+    handCollisionOffset.copy(offset);
+    resolved = true;
+    return true;
+  };
 
-      if (!handPoseCollides()) {
-        handCollisionOffset.copy(candidateOffset);
-        resolved = true;
-        break;
-      }
+  // A small upward movement gives the palm and cuff clearance above the bench top.
+  for (let liftIndex = 1; liftIndex <= 18 && !resolved; liftIndex += 1) {
+    tryHandOffset(new THREE.Vector3(0, liftIndex * 0.035, 0));
+  }
+
+  // For vertical obstacles, move the hand back toward the player's camera.
+  for (let retractIndex = 1; retractIndex <= 30 && !resolved; retractIndex += 1) {
+    tryHandOffset(new THREE.Vector3(0, 0, retractIndex * 0.035));
+  }
+
+  // A combined lift and retraction handles corners where two surfaces meet.
+  for (let liftIndex = 1; liftIndex <= 14 && !resolved; liftIndex += 1) {
+    for (let retractIndex = 1; retractIndex <= 20; retractIndex += 1) {
+      if (tryHandOffset(new THREE.Vector3(0, liftIndex * 0.035, retractIndex * 0.035))) break;
     }
   }
 
   handGroup.visible = resolved;
   if (!resolved) {
     // Never render the hand intersecting solid geometry if no safe pose can be found.
-    handGroup.position.copy(bobPosition).add(new THREE.Vector3(0, 0.315, 1.05));
+    handGroup.position.copy(bobPosition).add(new THREE.Vector3(0, 0.63, 1.05));
   }
 }
 
