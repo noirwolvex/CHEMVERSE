@@ -33,7 +33,7 @@
         <span class="live-dot"></span>
         <span>LABORATORY <b>01</b></span>
         <i></i>
-        <span class="scene-state">INTERACTIVE ENVIRONMENT</span>
+        <span class="scene-state">FIRST-PERSON EXPERIENCE</span>
       </div>
       <div class="topbar-right">
         <span class="environment-tag"><span class="environment-icon">✳</span> CHEMISTRY LAB</span>
@@ -45,28 +45,36 @@
       <div class="viewport-vignette"></div>
 
       <div class="intro-card">
-        <span class="eyebrow">YOUR SCIENCE SPACE</span>
-        <h1>Welcome to the<br><em>Laboratory.</em></h1>
-        <p>A purpose-built space for discovery, experiments and learning.</p>
-        <div class="intro-meta"><span class="meta-line"></span> 6 EXPERIMENT STATIONS <span class="meta-separator">/</span> 3D SPACE</div>
+        <span class="eyebrow">FIRST-PERSON EXPERIENCE</span>
+        <h1>Step into<br><em>CHEMVERSE.</em></h1>
+        <p>Explore the laboratory from the player's point of view.</p>
+        <div class="intro-meta"><span class="meta-line"></span> 6 EXPERIMENT STATIONS</div>
       </div>
 
-      <div class="view-controls" aria-label="Camera controls">
-        <button class="icon-button" id="reset-view" type="button" title="Reset camera" aria-label="Reset camera">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10a7.5 7.5 0 1 1 .8 5.2M4.5 4.8V10h5.2"/></svg>
-        </button>
-        <button class="icon-button" id="top-view" type="button" title="Top view" aria-label="Top view">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5 12 4l8 4.5-8 4.5L4 8.5Z"/><path d="M4 12.5 12 17l8-4.5M4 16.5 12 21l8-4.5"/></svg>
-        </button>
-      </div>
+
 
       <div class="lab-key">
-        <span class="key-icon"><span></span></span>
-        <span><b>DRAG</b> to rotate</span>
+        <span><b>W A S D</b> MOVE</span>
         <span class="key-divider"></span>
-        <span><b>SCROLL</b> to zoom</span>
+        <span><b>MOUSE</b> LOOK</span>
         <span class="key-divider"></span>
-        <span><b>CLICK</b> a table to inspect</span>
+        <span><b>SHIFT</b> SPRINT</span>
+        <span class="key-divider"></span>
+        <span><b>E</b> INSPECT</span>
+        <span class="key-divider"></span>
+        <span><b>ESC</b> PAUSE</span>
+      </div>
+      <div class="crosshair" aria-hidden="true"><span></span></div>
+      <div class="entry-overlay" id="entry-overlay">
+        <div class="entry-card">
+          <span class="eyebrow">CHEMVERSE / PLAYER MODE</span>
+          <h2 id="entry-title">Ready to explore?</h2>
+          <p>Enter the laboratory. Your view shows only your gloved hand — no visible body.</p>
+          <button class="enter-button" id="enter-lab" type="button">
+            ENTER LABORATORY <span aria-hidden="true">→</span>
+          </button>
+          <div class="entry-hint">WASD TO MOVE <span>•</span> MOUSE TO LOOK <span>•</span> ESC TO PAUSE</div>
+        </div>
       </div>
 
       <aside class="station-panel" id="station-panel" aria-live="polite" aria-hidden="true">
