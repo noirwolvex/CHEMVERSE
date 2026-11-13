@@ -65,9 +65,11 @@ let elapsed = 0;
 let playing = false;
 let playbackSpeed = 1;
 let temperatureC = 25;
-let acidAmountMmol = Number(acidAmountInput.value);
-let bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
 let volumeMl = Number(volumeInput.value);
+let acidConcentrationM = Number(acidAmountInput.value);
+let bicarbonateConcentrationM = Number(bicarbonateAmountInput.value);
+let acidAmountMmol = acidConcentrationM * volumeMl;
+let bicarbonateAmountMmol = bicarbonateConcentrationM * volumeMl;
 let durationSeconds = Number(durationInput.value);
 let rateConstant = null;
 let acidReactionOrder = null;
@@ -143,6 +145,8 @@ function buildKineticsCurve() {
   bicarbonateReactionOrder = optionalNumber(bicarbonateOrderInput);
   activationEnergyKJ = optionalNumber(activationEnergyInput);
   volumeMl = Number(volumeInput.value);
+  acidAmountMmol = acidConcentrationM * volumeMl;
+  bicarbonateAmountMmol = bicarbonateConcentrationM * volumeMl;
   durationSeconds = Number(durationInput.value);
   referenceTemperatureC = Number(referenceTemperatureInput.value);
   updateRateConstantUnits();
@@ -294,8 +298,8 @@ function calculateChemistry(timeSeconds) {
 }
 function formatMmol(value) { return value.toFixed(2) + ' mmol'; }
 function updateChemistryReadouts(result) {
-  acidAmountReadout.textContent = formatMmol(acidAmountMmol);
-  bicarbonateAmountReadout.textContent = formatMmol(bicarbonateAmountMmol);
+  acidAmountReadout.textContent = acidConcentrationM.toFixed(3) + ' M';
+  bicarbonateAmountReadout.textContent = bicarbonateConcentrationM.toFixed(3) + ' M';
   acidRemainingOutput.textContent = formatMmol(result.acidRemaining);
   bicarbonateRemainingOutput.textContent = formatMmol(result.bicarbonateRemaining);
   sodiumAcetateOutput.textContent = formatMmol(result.sodiumAcetate);
@@ -816,13 +820,13 @@ speedSelect.addEventListener('change', () => {
 acidAmountInput.addEventListener('input', () => {
   playing = false;
   elapsed = 0;
-  acidAmountMmol = Number(acidAmountInput.value);
+  acidConcentrationM = Number(acidAmountInput.value);
   refreshView();
 });
 bicarbonateAmountInput.addEventListener('input', () => {
   playing = false;
   elapsed = 0;
-  bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
+  bicarbonateConcentrationM = Number(bicarbonateAmountInput.value);
   refreshView();
 });
 for (const input of [
