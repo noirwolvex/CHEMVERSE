@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b151e">
+  <meta name="description" content="CHEMVERSE — interactive molecular reaction simulator.">
+  <title>CHEMVERSE | Molecular Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./simulation.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body class="sim-page">
+  <div class="sim-app">
+    <header class="sim-topbar">
+      <a class="sim-brand" href="./index.html" aria-label="العودة إلى مختبر CHEMVERSE">
+        <span class="brand-mark"><i></i><i></i><i></i></span>
+        <span><strong>CHEMVERSE</strong><small>MOLECULAR SCIENCE LAB</small></span>
+      </a>
+      <div class="topbar-center">
+        <span class="live-indicator"></span>
+        <span>محاكاة التفاعلات الجزيئية</span>
+        <span class="topbar-divider"></span>
+        <span class="topbar-muted">REACTION 001</span>
+      </div>
+      <a class="back-link" href="./index.html"><span>←</span> العودة إلى المختبر</a>
+    </header>
+
+    <main class="sim-main">
+      <section class="page-heading">
+        <div>
+          <div class="eyebrow">CHEMVERSE / INTERACTIVE SCIENCE</div>
+          <h1>داخل التفاعل <em>الكيميائي</em></h1>
+          <p>شاهد انتقال البروتون وتكوّن النواتج على مستوى الجزيئات والذرات.</p>
+        </div>
+        <div class="model-badge"><span class="badge-dot"></span><span>نموذج تفاعلي تعليمي</span></div>
+      </section>
+
+      <section class="sim-workspace">
+        <aside class="panel experiment-panel">
+          <div class="panel-kicker">01 / EXPERIMENT</div>
+          <div class="reaction-number">01</div>
+          <h2>تفاعل حمض الأسيتيك مع بيكربونات الصوديوم</h2>
+          <p class="experiment-copy">تفاعل حمض وقاعدة ينتج عنه أسيتات الصوديوم والماء وغاز ثاني أكسيد الكربون.</p>
+
+          <div class="equation-card">
+            <span class="mini-label">المعادلة الكيميائية الموزونة</span>
+            <div class="equation" dir="ltr">
+              <span>CH₃COOH</span><b>+</b><span>NaHCO₃</span>
+              <b class="equation-arrow">→</b>
+              <span>CH₃COONa</span><b>+</b><span>H₂O</span><b>+</b><span>CO₂</span>
+            </div>
+            <div class="equation-note">النسب المولية: 1 : 1 : 1 : 1 : 1</div>
+          </div>
+
+          <div class="stage-list">
+            <div class="stage-heading"><span>مراحل التفاعل</span><span>REACTION PATH</span></div>
+            <div class="stage-item is-active" data-stage="reactants">
+              <i>01</i><span><b>المواد المتفاعلة</b><small>حمض الأسيتيك + بيكربونات الصوديوم</small></span>
+            </div>
+            <div class="stage-item" data-stage="intermediate">
+              <i>02</i><span><b>انتقال البروتون</b><small>تكوّن الأسيتات وحمض الكربونيك</small></span>
+            </div>
+            <div class="stage-item" data-stage="products">
+              <i>03</i><span><b>تكوّن النواتج</b><small>أسيتات الصوديوم + الماء + CO₂</small></span>
+            </div>
+          </div>
+
+          <div class="atom-balance">
+            <div class="balance-title"><span>حفظ الذرات</span><span class="balance-ok"><i></i> متوازنة</span></div>
+            <div class="atom-counts" dir="ltr">
+              <span><b>C</b> 3</span><span><b>H</b> 5</span><span><b>Na</b> 1</span><span><b>O</b> 5</span>
+            </div>
+            <p>عدد كل نوع من الذرات محفوظ قبل التفاعل وبعده.</p>
+          </div>
+        </aside>
+
+        <section class="center-column">
+          <div class="molecule-panel">
+            <div class="molecule-toolbar">
+              <div class="scene-title">
+                <span class="scene-live"></span>
+                <div><b>MOLECULAR VIEW</b><small id="stage-caption">المواد المتفاعلة جاهزة للتفاعل</small></div>
+              </div>
+              <div class="scene-tools">
+                <span class="view-hint">اسحب للتدوير · عجلة الماوس للتقريب</span>
+                <button id="reset-camera" class="square-button" type="button" title="إعادة زاوية العرض" aria-label="إعادة زاوية العرض">↺</button>
+              </div>
+            </div>
+            <div id="molecule-view" class="molecule-view">
+              <div class="scene-corner scene-corner-tl"></div><div class="scene-corner scene-corner-br"></div>
+              <div class="scene-overlay-label" id="molecule-label">REACTANTS / BEFORE REACTION</div>
+              <div class="scene-scale-note">BALL-AND-STICK MODEL · NOT TO SCALE</div>
+              <div id="scene-loading" class="scene-loading">جاري تجهيز النموذج الجزيئي...</div>
+            </div>
+            <div class="atom-legend" dir="ltr">
+              <span><i class="atom-carbon"></i> C / Carbon</span>
+              <span><i class="atom-hydrogen"></i> H / Hydrogen</span>
+              <span><i class="atom-oxygen"></i> O / Oxygen</span>
+              <span><i class="atom-sodium"></i> Na / Sodium</span>
+            </div>
+          </div>
+
+          <div class="chart-panel">
+            <div class="chart-head">
+              <div><b>تقدم التفاعل</b><small>مؤشر توضيحي لتتابع مراحل التفاعل</small></div>
+              <span class="chart-readout" id="progress-readout">0%</span>
+            </div>
+            <canvas id="reaction-chart" aria-label="منحنى تقدم التفاعل"></canvas>
+            <div class="chart-axis"><span>البداية</span><span>انتقال البروتون</span><span>النواتج</span></div>
+          </div>
+        </section>
+
+        <aside class="panel controls-panel">
+          <div class="panel-kicker">02 / CONTROL DECK</div>
+          <h2>لوحة التحكم</h2>
+          <p class="panel-intro">تحكم في تشغيل النموذج وشاهد كيف تتغير الحركة مع الظروف المختارة.</p>
+
+          <div class="playback-controls">
+            <button id="play-toggle" class="primary-control" type="button"><span class="play-icon">▶</span><span id="play-label">ابدأ التفاعل</span></button>
+            <button id="reset-sim" class="secondary-control" type="button" aria-label="إعادة التفاعل">↺</button>
+          </div>
+
+          <div class="control-block">
+            <div class="control-label"><label for="timeline">الزمن الافتراضي</label><output id="time-readout">00:00 / 00:18</output></div>
+            <input id="timeline" class="range-input" type="range" min="0" max="18" step="0.05" value="0">
+          </div>
+
+          <div class="control-block">
+            <div class="control-label"><label for="temperature">درجة الحرارة</label><output id="temperature-readout">25°C</output></div>
+            <input id="temperature" class="range-input temperature-range" type="range" min="20" max="60" step="1" value="25">
+            <div class="range-ends"><span>20°C</span><span>60°C</span></div>
+          </div>
+
+          <div class="control-block">
+            <div class="control-label"><label for="speed-select">سرعة العرض</label><span class="control-hint">PLAYBACK SPEED</span></div>
+            <select id="speed-select" class="speed-select">
+              <option value="0.5">0.5× بطيء</option>
+              <option value="1" selected>1× عادي</option>
+              <option value="1.5">1.5× سريع</option>
+              <option value="2">2× سريع جداً</option>
+            </select>
+          </div>
+
+          <div class="live-status" aria-live="polite">
+            <span class="status-icon" id="status-icon">◌</span>
+            <div><small>حالة المحاكاة</small><b id="status-title">جاهز للبدء</b><p id="status-description">ابدأ لمشاهدة اقتراب الجزيئات.</p></div>
+          </div>
+
+          <div class="products-summary">
+            <div class="summary-title">النواتج النهائية</div>
+            <div class="product-row"><span class="product-symbol acetate">Ac</span><span><b>أسيتات الصوديوم</b><small>CH₃COONa</small></span></div>
+            <div class="product-row"><span class="product-symbol water">H₂O</span><span><b>الماء</b><small>H₂O</small></span></div>
+            <div class="product-row"><span class="product-symbol carbon">CO₂</span><span><b>ثاني أكسيد الكربون</b><small>CO₂</small></span></div>
+          </div>
+
+          <div class="science-note"><b>ملاحظة علمية</b><p>هذه نسخة تعليمية مبسطة تعرض البنية والروابط وتسلسل التفاعل. الحركة وتأثير الحرارة نوعيان توضيحيان، وليسا قياساً تجريبياً لسرعة التفاعل أو محاكاة كمّية.</p></div>
+        </aside>
+      </section>
+      <footer class="sim-footer"><span>CHEMVERSE MOLECULAR LAB</span><span>LEARN · OBSERVE · DISCOVER</span><span>MODEL 001 / ACID–BICARBONATE</span></footer>
+    </main>
+  </div>
+  <script type="module" src="./src/simulation.js"></script>
+</body>
+</html>
