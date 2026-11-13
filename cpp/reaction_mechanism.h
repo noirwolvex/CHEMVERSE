@@ -15,7 +15,9 @@ enum {
   CV_MECHANISM_STAGE_INTERMEDIATE = 1,
   CV_MECHANISM_STAGE_PRODUCTS = 2,
   CV_MECHANISM_BOND_COVALENT = 0,
-  CV_MECHANISM_BOND_IONIC = 1
+  CV_MECHANISM_BOND_IONIC = 1,
+  CV_MECHANISM_EVENT_COUNT = 2,
+  CV_MECHANISM_MAX_EVENT_CHANGES = 6
 };
 
 /*
@@ -37,6 +39,12 @@ int cv_mechanism_bond_atom_a(int bond_index);
 int cv_mechanism_bond_atom_b(int bond_index);
 int cv_mechanism_bond_kind(int bond_index);
 int cv_mechanism_stage(double progress);
+int cv_mechanism_event_count(void);
+double cv_mechanism_event_progress(int event_index);
+int cv_mechanism_event_change_count(int event_index);
+int cv_mechanism_event_bond_index(int event_index, int change_index);
+double cv_mechanism_event_bond_before(int event_index, int change_index);
+double cv_mechanism_event_bond_after(int event_index, int change_index);
 const double *cv_mechanism_sample(double progress);
 int cv_mechanism_validate(void);
 int cv_mechanism_engine_version(void);
