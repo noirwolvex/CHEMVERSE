@@ -1,5 +1,15 @@
 #include "kinetics_engine.h"
 
+#if defined(__wasm__)
+extern "C" void *memset(void *destination, int value, __SIZE_TYPE__ length) {
+  volatile unsigned char *bytes = static_cast<volatile unsigned char *>(destination);
+  for (__SIZE_TYPE__ index = 0; index < length; ++index) {
+    bytes[index] = static_cast<unsigned char>(value);
+  }
+  return destination;
+}
+#endif
+
 namespace {
 constexpr double R = 8.31446261815324;
 constexpr double LN2 = 0.69314718055994530942;
