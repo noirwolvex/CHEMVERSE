@@ -39,6 +39,19 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_concentration_fit_engine_version \
   -Wl,--strip-all "$ROOT/cpp/concentration_fit.cpp" -o "$ROOT/wasm/concentration_fit.wasm"
 
-printf 'Built %s, %s, %s, and %s\\n' \
+# Atom-mapped reaction mechanism module; stable atom identities and bond-order transitions.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_mechanism_atom_count -Wl,--export=cv_mechanism_bond_count \
+  -Wl,--export=cv_mechanism_atom_id -Wl,--export=cv_mechanism_atom_element \
+  -Wl,--export=cv_mechanism_bond_atom_a -Wl,--export=cv_mechanism_bond_atom_b \
+  -Wl,--export=cv_mechanism_bond_kind -Wl,--export=cv_mechanism_stage \
+  -Wl,--export=cv_mechanism_sample -Wl,--export=cv_mechanism_validate \
+  -Wl,--export=cv_mechanism_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/reaction_mechanism.cpp" -o "$ROOT/wasm/reaction_mechanism.wasm"
+
+printf 'Built %s, %s, %s, %s, and %s\\n' \
   "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
-  "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm"
+  "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm" \
+  "$ROOT/wasm/reaction_mechanism.wasm"
