@@ -142,7 +142,37 @@ jobs:
                 concentrationResult[13] !== 1) {
               throw new Error('Concentration-time regression returned incorrect rates');
             }
-            console.log('Stoichiometry, kinetics, experimental fitting, and concentration-time validation passed');
+            const mechanism = await WebAssembly.instantiate(fs.readFileSync('wasm/reaction_mechanism.wasm'), {});
+            const m = mechanism.instance.exports;
+            const mechanismNames = ['memory', 'cv_mechanism_atom_count', 'cv_mechanism_bond_count',
+              'cv_mechanism_atom_id', 'cv_mechanism_atom_element', 'cv_mechanism_bond_atom_a',
+              'cv_mechanism_bond_atom_b', 'cv_mechanism_bond_kind', 'cv_mechanism_stage',
+              'cv_mechanism_sample', 'cv_mechanism_validate', 'cv_mechanism_engine_version'];
+            for (const name of mechanismNames) {
+              if (!(name in m)) throw new Error('Missing mechanism export: ' + name);
+            }
+            if (m.cv_mechanism_engine_version() !== 100 ||
+                m.cv_mechanism_atom_count() !== 14 ||
+                m.cv_mechanism_bond_count() !== 15 ||
+                m.cv_mechanism_validate() !== 1) {
+              throw new Error('Atom-mapped mechanism identity or conservation validation failed');
+            }
+            const atomIds = Array.from({ length: 14 }, (_, i) => m.cv_mechanism_atom_id(i));
+            if (new Set(atomIds).size !== 14 || atomIds.some(id => !id)) {
+              throw new Error('Mechanism atom IDs must be stable and unique');
+            }
+            const intermediatePointer = m.cv_mechanism_sample(0.5);
+            const intermediate = new Float64Array(m.memory.buffer, intermediatePointer, 14 * 4 + 15);
+            if (intermediate[14 * 4 + 3] !== 0 || intermediate[14 * 4 + 11] !== 1) {
+              throw new Error('Proton-transfer bond mapping failed');
+            }
+            const productPointer = m.cv_mechanism_sample(1);
+            const products = new Float64Array(m.memory.buffer, productPointer, 14 * 4 + 15);
+            if (products[14 * 4 + 8] !== 2 || products[14 * 4 + 9] !== 0 ||
+                products[14 * 4 + 12] !== 1) {
+              throw new Error('Carbonic-acid decomposition bond mapping failed');
+            }
+            console.log('Stoichiometry, kinetics, fitting, concentration-time, and atom-mapped mechanism validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -152,7 +182,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -168,5 +198,6 @@ jobs:
             wasm/kinetics_engine.wasm
             wasm/experimental_fit.wasm
             wasm/concentration_fit.wasm
+            wasm/reaction_mechanism.wasm
           if-no-files-found: error
           retention-days: 14
