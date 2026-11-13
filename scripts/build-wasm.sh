@@ -47,6 +47,9 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_mechanism_atom_id -Wl,--export=cv_mechanism_atom_element \
   -Wl,--export=cv_mechanism_bond_atom_a -Wl,--export=cv_mechanism_bond_atom_b \
   -Wl,--export=cv_mechanism_bond_kind -Wl,--export=cv_mechanism_stage \
+  -Wl,--export=cv_mechanism_event_count -Wl,--export=cv_mechanism_event_progress \
+  -Wl,--export=cv_mechanism_event_change_count -Wl,--export=cv_mechanism_event_bond_index \
+  -Wl,--export=cv_mechanism_event_bond_before -Wl,--export=cv_mechanism_event_bond_after \
   -Wl,--export=cv_mechanism_sample -Wl,--export=cv_mechanism_validate \
   -Wl,--export=cv_mechanism_engine_version \
   -Wl,--strip-all "$ROOT/cpp/reaction_mechanism.cpp" -o "$ROOT/wasm/reaction_mechanism.wasm"
