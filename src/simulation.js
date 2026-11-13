@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getDisplayProgress, getReactionStage, getStageVisuals } from './reaction-stages.mjs';
 import { parseInitialRatesCsv, INITIAL_RATES_CSV_TEMPLATE } from './experimental-data.mjs';
+import { parseConcentrationTimeCsv, CONCENTRATION_TIME_CSV_TEMPLATE } from './concentration-data.mjs';
 
 const view = document.getElementById('molecule-view');
 const loading = document.getElementById('scene-loading');
@@ -69,6 +70,22 @@ const fitR2Result = document.getElementById('fit-r2-result');
 const fitRmseResult = document.getElementById('fit-rmse-result');
 const fitOrdersSeResult = document.getElementById('fit-orders-se-result');
 const fitKSeResult = document.getElementById('fit-k-se-result');
+const concentrationTimeFileInput = document.getElementById('concentration-time-file');
+const downloadConcentrationTemplateButton = document.getElementById('download-concentration-template');
+const analyzeConcentrationTimeButton = document.getElementById('analyze-concentration-time');
+const concentrationTimeStatus = document.getElementById('concentration-time-status');
+const concentrationTimePreview = document.getElementById('concentration-time-preview');
+const concentrationTimePreviewCount = document.getElementById('concentration-time-preview-count');
+const concentrationTimePreviewBody = document.getElementById('concentration-time-preview-body');
+const initialWindowPointsInput = document.getElementById('initial-window-points');
+const rateAgreementToleranceInput = document.getElementById('rate-agreement-tolerance');
+const concentrationTimeResults = document.getElementById('concentration-time-results');
+const concentrationTimeResultsBody = document.getElementById('concentration-time-results-body');
+const concentrationTimeResultsCount = document.getElementById('concentration-time-results-count');
+const concentrationFitKOutput = document.getElementById('concentration-fit-k');
+const concentrationFitMOutput = document.getElementById('concentration-fit-m');
+const concentrationFitNOutput = document.getElementById('concentration-fit-n');
+const concentrationFitR2Output = document.getElementById('concentration-fit-r2');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -107,7 +124,9 @@ let effectiveRateConstant = 0;
 let chemistryCore = null;
 let kineticsCore = null;
 let fittingCore = null;
+let concentrationFitCore = null;
 let importedExperiments = null;
+let importedConcentrationSeries = null;
 let latestExperimentalFit = null;
 let species = {};
 
@@ -152,11 +171,31 @@ async function loadChemistryCore() {
   for (const name of fitRequired) {
     if (!(name in fittingCore)) throw new Error('Missing fitting WebAssembly export: ' + name);
   }
+
+  const concentrationResponse = await fetch(new URL('../wasm/concentration_fit.wasm', import.meta.url));
+  if (!concentrationResponse.ok) {
+    throw new Error('Concentration-time WebAssembly request failed: HTTP ' + concentrationResponse.status);
+  }
+  const concentrationBytes = await concentrationResponse.arrayBuffer();
+  const concentrationInstance = await WebAssembly.instantiate(concentrationBytes, {});
+  concentrationFitCore = concentrationInstance.instance.exports;
+  const concentrationRequired = [
+    'memory', 'cv_concentration_fit_input_buffer', 'cv_concentration_fit_initial_rates',
+    'cv_concentration_fit_last_error', 'cv_concentration_fit_engine_version'
+  ];
+  for (const name of concentrationRequired) {
+    if (!(name in concentrationFitCore)) {
+      throw new Error('Missing concentration-time WebAssembly export: ' + name);
+    }
+  }
+
   engineStatus.classList.add('is-ready');
   engineState.textContent = 'Stoichiometry v' + (api.cv_engine_version() / 100).toFixed(2) +
     ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2) +
-    ' · Fit v' + (fittingCore.cv_fit_engine_version() / 100).toFixed(2);
+    ' · Fit v' + (fittingCore.cv_fit_engine_version() / 100).toFixed(2) +
+    ' · dC/dt v' + (concentrationFitCore.cv_concentration_fit_engine_version() / 100).toFixed(2);
   if (importedExperiments) analyzeInitialRatesButton.disabled = false;
+  if (importedConcentrationSeries) analyzeConcentrationTimeButton.disabled = false;
 }
 
 function optionalNumber(input) {
@@ -380,10 +419,10 @@ function updateChemistryReadouts(result) {
 }
 
 
-function setFitFileStatus(message, state = '') {
-  fitFileStatus.classList.remove('is-error', 'is-ready');
-  if (state) fitFileStatus.classList.add(state);
-  fitFileStatus.textContent = message;
+function setFitFileStatus(message, state = '', target = fitFileStatus) {
+  target.classList.remove('is-error', 'is-ready');
+  if (state) target.classList.add(state);
+  target.textContent = message;
 }
 
 function renderExperimentPreview(dataset) {
@@ -449,7 +488,7 @@ async function readInitialRatesFile(file) {
 function analyzeInitialRates() {
   if (!importedExperiments || !fittingCore) {
     setFitFileStatus('حمّل ملف CSV صالحاً أولاً.', 'is-error');
-    return;
+    return false;
   }
 
   try {
@@ -538,12 +577,266 @@ function analyzeInitialRates() {
         : 'اكتملت الملاءمة، لكن k أو الرتب أو درجة الحرارة خارج نطاق محرك المحاكاة الحالي. احتفظ بالنتائج للتحليل، ولا يمكن اعتمادها في هذا الإصدار.',
       canApplyToCurrentEngine ? 'is-ready' : 'is-error'
     );
+    if (concentrationFitKOutput) {
+      concentrationFitKOutput.textContent = latestExperimentalFit.k.toExponential(4);
+      concentrationFitMOutput.textContent = latestExperimentalFit.orderA.toFixed(4);
+      concentrationFitNOutput.textContent = latestExperimentalFit.orderB.toFixed(4);
+      concentrationFitR2Output.textContent = Number.isFinite(latestExperimentalFit.rSquared)
+        ? latestExperimentalFit.rSquared.toFixed(6)
+        : 'غير معرّف';
+    }
+    return true;
   } catch (error) {
     latestExperimentalFit = null;
     fitResults.hidden = true;
     applyFittedParametersButton.disabled = true;
     setFitFileStatus(error.message || 'تعذّر تحليل البيانات.', 'is-error');
+    return false;
   }
+}
+
+function renderConcentrationTimePreview(dataset) {
+  concentrationTimePreviewBody.replaceChildren();
+  dataset.experiments.slice(0, 12).forEach((experiment) => {
+    const first = experiment.samples[0];
+    const row = document.createElement('tr');
+    const values = [
+      experiment.id,
+      experiment.temperatureC.toFixed(2),
+      String(experiment.samples.length),
+      first.concentrationA.toExponential(3),
+      first.concentrationB.toExponential(3)
+    ];
+    values.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    concentrationTimePreviewBody.appendChild(row);
+  });
+  concentrationTimePreviewCount.textContent =
+    dataset.count + ' تجارب · ' + dataset.totalSamples + ' قراءة · ' +
+    dataset.temperatureC + ' °C';
+  concentrationTimePreview.hidden = false;
+}
+
+async function readConcentrationTimeFile(file) {
+  importedConcentrationSeries = null;
+  latestExperimentalFit = null;
+  fitResults.hidden = true;
+  applyFittedParametersButton.disabled = true;
+  analyzeConcentrationTimeButton.disabled = true;
+  concentrationTimePreview.hidden = true;
+  concentrationTimeResults.hidden = true;
+
+  if (!file) {
+    setFitFileStatus('لم يتم اختيار ملف بيانات تركيز مقابل الزمن.', '', concentrationTimeStatus);
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+    setFitFileStatus('اختر ملف CSV بامتداد .csv فقط.', 'is-error', concentrationTimeStatus);
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    setFitFileStatus('حجم الملف يتجاوز الحد المسموح (2 MB).', 'is-error', concentrationTimeStatus);
+    return;
+  }
+
+  try {
+    const source = await file.text();
+    importedConcentrationSeries = parseConcentrationTimeCsv(source);
+    importedConcentrationSeries.fileName = file.name;
+    renderConcentrationTimePreview(importedConcentrationSeries);
+    analyzeConcentrationTimeButton.disabled = !concentrationFitCore || !fittingCore;
+    const minPoints = importedConcentrationSeries.minimumPoints;
+    const maxPoints = importedConcentrationSeries.maximumPoints;
+    setFitFileStatus(
+      'تم التحقق من بنية البيانات: ' + importedConcentrationSeries.count +
+      ' تجارب و' + importedConcentrationSeries.totalSamples + ' قراءة عند ' +
+      importedConcentrationSeries.temperatureC + ' °C. هذا تحقق بنيوي، وليس تصديقاً مستقلاً على القياسات.',
+      'is-ready',
+      concentrationTimeStatus
+    );
+    initialWindowPointsInput.max = String(maxPoints);
+    initialWindowPointsInput.min = '3';
+    initialWindowPointsInput.value = String(Math.min(5, maxPoints));
+    initialWindowPointsInput.disabled = maxPoints < 3 || minPoints < 3;
+  } catch (error) {
+    importedConcentrationSeries = null;
+    setFitFileStatus(error.message || 'تعذر قراءة ملف التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
+  }
+}
+
+function renderConcentrationSlopeResults(rows, pointCount) {
+  concentrationTimeResultsBody.replaceChildren();
+  rows.forEach((item) => {
+    const row = document.createElement('tr');
+    const values = [
+      item.id,
+      item.rateA.toExponential(3),
+      item.rateB.toExponential(3),
+      (item.relativeDisagreement * 100).toFixed(1) + '%',
+      (item.rSquaredA * 100).toFixed(2) + '% / ' + (item.rSquaredB * 100).toFixed(2) + '%'
+    ];
+    values.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    concentrationTimeResultsBody.appendChild(row);
+  });
+  concentrationTimeResultsCount.textContent =
+    'أول ' + pointCount + ' نقاط من كل تجربة · ' + rows.length + ' تجارب';
+  concentrationTimeResults.hidden = false;
+}
+
+function analyzeConcentrationTime() {
+  if (!importedConcentrationSeries || !concentrationFitCore || !fittingCore) {
+    setFitFileStatus('استورد ملف CSV صالحاً وانتظر تحميل محركات WebAssembly.', 'is-error', concentrationTimeStatus);
+    return;
+  }
+
+  latestExperimentalFit = null;
+  fitResults.hidden = true;
+  applyFittedParametersButton.disabled = true;
+  concentrationTimeResults.hidden = true;
+
+  try {
+    const pointCount = Number(initialWindowPointsInput.value);
+    const tolerancePercent = Number(rateAgreementToleranceInput.value);
+    if (!Number.isInteger(pointCount) || pointCount < 3 || pointCount > 64 ||
+        !Number.isFinite(tolerancePercent) || tolerancePercent < 0 || tolerancePercent > 200) {
+      throw new Error('أدخل عدد نقاط من 3 إلى 64 وحد اختلاف من 0% إلى 200%.');
+    }
+    if (importedConcentrationSeries.experiments.some((experiment) => experiment.samples.length < pointCount)) {
+      throw new Error('بعض التجارب لا تحتوي على عدد النقاط المحدد في نافذة السرعة الابتدائية.');
+    }
+
+    const derivedRows = [];
+    const slopeDiagnostics = [];
+    const tolerance = tolerancePercent / 100;
+
+    importedConcentrationSeries.experiments.forEach((experiment) => {
+      const samples = experiment.samples.slice(0, pointCount);
+      const pointer = concentrationFitCore.cv_concentration_fit_input_buffer();
+      const input = new Float64Array(
+        concentrationFitCore.memory.buffer,
+        pointer,
+        pointCount * 3
+      );
+      const firstTime = samples[0].timeS;
+      samples.forEach((sample, index) => {
+        const offset = index * 3;
+        input[offset] = sample.timeS - firstTime;
+        input[offset + 1] = sample.concentrationA;
+        input[offset + 2] = sample.concentrationB;
+      });
+
+      const resultPointer = concentrationFitCore.cv_concentration_fit_initial_rates(pointCount, tolerance);
+      const errorCode = concentrationFitCore.cv_concentration_fit_last_error();
+      if (!resultPointer || errorCode !== 0) {
+        const messages = {
+          1: 'توجد أزمنة مكررة أو قيم غير صالحة في التجربة ' + experiment.id + '.',
+          2: 'كل تجربة تحتاج ثلاث نقاط زمنية على الأقل.',
+          3: 'تعذر تحديد ميل التركيز؛ تحقق من اختلاف الأزمنة.',
+          4: 'حدث تجاوز عددي أثناء استخراج الميل.',
+          5: 'لم يظهر تناقص في تركيز أحد المتفاعلين في التجربة ' + experiment.id + '. تحقق من ترتيب القراءات والقياسات.'
+        };
+        throw new Error(messages[errorCode] || 'فشل استخراج السرعة الابتدائية (رمز ' + errorCode + ').');
+      }
+
+      const values = new Float64Array(
+        concentrationFitCore.memory.buffer,
+        resultPointer,
+        14
+      );
+      const diagnostic = {
+        id: experiment.id,
+        rateA: values[4],
+        rateB: values[9],
+        relativeDisagreement: values[10],
+        meanRate: values[11],
+        rSquaredA: values[2],
+        rSquaredB: values[7],
+        ratesConsistent: values[13] === 1,
+        pointCount: values[12],
+        firstTimeS: firstTime
+      };
+      slopeDiagnostics.push(diagnostic);
+      derivedRows.push({
+        id: experiment.id,
+        temperatureC: experiment.temperatureC,
+        concentrationA: samples[0].concentrationA,
+        concentrationB: samples[0].concentrationB,
+        initialRate: diagnostic.meanRate
+      });
+    });
+
+    renderConcentrationSlopeResults(slopeDiagnostics, pointCount);
+    const incompatible = slopeDiagnostics.filter((item) => !item.ratesConsistent);
+    if (incompatible.length > 0) {
+      latestExperimentalFit = null;
+      applyFittedParametersButton.disabled = true;
+      setFitFileStatus(
+        'توقّف التحليل: اختلاف سرعتي اختفاء A وB تجاوز حد السماح (' +
+        tolerancePercent.toFixed(1) + '%) في ' + incompatible.map((item) => item.id).join('، ') +
+        '. راجع القياسات أو نافذة النقاط؛ لم نستخدم متوسطاً غير متوافق لاستخراج k وm وn.',
+        'is-error',
+        concentrationTimeStatus
+      );
+      return;
+    }
+
+    const derivedDataset = {
+      experiments: derivedRows,
+      temperatureC: importedConcentrationSeries.temperatureC,
+      count: derivedRows.length,
+      fileName: importedConcentrationSeries.fileName,
+      method: 'concentration-time-derived-initial-rates'
+    };
+    const previousDataset = importedExperiments;
+    importedExperiments = derivedDataset;
+    const fitSucceeded = analyzeInitialRates();
+    importedExperiments = previousDataset;
+
+    if (!fitSucceeded || !latestExperimentalFit) {
+      setFitFileStatus(
+        'استُخرجت السرعات الابتدائية، لكن لم تنجح ملاءمة قانون السرعة. راجع شروط استقلال تغير [A] و[B] في التجارب.',
+        'is-error',
+        concentrationTimeStatus
+      );
+      return;
+    }
+
+    const delayedStart = slopeDiagnostics.some((item) => item.firstTimeS > 1.0e-9);
+    setFitFileStatus(
+      'اكتمل التحليل: استُخرجت السرعات من أول ' + pointCount +
+      ' نقاط بالانحدار الخطي، ثم استُخرج k وm وn من ' + derivedRows.length +
+      ' تجارب. اتفاق السرعتين ضمن ' + tolerancePercent.toFixed(1) +
+      '%. ' + (delayedStart
+        ? 'تنبيه: أول قراءة لبعض التجارب لم تكن عند t=0؛ تأخر بدء التسجيل قد يقلل تمثيل الميل للسرعة الابتدائية الفعلية.'
+        : 'بدأت القراءات من t=0 حسب الملف.'),
+      'is-ready',
+      concentrationTimeStatus
+    );
+  } catch (error) {
+    latestExperimentalFit = null;
+    applyFittedParametersButton.disabled = true;
+    fitResults.hidden = true;
+    setFitFileStatus(error.message || 'تعذّر تحليل بيانات التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
+  }
+}
+
+function downloadConcentrationTimeTemplate() {
+  const blob = new Blob([CONCENTRATION_TIME_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'chemverse-concentration-time-template.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function applyExperimentalFitToSimulator() {
@@ -1079,6 +1372,11 @@ playButton.addEventListener('click', togglePlayback);
 initialRatesFileInput.addEventListener('change', () => {
   readInitialRatesFile(initialRatesFileInput.files && initialRatesFileInput.files[0]);
 });
+concentrationTimeFileInput.addEventListener('change', () => {
+  readConcentrationTimeFile(concentrationTimeFileInput.files && concentrationTimeFileInput.files[0]);
+});
+downloadConcentrationTemplateButton.addEventListener('click', downloadConcentrationTimeTemplate);
+analyzeConcentrationTimeButton.addEventListener('click', analyzeConcentrationTime);
 downloadFitTemplateButton.addEventListener('click', downloadInitialRatesTemplate);
 analyzeInitialRatesButton.addEventListener('click', analyzeInitialRates);
 applyFittedParametersButton.addEventListener('click', applyExperimentalFitToSimulator);
