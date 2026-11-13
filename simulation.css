@@ -53,7 +53,7 @@ button, a, select, input { -webkit-tap-highlight-color: transparent; }
 .page-heading h1 em { color: var(--accent); font-style: normal; }
 .page-heading p { margin: 0; color: var(--muted); font-size: 11px; }
 .model-badge { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border: 1px solid rgba(114,217,197,.2); border-radius: 5px; color: #9fbbb5; background: rgba(114,217,197,.055); white-space: nowrap; font-size: 9px; }
-.sim-workspace { display: grid; grid-template-columns: 250px minmax(360px, 1fr) 280px; gap: 14px; min-height: 650px; flex: 1; align-items: stretch; }
+.sim-workspace { display: grid; grid-template-columns: 225px minmax(0, 1.35fr) 250px; gap: 14px; min-height: 720px; flex: 1; align-items: stretch; }
 .panel, .molecule-panel, .chart-panel { border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(150deg, rgba(21,39,49,.97), rgba(14,28,37,.97)); box-shadow: 0 16px 44px rgba(0,0,0,.16); }
 .panel { padding: 20px 18px; min-width: 0; }
 .panel-kicker { color: #729b99; }
@@ -86,7 +86,7 @@ button, a, select, input { -webkit-tap-highlight-color: transparent; }
 .atom-counts b { color: var(--accent); }
 .atom-balance p { margin: 8px 0 0; color: #748f92; font-size: 8px; line-height: 1.7; }
 .center-column { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.molecule-panel { display: flex; flex-direction: column; min-height: 420px; overflow: hidden; flex: 1; }
+.molecule-panel { display: flex; flex-direction: column; min-height: 590px; overflow: hidden; flex: 1; }
 .molecule-toolbar { height: 58px; flex: 0 0 58px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--line); }
 .scene-title { display: flex; align-items: center; gap: 10px; }
 .scene-live { width: 6px; height: 6px; }
@@ -96,7 +96,7 @@ button, a, select, input { -webkit-tap-highlight-color: transparent; }
 .view-hint { color: #718c8e; font-size: 8px; }
 .square-button, .secondary-control { width: 32px; height: 32px; display: grid; place-items: center; color: #b7cdc6; background: #172d37; border: 1px solid var(--line); border-radius: 5px; cursor: pointer; font-size: 17px; transition: .2s; }
 .square-button:hover, .secondary-control:hover { border-color: rgba(114,217,197,.5); color: var(--accent); }
-.molecule-view { position: relative; flex: 1; min-height: 350px; overflow: hidden; background: radial-gradient(ellipse at 50% 45%, #18313d 0%, #0e1d28 64%, #0b1721 100%); }
+.molecule-view { position: relative; flex: 1; min-height: 490px; overflow: hidden; background: radial-gradient(ellipse at 50% 45%, #18313d 0%, #0e1d28 64%, #0b1721 100%); }
 .molecule-view canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; outline: none; }
 .scene-corner { pointer-events: none; position: absolute; width: 22px; height: 22px; z-index: 2; opacity: .55; }
 .scene-corner-tl { top: 13px; left: 13px; border-top: 1px solid #69baa9; border-left: 1px solid #69baa9; }
@@ -153,7 +153,7 @@ button, a, select, input { -webkit-tap-highlight-color: transparent; }
 .sim-footer { display: flex; justify-content: space-between; gap: 12px; padding: 13px 5px 0; color: #526c72; font: 600 7px "Space Grotesk", sans-serif; letter-spacing: .16em; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 1180px) {
-  .sim-workspace { grid-template-columns: 220px minmax(320px,1fr) 250px; gap: 10px; }
+  .sim-workspace { grid-template-columns: 205px minmax(0,1fr) 225px; gap: 10px; }
   .panel { padding: 17px 14px; }
   .experiment-panel h2, .controls-panel h2 { font-size: 13px; }
   .equation { font-size: 9px; gap: 3px; }
@@ -167,7 +167,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .experiment-panel .atom-balance { max-width: 420px; }
   .center-column { grid-column: 1; }
   .controls-panel { grid-column: 2; grid-row: 2; }
-  .molecule-panel { min-height: 440px; }
+  .molecule-panel { min-height: 560px; }
   .sim-main { padding-top: 20px; }
 }
 @media (max-width: 650px) {
@@ -187,8 +187,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .controls-panel { order: 3; }
   .experiment-panel .stage-item { width: 100%; display: flex; }
   .experiment-panel .stage-list { max-width: none; }
-  .molecule-panel { min-height: 430px; }
-  .molecule-view { min-height: 340px; }
+  .molecule-panel { min-height: 500px; }
+  .molecule-view { min-height: 410px; }
   .view-hint { display: none; }
   .atom-legend { flex-wrap: wrap; gap: 9px 14px; font-size: 7px; }
   .chart-panel { flex-basis: 150px; }
@@ -489,4 +489,39 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   text-align: left;
   font: 600 10px "Space Grotesk", sans-serif;
   overflow-wrap: anywhere;
+}
+
+
+/* Focus mode: give the Three.js canvas the full display for close inspection. */
+.molecule-panel:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: #0e1d28;
+}
+.molecule-panel:fullscreen .molecule-toolbar {
+  height: 68px;
+  flex-basis: 68px;
+  padding-inline: clamp(18px, 3vw, 42px);
+}
+.molecule-panel:fullscreen .molecule-view {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.molecule-panel:fullscreen .scene-title b { font-size: 11px; }
+.molecule-panel:fullscreen .scene-title small,
+.molecule-panel:fullscreen .view-hint { font-size: 10px; }
+.molecule-panel:fullscreen .scene-overlay-label,
+.molecule-panel:fullscreen .scene-scale-note { font-size: 9px; }
+.molecule-panel:fullscreen .atom-legend {
+  min-height: 54px;
+  font-size: 10px;
+  gap: 26px;
+}
+.molecule-panel:fullscreen .atom-legend i {
+  width: 10px;
+  height: 10px;
 }
