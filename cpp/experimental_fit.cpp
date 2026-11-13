@@ -18,7 +18,6 @@ bool finiteValue(double value) {
   return value == value && value <= 1.0e300 && value >= -1.0e300;
 }
 
-double absValue(double value) { return value < 0.0 ? -value : value; }
 double maxValue(double a, double b) { return a > b ? a : b; }
 
 double logApprox(double value) {
