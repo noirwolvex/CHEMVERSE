@@ -168,12 +168,12 @@
               <label class="kinetics-field kinetics-field-wide" for="duration-seconds">مدة المحاكاة (s)
                 <input id="duration-seconds" type="number" min="0.1" max="10000000" step="any" value="60" inputmode="decimal">
               </label>
-              <label class="kinetics-field kinetics-field-wide" for="kinetics-source">مصدر بيانات الحركية (DOI أو رابط أو وصف تجربة)
+              <label class="kinetics-field kinetics-field-wide" for="kinetics-source">مرجع بيانات الحركية (DOI أو رابط أو وصف تجربة — إدخال يدوي)
                 <input id="kinetics-source" type="text" maxlength="500" placeholder="أدخل مرجع k ورتب التفاعل أو بيانات التجربة">
               </label>
             </div>
             <div class="kinetics-units" id="rate-constant-unit">وحدات k تعتمد على الرتبة الكلية m + n.</div>
-            <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً.</p>
+            <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. يُسجّل المرجع كنص فقط ولا يتحقق النظام آلياً من صحته أو من تطابقه مع القيم. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً.</p>
             <div class="kinetics-parameter-status" id="kinetics-parameter-status" aria-live="polite">الحركية غير مفعّلة: أدخل k والرتبتين التجريبيتين.</div>
           </section>
           <div class="control-block">
