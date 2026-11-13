@@ -20,7 +20,7 @@ FIT_OUT="$OUT_DIR/chemverse-experimental-fit-test"
 "$FIT_OUT"
 
 CONCENTRATION_OUT="$OUT_DIR/chemverse-concentration-fit-test"
-"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \\
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
   "$ROOT/cpp/concentration_fit.cpp" "$ROOT/tests/concentration_fit_test.cpp" -o "$CONCENTRATION_OUT"
 "$CONCENTRATION_OUT"
 
