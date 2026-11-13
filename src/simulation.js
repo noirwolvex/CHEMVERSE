@@ -89,8 +89,6 @@ const concentrationFitMOutput = document.getElementById('concentration-fit-m');
 const concentrationFitNOutput = document.getElementById('concentration-fit-n');
 const concentrationFitR2Output = document.getElementById('concentration-fit-r2');
 const applyConcentrationFitButton = document.getElementById('apply-concentration-fit');
-const mechanismReadout = document.getElementById('mechanism-readout');
-const atomSelectionReadout = document.getElementById('atom-selection-readout');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -1039,8 +1037,6 @@ function buildMolecularScene() {
     mechanismBonds.push(createTrackedBond(index));
   }
 
-  atomSelectionReadout.textContent = 'انقر على أي ذرة لعرض معرّفها الثابت';
-  mechanismReadout.textContent = atomCount + ' ATOMS TRACKED · ' + bondCount + ' BOND RECORDS';
 }
 
 function updateCovalentBond(bond, order) {
@@ -1144,11 +1140,6 @@ function selectTrackedAtom(event) {
   selectedMechanismAtom = intersections[0].object;
   selectedMechanismAtom.scale.setScalar(1.22);
   selectedMechanismAtom.material.emissiveIntensity = 0.34;
-  atomSelectionReadout.textContent =
-    selectedMechanismAtom.userData.atomId + ' · ' +
-    selectedMechanismAtom.userData.element + ' / ' +
-    selectedMechanismAtom.userData.elementName +
-    ' — هوية الذرة ثابتة خلال جميع مراحل التفاعل';
 }
 
 function updateStageUI(progress, chemistryResult, visualDemo) {
@@ -1160,7 +1151,6 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
       label: 'REACTANTS / STABLE ATOM MAP',
       title: 'المواد المتفاعلة',
       description: 'حمض الأسيتيك وبيكربونات الصوديوم. يحتفظ كل عنصر ذري بمعرّف واحد طوال مسار التفاعل.',
-      readout: '14 ATOMS · REACTANT BONDS',
       icon: '◌'
     },
     intermediate: {
@@ -1168,7 +1158,6 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
       label: 'STEP 01 / PROTON TRANSFER',
       title: 'انتقال البروتون',
       description: 'تنكسر رابطة O-AC-Hacid وتتكون رابطة O-BIC-O2-Hacid. ينتقل ارتباط Na+ الأيوني من البيكربونات إلى الأسيتات.',
-      readout: 'H-ACID → O-BIC-O2 · ACETATE + H₂CO₃',
       icon: '↗'
     },
     products: {
@@ -1176,7 +1165,6 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
       label: 'STEP 02 / CARBONIC ACID DECOMPOSITION',
       title: 'تكوّن النواتج',
       description: 'تتحول رابطة C-BIC-O2 إلى رابطة مزدوجة في CO₂، وينتقل H-ACID إلى O-BIC-O3 لتكوين الماء. تبقى ذرات الأسيتات والصوديوم محفوظة.',
-      readout: 'H₂O + CO₂ · ALL 14 ATOMS RETAINED',
       icon: '✓'
     }
   };
@@ -1186,7 +1174,6 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
   statusTitle.textContent = info.title;
   statusDescription.textContent = info.description;
   statusIcon.textContent = info.icon;
-  mechanismReadout.textContent = info.readout;
 
   document.querySelectorAll('.stage-item').forEach((item) => {
     const itemStage = item.dataset.stage;
