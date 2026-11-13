@@ -100,6 +100,31 @@ experiment_id,temperature_c,concentration_a_mol_l,concentration_b_mol_l,initial_
 - Use **Apply fitted parameters** to copy the estimated `k`, `m`, `n`, and the dataset temperature into the simulator. The fit is performed at that temperature; a single-temperature dataset cannot determine activation energy.
 - CSV files are limited to 2 MB and 256 experiments in the current browser implementation.
 
-This module implements the method of initial rates. It does not calculate initial slopes from raw concentration–time series yet, perform Arrhenius fitting across temperatures, or verify the experimental provenance, instrument calibration, or measurement method. A high `R²` alone does not prove that the assumed power-law model or a proposed reaction mechanism is chemically correct. The estimated standard errors describe the regression under its assumptions and do not include systematic experimental uncertainty.
+This module implements the method of initial rates. It does not perform Arrhenius fitting across temperatures or independently verify experimental provenance, instrument calibration, or measurement methods. A high `R²` alone does not prove that the assumed power-law model or a proposed reaction mechanism is chemically correct. The estimated standard errors describe the regression under its assumptions and do not include systematic experimental uncertainty.
 
 The fitting ABI and native tests are in `cpp/experimental_fit.h`, `cpp/experimental_fit.cpp`, and `tests/experimental_fit_test.cpp`. CSV parsing and browser tests are in `src/experimental-data.mjs` and `tests/experimental-data.test.mjs`. The browser module is `wasm/experimental_fit.wasm`, built by `scripts/build-wasm.sh`.
+
+
+## Concentration-time analyzer — v1
+
+The simulator can now derive initial rates from raw concentration-versus-time measurements before estimating the empirical rate law.
+
+Required CSV columns (case-insensitive):
+
+```csv
+experiment_id,time_s,temperature_c,concentration_a_mol_l,concentration_b_mol_l
+```
+
+- Each experiment ID groups one time series. Provide at least four independent experiments, with at least three readings per experiment.
+- Time is non-negative and measured in seconds. Concentrations must be positive and measured in mol/L (M).
+- All experiments in one file must use the same temperature. Analyze different temperatures in separate files.
+- Rows may be interleaved; the browser groups samples by experiment and sorts them by time. Duplicate time points within an experiment are rejected.
+- CSV files are limited to 2 MB, 64 experiments, and 64 readings per experiment in this version.
+- Select the number of early readings (3 through the smallest available series length). The C++/WebAssembly engine applies ordinary least squares separately to [A](t) and [B](t), returning both slopes, intercepts, R² values, and RMSE values.
+- Disappearance rates are calculated as `rate_A = -d[A]/dt` and `rate_B = -d[B]/dt`. Because this experiment is represented as a 1:1 reaction, the browser compares the two rates. The default maximum relative disagreement is 20% and can be adjusted; if the measured rates exceed the selected tolerance, the analyzer shows the diagnostics and stops instead of silently averaging them.
+- When the rates pass the consistency check, their mean is passed to the existing initial-rate fitter together with the first measured concentrations for each experiment. The resulting `k`, `m`, and `n` can then be applied to the simulator.
+- If a time series starts after zero, time is shifted to its first sample for the line fit and the interface warns that delayed acquisition can make the slope less representative of the true initial rate. Start recording as close as possible to mixing.
+
+This is a linear-window estimate, not a full nonlinear fit of the complete concentration-time profile. Inspect the per-species R² values, the selected early-time window, and agreement between both reactants before relying on the derived initial rates. The analyzer does not correct sensor drift, mixing delay, side reactions, or systematic measurement errors.
+
+The C++ ABI and native regression tests are in `cpp/concentration_fit.h`, `cpp/concentration_fit.cpp`, and `tests/concentration_fit_test.cpp`. CSV grouping and validation are in `src/concentration-data.mjs` and `tests/concentration-data.test.mjs`. The browser module is `wasm/concentration_fit.wasm`, built by `scripts/build-wasm.sh`.
