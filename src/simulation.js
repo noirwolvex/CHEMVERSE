@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { getDisplayProgress, getReactionStage, getStageVisuals } from './reaction-stages.mjs';
 
 const view = document.getElementById('molecule-view');
 const loading = document.getElementById('scene-loading');
@@ -46,6 +47,7 @@ const bicarbonateConcentrationOutput = document.getElementById('bicarbonate-conc
 const reactionRateOutput = document.getElementById('reaction-rate-output');
 const effectiveKOutput = document.getElementById('effective-k-output');
 const chartDuration = document.getElementById('chart-duration');
+const chartTitle = document.getElementById('chart-title');
 const chartDescription = document.getElementById('chart-description');
 
 const KINETICS_SAMPLE_COUNT = 121;
@@ -80,6 +82,7 @@ let referenceTemperatureC = Number(referenceTemperatureInput.value);
 let activationEnergyKJ = null;
 let kineticsCurve = null;
 let kineticsConfigured = false;
+let simulationAvailable = false;
 let effectiveRateConstant = 0;
 let chemistryCore = null;
 let kineticsCore = null;
@@ -176,12 +179,24 @@ function buildKineticsCurve() {
     kineticsCurve = null;
     kineticsConfigured = false;
     effectiveRateConstant = 0;
+    const kineticsInputsStarted = [
+      rateConstantInput,
+      acidOrderInput,
+      bicarbonateOrderInput,
+      activationEnergyInput,
+      kineticsSourceInput
+    ].some((input) => input.value.trim() !== '');
+    simulationAvailable = !kineticsInputsStarted;
     kineticsParameterStatus.classList.remove('is-ready', 'is-error');
-    kineticsParameterStatus.textContent =
-      'الحركية غير مفعّلة: أدخل k ورتبتي التفاعل والحجم ومرجعاً موثقاً للقيم.';
-    chartDescription.textContent = 'بانتظار مدخلات حركية موثقة لاحتساب المنحنى.';
-    playButton.disabled = true;
-    timeline.disabled = true;
+    kineticsParameterStatus.textContent = simulationAvailable
+      ? 'وضع العرض المرئي فقط: ستُعرض المراحل الثلاث بالتتابع، دون احتساب سرعة تفاعل أو نواتج كمية.'
+      : 'مدخلات الحركية غير مكتملة أو غير صالحة. أكمل k والرتبتين والمرجع، أو أفرغ حقول الحركية لتشغيل العرض المرئي فقط.';
+    chartTitle.textContent = simulationAvailable ? 'تسلسل العرض البصري' : 'الحركية غير متاحة';
+    chartDescription.textContent = simulationAvailable
+      ? 'مؤشر زمني لمراحل العرض فقط؛ لا يمثل تحولاً كيميائياً محسوباً.'
+      : 'أكمل مدخلات الحركية الصحيحة لتوليد منحنى علمي.';
+    playButton.disabled = !simulationAvailable;
+    timeline.disabled = !simulationAvailable;
     return false;
   }
 
@@ -200,6 +215,7 @@ function buildKineticsCurve() {
     const errorCode = kineticsCore.cv_kinetics_last_error();
     kineticsCurve = null;
     kineticsConfigured = false;
+    simulationAvailable = false;
     effectiveRateConstant = 0;
     kineticsParameterStatus.classList.remove('is-ready');
     kineticsParameterStatus.classList.add('is-error');
@@ -231,10 +247,12 @@ function buildKineticsCurve() {
 
   effectiveRateConstant = kineticsCore.cv_kinetics_effective_k();
   kineticsConfigured = kineticsCore.cv_kinetics_atom_balance_ok() === 1;
+  simulationAvailable = kineticsConfigured;
   if (!kineticsConfigured) throw new Error('Kinetics engine failed stoichiometric conservation validation.');
 
   kineticsParameterStatus.classList.remove('is-error');
   kineticsParameterStatus.classList.add('is-ready');
+  chartTitle.textContent = 'التقدم الحركي المحسوب';
   chartDescription.textContent = 'منحنى محسوب من قانون السرعة والبيانات المدخلة.';
   kineticsParameterStatus.textContent =
     'اكتمل حساب المنحنى بـ ' + kineticsCore.cv_kinetics_last_steps() +
@@ -306,22 +324,23 @@ function calculateChemistry(timeSeconds) {
 }
 function formatMmol(value) { return value.toFixed(2) + ' mmol'; }
 function updateChemistryReadouts(result) {
+  const visualDemo = simulationAvailable && !kineticsConfigured;
   acidAmountReadout.textContent = acidConcentrationM.toFixed(3) + ' M';
   bicarbonateAmountReadout.textContent = bicarbonateConcentrationM.toFixed(3) + ' M';
-  acidRemainingOutput.textContent = formatMmol(result.acidRemaining);
-  bicarbonateRemainingOutput.textContent = formatMmol(result.bicarbonateRemaining);
-  sodiumAcetateOutput.textContent = formatMmol(result.sodiumAcetate);
-  waterOutput.textContent = formatMmol(result.water);
-  carbonDioxideOutput.textContent = formatMmol(result.carbonDioxide);
+  acidRemainingOutput.textContent = visualDemo ? '—' : formatMmol(result.acidRemaining);
+  bicarbonateRemainingOutput.textContent = visualDemo ? '—' : formatMmol(result.bicarbonateRemaining);
+  sodiumAcetateOutput.textContent = visualDemo ? '—' : formatMmol(result.sodiumAcetate);
+  waterOutput.textContent = visualDemo ? '—' : formatMmol(result.water);
+  carbonDioxideOutput.textContent = visualDemo ? '—' : formatMmol(result.carbonDioxide);
   const labels = ['متساويان', 'حمض الأسيتيك', 'بيكربونات الصوديوم'];
   limitingReagentOutput.textContent = labels[result.limitingReagent] || 'غير محدد';
   atomIntegrity.classList.toggle('is-error', !result.atomBalanceOk);
   atomIntegrity.lastChild.textContent = result.atomBalanceOk
-    ? ' حفظ الذرات متحقق'
+    ? ' حفظ المعادلة الذرية متحقق'
     : ' فشل التحقق من حفظ الذرات';
-  acidConcentrationOutput.textContent = result.acidConcentration.toExponential(3) + ' M';
-  bicarbonateConcentrationOutput.textContent = result.bicarbonateConcentration.toExponential(3) + ' M';
-  reactionRateOutput.textContent = result.rate.toExponential(3) + ' M/s';
+  acidConcentrationOutput.textContent = visualDemo ? '— M' : result.acidConcentration.toExponential(3) + ' M';
+  bicarbonateConcentrationOutput.textContent = visualDemo ? '— M' : result.bicarbonateConcentration.toExponential(3) + ' M';
+  reactionRateOutput.textContent = visualDemo ? 'غير محسوب' : result.rate.toExponential(3) + ' M/s';
   effectiveKOutput.textContent = kineticsConfigured ? result.effectiveK.toExponential(3) : '—';
 }
 
@@ -535,17 +554,21 @@ function moveSpecies(group, x, y, z, time, phase, amplitude) {
   );
 }
 
-function updateMolecularScene(time, result) {
-  // Vibration remains schematic; only supplied Ea data can adjust k(T) via Arrhenius.
+function updateMolecularScene(time, result, displayProgress, visualDemo) {
+  // Temperature-dependent vibration is illustrative; only supplied Ea changes k(T).
   const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
   const vibration = 0.018 * temperatureFactor;
-  const progress = result.progress;
-  const intermediateFade = smoothStep(0.34, 0.48, progress) * (1 - smoothStep(0.68, 0.82, progress));
-  const acidVisibility = acidAmountMmol > 0 ? result.acidRemaining / acidAmountMmol : 0;
-  const bicarbonateVisibility = bicarbonateAmountMmol > 0 ? result.bicarbonateRemaining / bicarbonateAmountMmol : 0;
-  const approach = smoothStep(0, 0.45, progress);
-  const acidX = THREE.MathUtils.lerp(-2.05, -0.88, approach);
-  const bicarbonateX = THREE.MathUtils.lerp(2.05, 0.88, approach);
+  const progress = displayProgress;
+  const visuals = getStageVisuals(progress, visualDemo);
+  const intermediateFade = visuals.intermediate;
+  const acidVisibility = visualDemo
+    ? visuals.reactants
+    : (acidAmountMmol > 0 ? result.acidRemaining / acidAmountMmol : 0);
+  const bicarbonateVisibility = visualDemo
+    ? visuals.reactants
+    : (bicarbonateAmountMmol > 0 ? result.bicarbonateRemaining / bicarbonateAmountMmol : 0);
+  const acidX = THREE.MathUtils.lerp(-2.05, -0.88, visuals.approach);
+  const bicarbonateX = THREE.MathUtils.lerp(2.05, 0.88, visuals.approach);
   moveSpecies(species.acetic, acidX, 0.03, 0, time, 0.4, vibration);
   moveSpecies(species.bicarbonate, bicarbonateX, -0.03, 0, time, 1.6, vibration);
   setOpacity(species.acetic, acidVisibility);
@@ -557,20 +580,13 @@ function updateMolecularScene(time, result) {
   moveSpecies(species.sodiumAcetate, -1.82, 0.12, 0, time, 0.7, vibration * 0.45);
   moveSpecies(species.carbonDioxide, 1.25, 0.72, 0, time, 1.8, vibration * 0.9);
   moveSpecies(species.water, 2.75, -1.03, 0.28, time, 2.7, vibration * 0.6);
-  const productVisibility = smoothStep(0.68, 0.88, progress);
-  setOpacity(species.sodiumAcetate, productVisibility);
-  setOpacity(species.carbonDioxide, productVisibility);
-  setOpacity(species.water, productVisibility);
+  setOpacity(species.sodiumAcetate, visuals.products);
+  setOpacity(species.carbonDioxide, visuals.products);
+  setOpacity(species.water, visuals.products);
 }
 
-function currentStage(progress) {
-  if (progress < 0.34) return 'reactants';
-  if (progress < 0.82) return 'intermediate';
-  return 'products';
-}
-
-function updateStageUI(progress, chemistryResult) {
-  const stage = currentStage(progress);
+function updateStageUI(progress, chemistryResult, visualDemo) {
+  const stage = getReactionStage(progress, visualDemo);
   const descriptions = {
     reactants: {
       caption: 'الجزيئات تقترب استعداداً للتفاعل',
@@ -610,7 +626,7 @@ function updateStageUI(progress, chemistryResult) {
     );
   });
 
-  progressReadout.textContent = Math.round(chemistryResult.progress * 100) + '%';
+  progressReadout.textContent = visualDemo ? 'عرض بصري' : Math.round(chemistryResult.progress * 100) + '%';
 }
 
 function formatTime(value) {
@@ -624,7 +640,13 @@ function formatTime(value) {
 }
 
 function updatePlaybackUI() {
-  playLabel.textContent = playing ? 'إيقاف مؤقت' : (elapsed >= durationSeconds ? 'إعادة التشغيل' : 'ابدأ التفاعل');
+  const visualDemo = simulationAvailable && !kineticsConfigured;
+  const finished = elapsed >= durationSeconds;
+  playLabel.textContent = playing
+    ? 'إيقاف مؤقت'
+    : (finished
+      ? (visualDemo ? 'إعادة العرض' : 'إعادة التفاعل')
+      : (visualDemo ? 'ابدأ العرض المرئي' : 'ابدأ التفاعل'));
   playButton.querySelector('.play-icon').textContent = playing ? 'Ⅱ' : '▶';
   timeReadout.textContent = formatTime(elapsed) + ' / ' + formatTime(durationSeconds);
   timeline.max = String(durationSeconds);
@@ -634,11 +656,11 @@ function updatePlaybackUI() {
   temperatureReadout.textContent = temperatureC + '°C';
   temperature.style.background = 'linear-gradient(to left, #72d9c5 0%, #72d9c5 ' +
     ((temperatureC - 20) / 40 * 100) + '%, #2a424a ' + ((temperatureC - 20) / 40 * 100) + '%, #2a424a 100%)';
-  playButton.disabled = !kineticsConfigured;
-  timeline.disabled = !kineticsConfigured;
+  playButton.disabled = !simulationAvailable;
+  timeline.disabled = !simulationAvailable;
 }
 
-function drawChart(result) {
+function drawChart(result, displayProgress, visualDemo) {
   const width = chart.clientWidth || 500;
   const height = chart.clientHeight || 70;
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -666,10 +688,12 @@ function drawChart(result) {
     const leftIndex = Math.floor(position);
     const rightIndex = Math.min(Math.max(0, sampleCount - 1), leftIndex + 1);
     const fraction = position - leftIndex;
-    const yValue = sampleCount > 1
-      ? kineticsCurve[leftIndex].progress +
-        (kineticsCurve[rightIndex].progress - kineticsCurve[leftIndex].progress) * fraction
-      : 0;
+    const yValue = visualDemo
+      ? displayProgress
+      : (sampleCount > 1
+        ? kineticsCurve[leftIndex].progress +
+          (kineticsCurve[rightIndex].progress - kineticsCurve[leftIndex].progress) * fraction
+        : 0);
     const y = bottom - (bottom - top) * yValue;
     if (i === 0) chartContext.moveTo(x, y);
     else chartContext.lineTo(x, y);
@@ -682,7 +706,7 @@ function drawChart(result) {
   chartContext.shadowBlur = 0;
 
   const progressX = left + (right - left) * elapsed / durationSeconds;
-  const progressY = bottom - (bottom - top) * result.progress;
+  const progressY = bottom - (bottom - top) * displayProgress;
   chartContext.beginPath();
   chartContext.arc(progressX, progressY, 3.5, 0, Math.PI * 2);
   chartContext.fillStyle = '#e1fff5';
@@ -696,15 +720,19 @@ function drawChart(result) {
 function refreshView(rebuildKinetics = false) {
   if (rebuildKinetics) buildKineticsCurve();
   const result = calculateChemistry(elapsed);
-  updateMolecularScene(elapsed, result);
-  updateStageUI(result.progress, result);
+  const visualDemo = simulationAvailable && !kineticsConfigured;
+  const displayProgress = simulationAvailable
+    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    : result.progress;
+  updateMolecularScene(elapsed, result, displayProgress, visualDemo);
+  updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
   updatePlaybackUI();
-  drawChart(result);
+  drawChart(result, displayProgress, visualDemo);
 }
 
 function togglePlayback() {
-  if (!kineticsConfigured) return;
+  if (!simulationAvailable) return;
   if (elapsed >= durationSeconds) elapsed = 0;
   playing = !playing;
   previousFrame = 0;
@@ -722,11 +750,15 @@ function animate(timestamp) {
   }
 
   const result = calculateChemistry(elapsed);
-  updateMolecularScene(elapsed, result);
-  updateStageUI(result.progress, result);
+  const visualDemo = simulationAvailable && !kineticsConfigured;
+  const displayProgress = simulationAvailable
+    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    : result.progress;
+  updateMolecularScene(elapsed, result, displayProgress, visualDemo);
+  updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
   updatePlaybackUI();
-  drawChart(result);
+  drawChart(result, displayProgress, visualDemo);
   orbit.update();
   renderer.render(scene, camera);
 }
@@ -799,7 +831,12 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  drawChart(calculateChemistry(elapsed));
+  const result = calculateChemistry(elapsed);
+  const visualDemo = simulationAvailable && !kineticsConfigured;
+  const displayProgress = simulationAvailable
+    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    : result.progress;
+  drawChart(result, displayProgress, visualDemo);
 }
 
 playButton.addEventListener('click', togglePlayback);
