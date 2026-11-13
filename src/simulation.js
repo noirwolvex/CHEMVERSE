@@ -38,6 +38,7 @@ const bicarbonateOrderInput = document.getElementById('bicarbonate-order');
 const referenceTemperatureInput = document.getElementById('reference-temperature');
 const activationEnergyInput = document.getElementById('activation-energy');
 const durationInput = document.getElementById('duration-seconds');
+const kineticsSourceInput = document.getElementById('kinetics-source');
 const kineticsParameterStatus = document.getElementById('kinetics-parameter-status');
 const rateConstantUnit = document.getElementById('rate-constant-unit');
 const acidConcentrationOutput = document.getElementById('acid-concentration-output');
@@ -161,6 +162,7 @@ function buildKineticsCurve() {
     acidReactionOrder >= 0 && bicarbonateReactionOrder >= 0 &&
     acidReactionOrder <= 4 && bicarbonateReactionOrder <= 4 &&
     acidReactionOrder + bicarbonateReactionOrder <= 6 &&
+    kineticsSourceInput.value.trim().length > 0 &&
     (!hasActivationEnergy || (Number.isFinite(activationEnergyKJ) && activationEnergyKJ >= 0));
 
   timeline.max = String(Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 60);
@@ -172,7 +174,7 @@ function buildKineticsCurve() {
     effectiveRateConstant = 0;
     kineticsParameterStatus.classList.remove('is-ready', 'is-error');
     kineticsParameterStatus.textContent =
-      'الحركية غير مفعّلة: أدخل k موجبة ورتبتي التفاعل التجريبيتين وحجم المحلول.';
+      'الحركية غير مفعّلة: أدخل k ورتبتي التفاعل والحجم ومرجعاً موثقاً للقيم.';
     playButton.disabled = true;
     timeline.disabled = true;
     return false;
@@ -831,7 +833,7 @@ bicarbonateAmountInput.addEventListener('input', () => {
 });
 for (const input of [
   volumeInput, rateConstantInput, acidOrderInput, bicarbonateOrderInput,
-  referenceTemperatureInput, activationEnergyInput, durationInput
+  referenceTemperatureInput, activationEnergyInput, durationInput, kineticsSourceInput
 ]) {
   input.addEventListener('change', () => {
     playing = false;
