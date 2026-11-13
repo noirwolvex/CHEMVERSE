@@ -296,3 +296,132 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .kinetics-field { font-size: 9px; }
   .kinetics-field input { height: 36px; }
 }
+
+
+.experimental-fit-panel {
+  margin-top: 17px;
+  padding: 11px 10px 10px;
+  border: 1px solid rgba(114,217,197,.22);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgba(114,217,197,.055), rgba(13,32,43,.48));
+}
+.experimental-fit-panel > .summary-title { margin-bottom: 7px; }
+.fit-intro, .fit-warning {
+  margin: 0 0 9px;
+  color: #829d9c;
+  font-size: 8px;
+  line-height: 1.75;
+}
+.fit-import-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.fit-file-label, .fit-secondary-button, .fit-primary-button, .fit-apply-button {
+  min-height: 33px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: 600 8px "IBM Plex Sans Arabic", sans-serif;
+  text-align: center;
+}
+.fit-file-label {
+  position: relative;
+  overflow: hidden;
+  color: #d9eee7;
+  border: 1px solid rgba(114,217,197,.32);
+  background: rgba(114,217,197,.09);
+}
+.fit-file-label input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.fit-secondary-button {
+  color: #abc7c0;
+  border: 1px solid rgba(176,215,211,.17);
+  background: rgba(176,215,211,.045);
+}
+.fit-primary-button, .fit-apply-button {
+  width: 100%;
+  margin-top: 8px;
+  color: #09211f;
+  border: 1px solid rgba(114,217,197,.4);
+  background: #72d9c5;
+}
+.fit-apply-button {
+  color: #dffaf0;
+  border-color: rgba(114,217,197,.32);
+  background: rgba(114,217,197,.12);
+}
+.fit-primary-button:disabled, .fit-apply-button:disabled {
+  cursor: not-allowed;
+  opacity: .38;
+}
+.fit-file-status {
+  margin-top: 8px;
+  padding: 7px 8px;
+  color: #9ebbb5;
+  border-right: 2px solid rgba(114,217,197,.36);
+  background: rgba(114,217,197,.035);
+  border-radius: 3px;
+  font-size: 8px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.fit-file-status.is-error {
+  color: #f08b8b;
+  border-right-color: #f08b8b;
+  background: rgba(240,139,139,.06);
+}
+.fit-file-status.is-ready {
+  color: #8ee0ca;
+  border-right-color: #72d9c5;
+}
+.fit-preview { margin-top: 9px; }
+.fit-preview-heading, .fit-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #c5d9d2;
+  font-size: 8px;
+}
+.fit-preview-heading span, .fit-results-heading span {
+  color: #7fa8a1;
+  direction: ltr;
+  font: 600 8px "Space Grotesk", sans-serif;
+}
+.fit-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid rgba(176,215,211,.12); border-radius: 4px; }
+.fit-data-table { width: 100%; min-width: 390px; border-collapse: collapse; color: #bed1ca; font: 500 8px "Space Grotesk", sans-serif; }
+.fit-data-table th, .fit-data-table td { padding: 5px 6px; text-align: right; white-space: nowrap; border-bottom: 1px solid rgba(176,215,211,.08); }
+.fit-data-table th { color: #83bbb0; background: rgba(114,217,197,.055); font-weight: 700; }
+.fit-data-table tr:last-child td { border-bottom: 0; }
+.fit-results { margin-top: 11px; padding-top: 9px; border-top: 1px solid rgba(176,215,211,.12); }
+.fit-parameter-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.fit-parameter-grid > div {
+  min-width: 0;
+  padding: 7px 5px;
+  border: 1px solid rgba(114,217,197,.14);
+  border-radius: 4px;
+  background: rgba(114,217,197,.045);
+}
+.fit-parameter-grid small { display: block; color: #83a39b; font-size: 7px; line-height: 1.5; }
+.fit-parameter-grid b { display: block; margin-top: 4px; color: #dff9ef; direction: ltr; text-align: left; font: 600 10px "Space Grotesk", sans-serif; overflow-wrap: anywhere; }
+.fit-equation {
+  margin-top: 8px;
+  padding: 8px;
+  color: #a9e7d6;
+  border-radius: 4px;
+  background: rgba(4,17,25,.55);
+  text-align: center;
+  font: 600 10px "Space Grotesk", sans-serif;
+  overflow-wrap: anywhere;
+}
+.fit-diagnostics { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; margin-top: 8px; }
+.fit-diagnostics > div { display: flex; justify-content: space-between; gap: 5px; color: #88a49e; font-size: 7px; }
+.fit-diagnostics b { color: #c5dfd5; font: 600 8px "Space Grotesk", sans-serif; direction: ltr; }
+.fit-warning { margin-top: 8px; color: #c7aa7c; }
