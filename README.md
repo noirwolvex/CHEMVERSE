@@ -46,7 +46,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
 - A C++ / WebAssembly core computes reaction extent, the limiting reagent, remaining reactants, product millimoles and an atom-conservation check from the selected initial millimole amounts.
 - The default inputs are 10 mmol acetic acid and 8 mmol sodium bicarbonate; at full conversion the bicarbonate is limiting, 2 mmol acetic acid remains and 8 mmol of each product is calculated.
-- The time slider drives an educational progress value in the C++ core. It is a playback schedule, not measured reaction kinetics. Temperature controls schematic vibration only; it does not change the calculated reaction rate.
+- With supplied k, experimental orders, solution volume, and a documented parameter source, the time slider follows the integrated C++ kinetic curve. Without valid sourced kinetic data, kinetic playback remains disabled rather than inventing a rate. Temperature changes k only when an activation energy and reference temperature are supplied for the Arrhenius correction; otherwise it affects only schematic vibration.
 - Atom sizes, bond lengths, molecular arrangement and transition timing remain schematic. This is not molecular dynamics or quantum chemistry.
 
 ## Next development stage
