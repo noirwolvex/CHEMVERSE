@@ -1,24 +1,93 @@
-name: Chemistry core
+name: Chemistry engines
 on:
   push:
-    paths: ['cpp/**', 'tests/**', 'scripts/**', 'wasm/**', '.github/workflows/chemistry-core.yml']
+    paths:
+      - 'cpp/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'simulation.html'
+      - 'simulation.css'
+      - 'wasm/**'
+      - '.github/workflows/chemistry-core.yml'
   pull_request:
-    paths: ['cpp/**', 'tests/**', 'scripts/**', 'wasm/**', '.github/workflows/chemistry-core.yml']
+    paths:
+      - 'cpp/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'simulation.html'
+      - 'simulation.css'
+      - 'wasm/**'
+      - '.github/workflows/chemistry-core.yml'
+
 jobs:
   native-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run native chemistry tests
+      - name: Run native chemistry and kinetics tests
         run: bash scripts/test-native.sh
+      - name: Check simulator JavaScript syntax
+        run: node --check src/simulation.js
+
   wasm-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install Clang
         run: sudo apt-get update && sudo apt-get install -y clang
-      - name: Build WebAssembly module
+      - name: Build WebAssembly modules
         run: bash scripts/build-wasm.sh
-      - name: Validate WebAssembly module
+      - name: Validate WebAssembly exports and calculations
         run: |
-          node -e "const fs=require('fs');const b=fs.readFileSync('wasm/chemistry_core.wasm');WebAssembly.instantiate(b).then(({instance})=>{const e=instance.exports;if(e.cv_engine_version()!==100||e.cv_reaction_is_balanced()!==1)process.exit(1);const p=e.cv_calculate_reaction(10,8,0.5);const f=new Float64Array(e.memory.buffer);const o=p/8;if(Math.abs(f[o+1]-4)>1e-9||Math.abs(f[o+2]-6)>1e-9||Math.abs(f[o+4]-4)>1e-9)process.exit(1);console.log('WebAssembly module validation passed');}).catch(e=>{console.error(e);process.exit(1);});"
+          node <<'NODE'
+          const fs = require('fs');
+          (async () => {
+            const bytes = fs.readFileSync('wasm/chemistry_core.wasm');
+            const { instance } = await WebAssembly.instantiate(bytes, {});
+            const e = instance.exports;
+            const required = [
+              'memory', 'cv_calculate_reaction', 'cv_reaction_is_balanced',
+              'cv_kinetics_simulate', 'cv_kinetics_last_error',
+              'cv_kinetics_last_steps', 'cv_kinetics_effective_k',
+              'cv_kinetics_atom_balance_ok', 'cv_kinetics_engine_version'
+            ];
+            for (const name of required) {
+              if (!(name in e)) throw new Error('Missing WASM export: ' + name);
+            }
+            if (e.cv_reaction_is_balanced() !== 1 || e.cv_kinetics_engine_version() !== 100) {
+              throw new Error('Engine version or reaction balance check failed');
+            }
+
+            const stoich = e.cv_calculate_reaction(10, 8, 0.5);
+            const f64 = new Float64Array(e.memory.buffer);
+            const stoichOffset = stoich / 8;
+            if (Math.abs(f64[stoichOffset + 1] - 4) > 1e-9 ||
+                Math.abs(f64[stoichOffset + 2] - 6) > 1e-9) {
+              throw new Error('Stoichiometry smoke test failed');
+            }
+
+            const p = e.cv_kinetics_simulate(8, 16, 100, 0.2, 1, 0,
+              25, 25, 0, 0, 5, 0.05, 101);
+            if (!p || e.cv_kinetics_last_error() !== 0 ||
+                e.cv_kinetics_atom_balance_ok() !== 1) {
+              throw new Error('Kinetics WASM simulation failed');
+            }
+            const curve = new Float64Array(e.memory.buffer, p, 101 * 6);
+            const last = 100 * 6;
+            if (Math.abs(curve[last + 3] - 2.9430355294) > 1e-5 ||
+                Math.abs(curve[last + 2] + curve[last + 3] - 8) > 1e-7) {
+              throw new Error('Kinetic curve or conservation check failed');
+            }
+            for (let i = 1; i < 101; i++) {
+              if (curve[i * 6 + 1] + 1e-10 < curve[(i - 1) * 6 + 1]) {
+                throw new Error('Reaction conversion must not decrease with time');
+              }
+            }
+            console.log('WebAssembly stoichiometry + kinetics validation passed');
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
