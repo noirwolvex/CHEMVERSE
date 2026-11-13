@@ -156,6 +156,7 @@ async function loadChemistryCore() {
   engineState.textContent = 'Stoichiometry v' + (api.cv_engine_version() / 100).toFixed(2) +
     ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2) +
     ' · Fit v' + (fittingCore.cv_fit_engine_version() / 100).toFixed(2);
+  if (importedExperiments) analyzeInitialRatesButton.disabled = false;
 }
 
 function optionalNumber(input) {
@@ -527,12 +528,14 @@ function analyzeInitialRates() {
       latestExperimentalFit.k > 0 && latestExperimentalFit.k <= 1.0e100 &&
       latestExperimentalFit.orderA >= 0 && latestExperimentalFit.orderA <= 4 &&
       latestExperimentalFit.orderB >= 0 && latestExperimentalFit.orderB <= 4 &&
-      latestExperimentalFit.orderA + latestExperimentalFit.orderB <= 6;
+      latestExperimentalFit.orderA + latestExperimentalFit.orderB <= 6 &&
+      latestExperimentalFit.temperatureC >= Number(temperature.min) &&
+      latestExperimentalFit.temperatureC <= Number(temperature.max);
     applyFittedParametersButton.disabled = !canApplyToCurrentEngine;
     setFitFileStatus(
       canApplyToCurrentEngine
         ? 'اكتملت الملاءمة بنجاح. يمكن اعتماد المعاملات في محرك المحاكاة؛ النتائج لا تثبت وحدها صحة النموذج أو الآلية.'
-        : 'اكتملت الملاءمة، لكن رتبة أو ثابت السرعة خارج نطاق محرك المحاكاة الحالي. احفظ النتائج للتحليل ولا يمكن اعتمادها في هذا الإصدار.',
+        : 'اكتملت الملاءمة، لكن k أو الرتب أو درجة الحرارة خارج نطاق محرك المحاكاة الحالي. احتفظ بالنتائج للتحليل، ولا يمكن اعتمادها في هذا الإصدار.',
       canApplyToCurrentEngine ? 'is-ready' : 'is-error'
     );
   } catch (error) {
@@ -551,6 +554,8 @@ function applyExperimentalFitToSimulator() {
   acidOrderInput.value = latestExperimentalFit.orderA.toFixed(8);
   bicarbonateOrderInput.value = latestExperimentalFit.orderB.toFixed(8);
   referenceTemperatureInput.value = latestExperimentalFit.temperatureC.toFixed(6);
+  temperatureC = latestExperimentalFit.temperatureC;
+  temperature.value = String(temperatureC);
   kineticsSourceInput.value =
     'CSV fit: ' + latestExperimentalFit.fileName +
     '; ' + latestExperimentalFit.experimentCount +
