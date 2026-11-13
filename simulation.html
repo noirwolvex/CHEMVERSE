@@ -216,6 +216,55 @@
               <button id="apply-fitted-parameters" class="fit-apply-button" type="button" disabled>اعتماد k و m و n في محرك المحاكاة</button>
             </div>
           </section>
+          <section class="concentration-time-panel" aria-labelledby="concentration-time-title">
+            <div class="summary-title" id="concentration-time-title">تحليل التركيز مقابل الزمن · CONCENTRATION-TIME ANALYZER</div>
+            <p class="fit-intro">استورد قراءات [A] و[B] مع الزمن لكل تجربة. سيقدّر محرك C++ الميل في الجزء الأول من المنحنى، ثم يمرر السرعة الابتدائية المتوافقة إلى ملاءمة قانون السرعة لاستخراج k وm وn.</p>
+            <div class="fit-import-actions">
+              <label class="fit-file-label" for="concentration-time-file">
+                <span>اختيار ملف بيانات CSV</span>
+                <input id="concentration-time-file" type="file" accept=".csv,text/csv">
+              </label>
+              <button id="download-concentration-template" class="fit-secondary-button" type="button">تنزيل قالب CSV</button>
+            </div>
+            <div class="fit-file-status" id="concentration-time-status" aria-live="polite">لم يتم استيراد بيانات التركيز والزمن بعد.</div>
+            <div class="fit-preview" id="concentration-time-preview" hidden>
+              <div class="fit-preview-heading"><b>ملخص التجارب المستوردة</b><span id="concentration-time-preview-count">0 تجربة</span></div>
+              <div class="fit-table-wrap">
+                <table class="fit-data-table" dir="ltr">
+                  <thead><tr><th>ID</th><th>T (°C)</th><th>Points</th><th>[A] first (M)</th><th>[B] first (M)</th></tr></thead>
+                  <tbody id="concentration-time-preview-body"></tbody>
+                </table>
+              </div>
+              <p class="fit-warning">تُستخدم أول قراءة لكل تجربة كتركيز ابتدائي. يبدأ محور الزمن من أول قراءة؛ إن تأخر التسجيل عن لحظة الخلط فقد لا يمثل الميل السرعة الابتدائية الحقيقية.</p>
+            </div>
+            <div class="concentration-time-options">
+              <label class="kinetics-field" for="initial-window-points">عدد أول النقاط المستخدمة للميل
+                <input id="initial-window-points" type="number" min="3" max="64" step="1" value="5" inputmode="numeric">
+              </label>
+              <label class="kinetics-field" for="rate-agreement-tolerance">حد اختلاف السرعتين A وB (%)
+                <input id="rate-agreement-tolerance" type="number" min="0" max="200" step="1" value="20" inputmode="decimal">
+              </label>
+            </div>
+            <p class="fit-intro">في هذا التفاعل ذي النسبة 1:1، يفترض أن يتقارب −d[A]/dt و−d[B]/dt. إذا تجاوز اختلافهما الحد المحدد، يعرض المختبر التشخيصات ويتوقف قبل ملاءمة k وm وn.</p>
+            <button id="analyze-concentration-time" class="fit-primary-button" type="button" disabled>استخراج السرعات الابتدائية وملاءمة قانون السرعة</button>
+            <div class="concentration-time-results" id="concentration-time-results" hidden>
+              <div class="fit-results-heading"><b>سرعات الانخفاض المستخرجة من المنحنيات</b><span id="concentration-time-results-count">—</span></div>
+              <div class="fit-table-wrap">
+                <table class="fit-data-table concentration-slope-table" dir="ltr">
+                  <thead><tr><th>ID</th><th>−d[A]/dt (M/s)</th><th>−d[B]/dt (M/s)</th><th>Difference</th><th>R² A / B</th></tr></thead>
+                  <tbody id="concentration-time-results-body"></tbody>
+                </table>
+              </div>
+              <div class="concentration-fit-summary">
+                <div><small>ثابت السرعة k</small><b id="concentration-fit-k">—</b></div>
+                <div><small>رتبة A · m</small><b id="concentration-fit-m">—</b></div>
+                <div><small>رتبة B · n</small><b id="concentration-fit-n">—</b></div>
+                <div><small>R² لقانون السرعة</small><b id="concentration-fit-r2">—</b></div>
+              </div>
+              <p class="fit-warning">هذه تقديرات انحدار من الجزء الزمني المختار. افحص قيم R²، ونطاق التركيز، وجودة أخذ العينات قبل اعتماد المعاملات. لا يثبت الانحدار وحده آلية التفاعل أو صحة القياسات.</p>
+              <button class="fit-apply-button" type="button" disabled aria-disabled="true">تُعتمد المعاملات من زر اعتماد k وm وn في نتائج الملاءمة أعلاه</button>
+            </div>
+          </section>
           <div class="control-block">
             <div class="control-label"><label for="timeline">زمن العرض</label><output id="time-readout">00:00 / 00:12</output></div>
             <input id="timeline" class="range-input" type="range" min="0" max="60" step="0.05" value="0" disabled>
