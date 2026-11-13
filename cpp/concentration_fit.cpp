@@ -15,8 +15,6 @@ bool finiteValue(double value) {
   return value == value && value <= 1.0e300 && value >= -1.0e300;
 }
 
-double maxValue(double a, double b) { return a > b ? a : b; }
-
 double sqrtApprox(double value) {
   if (!(value > 0.0)) return 0.0;
   double guess = value >= 1.0 ? value : 1.0;
