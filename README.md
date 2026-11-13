@@ -80,3 +80,26 @@ The C++ kinetics module is separate from the existing stoichiometry calculator:
 The model currently assumes a homogeneous liquid phase, fixed volume, and a single 1:1 reaction extent. It does not yet simulate gas–liquid CO2 transfer, acid/base equilibria, ionic-strength effects, the full elementary reaction mechanism, or molecular dynamics. Molecule motion remains an illustrative visualization driven by the calculated conversion, not an atomistic simulation.
 
 Run `bash scripts/test-native.sh` to test both C++ engines. Run `bash scripts/build-wasm.sh` to build the combined browser module. The GitHub Actions workflow validates the native tests, JavaScript syntax, WebAssembly exports, and a deterministic kinetics smoke test.
+
+## Experimental data import and initial-rate fitting — v1
+
+The simulator can import an initial-rate CSV and estimate the empirical rate law using the C++ fitting engine compiled to WebAssembly.
+
+Required CSV columns (case-insensitive):
+
+```csv
+experiment_id,temperature_c,concentration_a_mol_l,concentration_b_mol_l,initial_rate_mol_l_s
+```
+
+- Concentrations must be positive values in mol/L (M).
+- Initial rates must be positive values in mol/L/s (M/s), measured or calculated by the experimenter using a consistent reaction-rate definition.
+- Every experiment in one fit must have the same temperature in °C. Fit separate datasets for separate temperatures.
+- At least four experiments are required. Both initial concentrations must vary independently enough to identify both empirical orders.
+- The browser validates the CSV structure and values; the C++ engine then fits `ln(rate) = ln(k) + m ln([A]0) + n ln([B]0)` using centered modified Gram-Schmidt least squares.
+- Results include `k`, `m`, `n`, `R²`, log-rate RMSE, and estimated standard errors. The regression diagnostics are calculated in log-rate space.
+- Use **Apply fitted parameters** to copy the estimated `k`, `m`, `n`, and the dataset temperature into the simulator. The fit is performed at that temperature; a single-temperature dataset cannot determine activation energy.
+- CSV files are limited to 2 MB and 256 experiments in the current browser implementation.
+
+This module implements the method of initial rates. It does not calculate initial slopes from raw concentration–time series yet, perform Arrhenius fitting across temperatures, or verify the experimental provenance, instrument calibration, or measurement method. A high `R²` alone does not prove that the assumed power-law model or a proposed reaction mechanism is chemically correct. The estimated standard errors describe the regression under its assumptions and do not include systematic experimental uncertainty.
+
+The fitting ABI and native tests are in `cpp/experimental_fit.h`, `cpp/experimental_fit.cpp`, and `tests/experimental_fit_test.cpp`. CSV parsing and browser tests are in `src/experimental-data.mjs` and `tests/experimental-data.test.mjs`. The browser module is `wasm/experimental_fit.wasm`, built by `scripts/build-wasm.sh`.
