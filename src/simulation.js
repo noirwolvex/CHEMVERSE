@@ -46,6 +46,7 @@ const bicarbonateConcentrationOutput = document.getElementById('bicarbonate-conc
 const reactionRateOutput = document.getElementById('reaction-rate-output');
 const effectiveKOutput = document.getElementById('effective-k-output');
 const chartDuration = document.getElementById('chart-duration');
+const chartDescription = document.getElementById('chart-description');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -146,16 +147,19 @@ function buildKineticsCurve() {
   bicarbonateReactionOrder = optionalNumber(bicarbonateOrderInput);
   activationEnergyKJ = optionalNumber(activationEnergyInput);
   volumeMl = Number(volumeInput.value);
-  acidAmountMmol = acidConcentrationM * volumeMl;
-  bicarbonateAmountMmol = bicarbonateConcentrationM * volumeMl;
-  durationSeconds = Number(durationInput.value);
+  const volumeIsValid = Number.isFinite(volumeMl) && volumeMl > 0;
+  acidAmountMmol = volumeIsValid ? acidConcentrationM * volumeMl : 0;
+  bicarbonateAmountMmol = volumeIsValid ? bicarbonateConcentrationM * volumeMl : 0;
+  const requestedDurationSeconds = Number(durationInput.value);
+  durationSeconds = Number.isFinite(requestedDurationSeconds) && requestedDurationSeconds > 0
+    ? requestedDurationSeconds : 60;
   referenceTemperatureC = Number(referenceTemperatureInput.value);
   updateRateConstantUnits();
 
   const hasOrders = acidReactionOrder !== null && bicarbonateReactionOrder !== null;
   const hasActivationEnergy = activationEnergyKJ !== null;
   const valid = Number.isFinite(volumeMl) && volumeMl > 0 &&
-    Number.isFinite(durationSeconds) && durationSeconds > 0 && durationSeconds <= 1.0e7 &&
+    Number.isFinite(requestedDurationSeconds) && requestedDurationSeconds > 0 && requestedDurationSeconds <= 1.0e7 &&
     Number.isFinite(referenceTemperatureC) && referenceTemperatureC > -273.15 &&
     Number.isFinite(rateConstant) && rateConstant > 0 &&
     hasOrders && Number.isFinite(acidReactionOrder) && Number.isFinite(bicarbonateReactionOrder) &&
@@ -175,6 +179,7 @@ function buildKineticsCurve() {
     kineticsParameterStatus.classList.remove('is-ready', 'is-error');
     kineticsParameterStatus.textContent =
       'الحركية غير مفعّلة: أدخل k ورتبتي التفاعل والحجم ومرجعاً موثقاً للقيم.';
+    chartDescription.textContent = 'بانتظار مدخلات حركية موثقة لاحتساب المنحنى.';
     playButton.disabled = true;
     timeline.disabled = true;
     return false;
@@ -230,6 +235,7 @@ function buildKineticsCurve() {
 
   kineticsParameterStatus.classList.remove('is-error');
   kineticsParameterStatus.classList.add('is-ready');
+  chartDescription.textContent = 'منحنى محسوب من قانون السرعة والبيانات المدخلة.';
   kineticsParameterStatus.textContent =
     'اكتمل حساب المنحنى بـ ' + kineticsCore.cv_kinetics_last_steps() +
     ' خطوة تكامل. ' +
