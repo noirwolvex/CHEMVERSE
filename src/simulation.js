@@ -155,7 +155,7 @@ function buildMolecularScene() {
       { element: 'H', position: [-1.74, -0.96, 0] }
     ],
     bonds: [[1,2,2],[1,3,1],[1,4,1],[4,5,1]],
-    ionicPair: [1,0]
+    ionicPair: [3,0]
   });
 
   species.acetate = createSpecies({
