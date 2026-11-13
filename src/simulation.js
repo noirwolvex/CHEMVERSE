@@ -144,6 +144,10 @@ const MECHANISM_ATOM_IDS = [
   'AC-Hm1', 'AC-Hm2', 'AC-Hm3', 'BC-Na', 'BC-C',
   'BC-O1', 'BC-O2', 'BC-O3', 'BC-H'
 ];
+const MECHANISM_NUMERIC_ATOM_IDS = [
+  1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008,
+  2001, 2002, 2003, 2004, 2005, 2006
+];
 const ATOMIC_NUMBER_TO_SYMBOL = { 1: 'H', 6: 'C', 8: 'O', 11: 'Na' };
 const ATOMIC_NUMBER_TO_NAME = { 1: 'Hydrogen', 6: 'Carbon', 8: 'Oxygen', 11: 'Sodium' };
 const MECHANISM_ATOM_STRIDE = 4;
@@ -954,7 +958,7 @@ function createTrackedAtom(index) {
   const elementCode = mechanismCore.cv_mechanism_atom_element(index);
   const symbol = ATOMIC_NUMBER_TO_SYMBOL[elementCode];
   const style = atomPalette[symbol];
-  if (!style || atomId === 0 || !MECHANISM_ATOM_IDS[index]) {
+  if (!style || atomId !== MECHANISM_NUMERIC_ATOM_IDS[index] || !MECHANISM_ATOM_IDS[index]) {
     throw new Error('Invalid atom map entry at index ' + index);
   }
 
@@ -1106,6 +1110,9 @@ function updateMolecularScene(time, displayProgress) {
       sample[offset + 1] + Math.cos(time * 2.4 + index * 0.61) * vibration,
       sample[offset + 2] + Math.sin(time * 1.8 + index * 0.49) * vibration
     );
+    const opacity = THREE.MathUtils.clamp(sample[offset + 3], 0, 1);
+    atom.visible = opacity > 0.015;
+    atom.material.opacity = opacity;
   }
 
   const bondOffset = mechanismAtoms.length * MECHANISM_ATOM_STRIDE;
@@ -1512,7 +1519,7 @@ async function startSimulator() {
     console.error('CHEMVERSE molecular simulator failed:', error);
     engineStatus.classList.add('is-error');
     engineState.textContent = 'فشل تحميل نواة C++ / WebAssembly';
-    loading.textContent = 'تعذر تشغيل محرك الكيمياء. تأكد من وجود wasm/chemistry_core.wasm ثم حدّث الصفحة.';
+    loading.textContent = 'تعذر تشغيل المحرك. تحقق من ملفات wasm/chemistry_core.wasm وwasm/reaction_mechanism.wasm ثم حدّث الصفحة.';
   }
 }
 startSimulator();
