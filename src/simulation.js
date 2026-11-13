@@ -64,6 +64,7 @@ const fitKResult = document.getElementById('fit-k-result');
 const fitMResult = document.getElementById('fit-m-result');
 const fitNResult = document.getElementById('fit-n-result');
 const fitEquation = document.getElementById('fit-equation');
+const fitKUnits = document.getElementById('fit-k-units');
 const fitR2Result = document.getElementById('fit-r2-result');
 const fitRmseResult = document.getElementById('fit-rmse-result');
 const fitOrdersSeResult = document.getElementById('fit-orders-se-result');
@@ -507,6 +508,11 @@ function analyzeInitialRates() {
       'r = ' + latestExperimentalFit.k.toExponential(4) +
       ' [A]^' + latestExperimentalFit.orderA.toFixed(4) +
       ' [B]^' + latestExperimentalFit.orderB.toFixed(4);
+    const kConcentrationExponent = 1 - latestExperimentalFit.orderA - latestExperimentalFit.orderB;
+    fitKUnits.textContent = 'وحدات k: ' +
+      (Math.abs(kConcentrationExponent) < 1.0e-9
+        ? 's⁻¹'
+        : 'M^(' + kConcentrationExponent.toFixed(3) + ') · s⁻¹');
     fitR2Result.textContent = Number.isFinite(latestExperimentalFit.rSquared)
       ? latestExperimentalFit.rSquared.toFixed(6)
       : 'غير معرّف';
