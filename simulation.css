@@ -194,3 +194,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .chart-panel { flex-basis: 150px; }
   .sim-footer { flex-wrap: wrap; font-size: 6px; }
 }
+
+.scene-loading { opacity: 1; visibility: visible; transition: opacity .35s ease, visibility .35s ease; }
+.scene-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.molecule-view canvas { touch-action: none; }
