@@ -238,7 +238,7 @@ function buildKineticsCurve() {
   chartDescription.textContent = 'منحنى محسوب من قانون السرعة والبيانات المدخلة.';
   kineticsParameterStatus.textContent =
     'اكتمل حساب المنحنى بـ ' + kineticsCore.cv_kinetics_last_steps() +
-    ' خطوة تكامل. ' +
+    ' خطوة تكامل. المرجع الذي أدخلته لم يتم التحقق منه آلياً؛ التحقق هنا يخص المدخلات العددية وحفظ المادة في النموذج فقط. ' +
     (hasActivationEnergy
       ? 'تم تطبيق أرهينيوس على k حسب درجة الحرارة.'
       : 'لم تُدخل Ea؛ الحرارة لا تغيّر k حسابياً، والاهتزاز البصري تخطيطي فقط.');
