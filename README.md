@@ -42,7 +42,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - Open **Molecular Simulator** from the laboratory header or visit **simulation.html**.
 - The first educational model demonstrates the balanced reaction: CH3COOH + NaHCO3 → CH3COONa + H2O + CO2.
 - The 3D ball-and-stick view shows the reactants, the proton-transfer intermediate (acetate + carbonic acid), and the products (sodium acetate, water and carbon dioxide).
-- Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, change playback speed and adjust the illustrative temperature setting.
+- Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, move to the previous/next mechanism checkpoint, inspect the C++ event bond-change records, change playback speed and adjust the illustrative temperature setting.
 - The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
 - A C++ / WebAssembly core computes reaction extent, the limiting reagent, remaining reactants, product millimoles and an atom-conservation check from the selected initial millimole amounts.
 - The default inputs are 10 mmol acetic acid and 8 mmol sodium bicarbonate; at full conversion the bicarbonate is limiting, 2 mmol acetic acid remains and 8 mmol of each product is calculated.
@@ -115,7 +115,7 @@ The molecular view now uses a dedicated C++ atom-mapping engine instead of fadin
 - The engine samples continuous atom coordinates and bond orders for three presentation states: reactants, acetate + carbonic acid, and acetate + water + carbon dioxide.
 - The acid proton keeps one identity as it leaves the acetic-acid oxygen, attaches to the bicarbonate oxygen, and then moves to the second carbonic-acid oxygen to form water.
 - Covalent bond records persist through the sequence while their bond order changes. Sodium associations are drawn as dashed ionic contacts, not covalent bonds.
-- Click an atom in the 3D view to inspect its stable atom ID and element. The current step readout describes the bond and proton changes.
+- Click an atom in the 3D view to highlight it. The mechanism timeline reports the programmed bond-order changes for proton transfer and carbonic-acid decomposition.
 
 The acetate carboxylate is drawn using one conventional localized resonance form for readability; the drawing does not imply that the two C–O bonds are physically fixed as single and double bonds. The sodium–acetate dashed line is a schematic ion association, not a claim of a fixed contact pair in solution.
 
@@ -146,3 +146,12 @@ experiment_id,time_s,temperature_c,concentration_a_mol_l,concentration_b_mol_l
 This is a linear-window estimate, not a full nonlinear fit of the complete concentration-time profile. Inspect the per-species R² values, the selected early-time window, and agreement between both reactants before relying on the derived initial rates. The analyzer does not correct sensor drift, mixing delay, side reactions, or systematic measurement errors.
 
 The C++ ABI and native regression tests are in `cpp/concentration_fit.h`, `cpp/concentration_fit.cpp`, and `tests/concentration_fit_test.cpp`. CSV grouping and validation are in `src/concentration-data.mjs` and `tests/concentration-data.test.mjs`. The browser module is `wasm/concentration_fit.wasm`, built by `scripts/build-wasm.sh`.
+
+
+## Mechanism timeline and step controller — v1
+
+The molecular view now exposes three presentation checkpoints (reactants, the proton-transfer intermediate, and products) with previous/next controls. A checkpoint move pauses playback and seeks the existing presentation clock; the continuous time slider and normal playback remain available.
+
+The C++ mechanism ABI publishes two event records. Each record provides its progress checkpoint and the indexed bond changes with before/after bond orders. Native tests verify that these event records match the corresponding sampled C++ keyframes; the browser validates the metadata before rendering the event inspector. Ionic associations are explicitly marked as such, and the acetate structure uses the same localized resonance drawing documented above.
+
+The event timeline is an inspection of the scripted atom-map and keyframe bookkeeping. Its checkpoint positions are presentation coordinates, not measured reaction times. The event list does not establish an experimentally verified elementary mechanism, rate-limiting step, transition state, or molecular trajectory.
