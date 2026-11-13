@@ -78,6 +78,7 @@ let kineticsCurve = null;
 let kineticsConfigured = false;
 let effectiveRateConstant = 0;
 let chemistryCore = null;
+let kineticsCore = null;
 let species = {};
 
 const smoothStep = (a, b, value) => {
@@ -91,12 +92,29 @@ async function loadChemistryCore() {
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {});
   const api = instance.exports;
-  const required = ['memory', 'cv_calculate_reaction', 'cv_reaction_is_balanced', 'cv_engine_version', 'cv_kinetics_simulate', 'cv_kinetics_last_error', 'cv_kinetics_last_steps', 'cv_kinetics_effective_k', 'cv_kinetics_atom_balance_ok', 'cv_kinetics_engine_version'];
-  for (const name of required) if (!(name in api)) throw new Error('Missing WebAssembly export: ' + name);
+  const chemistryRequired = ['memory', 'cv_calculate_reaction', 'cv_reaction_is_balanced', 'cv_engine_version'];
+  for (const name of chemistryRequired) {
+    if (!(name in api)) throw new Error('Missing chemistry WebAssembly export: ' + name);
+  }
   if (api.cv_reaction_is_balanced() !== 1) throw new Error('C++ reaction formula validation failed.');
   chemistryCore = api;
+
+  const kineticsResponse = await fetch(new URL('../wasm/kinetics_engine.wasm', import.meta.url));
+  if (!kineticsResponse.ok) throw new Error('Kinetics WebAssembly request failed: HTTP ' + kineticsResponse.status);
+  const kineticsBytes = await kineticsResponse.arrayBuffer();
+  const kineticsInstance = await WebAssembly.instantiate(kineticsBytes, {});
+  kineticsCore = kineticsInstance.instance.exports;
+  const kineticsRequired = [
+    'memory', 'cv_kinetics_simulate', 'cv_kinetics_last_error',
+    'cv_kinetics_last_steps', 'cv_kinetics_effective_k',
+    'cv_kinetics_atom_balance_ok', 'cv_kinetics_engine_version'
+  ];
+  for (const name of kineticsRequired) {
+    if (!(name in kineticsCore)) throw new Error('Missing kinetics WebAssembly export: ' + name);
+  }
   engineStatus.classList.add('is-ready');
-  engineState.textContent = 'متصل · الإصدار ' + (api.cv_engine_version() / 100).toFixed(2);
+  engineState.textContent = 'Stoichiometry v' + (api.cv_engine_version() / 100).toFixed(2) +
+    ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2);
 }
 
 function optionalNumber(input) {
@@ -156,7 +174,7 @@ function buildKineticsCurve() {
     return false;
   }
 
-  const pointer = chemistryCore.cv_kinetics_simulate(
+  const pointer = kineticsCore.cv_kinetics_simulate(
     acidAmountMmol, bicarbonateAmountMmol, volumeMl,
     rateConstant, acidReactionOrder, bicarbonateReactionOrder,
     temperatureC, referenceTemperatureC,
@@ -167,8 +185,8 @@ function buildKineticsCurve() {
     KINETICS_SAMPLE_COUNT
   );
 
-  if (pointer === 0 || chemistryCore.cv_kinetics_last_error() !== 0) {
-    const errorCode = chemistryCore.cv_kinetics_last_error();
+  if (pointer === 0 || kineticsCore.cv_kinetics_last_error() !== 0) {
+    const errorCode = kineticsCore.cv_kinetics_last_error();
     kineticsCurve = null;
     kineticsConfigured = false;
     effectiveRateConstant = 0;
@@ -183,7 +201,7 @@ function buildKineticsCurve() {
   }
 
   const raw = new Float64Array(
-    chemistryCore.memory.buffer,
+    kineticsCore.memory.buffer,
     pointer,
     KINETICS_SAMPLE_COUNT * 6
   );
@@ -200,14 +218,14 @@ function buildKineticsCurve() {
     });
   }
 
-  effectiveRateConstant = chemistryCore.cv_kinetics_effective_k();
-  kineticsConfigured = chemistryCore.cv_kinetics_atom_balance_ok() === 1;
+  effectiveRateConstant = kineticsCore.cv_kinetics_effective_k();
+  kineticsConfigured = kineticsCore.cv_kinetics_atom_balance_ok() === 1;
   if (!kineticsConfigured) throw new Error('Kinetics engine failed stoichiometric conservation validation.');
 
   kineticsParameterStatus.classList.remove('is-error');
   kineticsParameterStatus.classList.add('is-ready');
   kineticsParameterStatus.textContent =
-    'اكتمل حساب المنحنى بـ ' + chemistryCore.cv_kinetics_last_steps() +
+    'اكتمل حساب المنحنى بـ ' + kineticsCore.cv_kinetics_last_steps() +
     ' خطوة تكامل. ' +
     (hasActivationEnergy
       ? 'تم تطبيق أرهينيوس على k حسب درجة الحرارة.'
@@ -252,7 +270,7 @@ function calculateChemistry(timeSeconds) {
   );
   const memory = chemistryCore.memory.buffer;
   const flags = new Int32Array(memory, pointer + 56, 3);
-  const kineticBalanced = !kineticsConfigured || chemistryCore.cv_kinetics_atom_balance_ok() === 1;
+  const kineticBalanced = !kineticsConfigured || kineticsCore.cv_kinetics_atom_balance_ok() === 1;
   const result = {
     progress: kinetic.progress,
     extent: kinetic.extent,
