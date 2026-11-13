@@ -96,6 +96,23 @@ constexpr double kProductBondOrders[CV_MECHANISM_BOND_COUNT] = {
   1, 1, 2, 0, 1, 1, 1, 2, 2, 0, 1, 0, 1, 0, 1
 };
 
+/*
+ * Events expose the programmed bond-order transitions at the two keyframes.
+ * Event 0 includes a localized acetate resonance drawing and ionic associations.
+ * These are model records, not claims of a measured elementary-step trajectory.
+ */
+constexpr double kEventProgress[CV_MECHANISM_EVENT_COUNT] = {0.50, 1.00};
+constexpr int kEventChangeCounts[CV_MECHANISM_EVENT_COUNT] = {6, 4};
+constexpr int kEventBondIndices[CV_MECHANISM_EVENT_COUNT][CV_MECHANISM_MAX_EVENT_CHANGES] = {
+  {1, 2, 3, 11, 13, 14},
+  {8, 9, 11, 12, -1, -1}
+};
+
+const double *bondOrdersForEventStage(int event_index, bool after) {
+  if (event_index == 0) return after ? kIntermediateBondOrders : kReactantBondOrders;
+  return after ? kProductBondOrders : kIntermediateBondOrders;
+}
+
 double g_sample[CV_MECHANISM_SAMPLE_FIELDS]{};
 
 double clamp01(double value) {
@@ -153,6 +170,40 @@ extern "C" int cv_mechanism_stage(double progress) {
   if (value < (1.0 / 3.0)) return CV_MECHANISM_STAGE_REACTANTS;
   if (value < (2.0 / 3.0)) return CV_MECHANISM_STAGE_INTERMEDIATE;
   return CV_MECHANISM_STAGE_PRODUCTS;
+}
+
+extern "C" int cv_mechanism_event_count(void) {
+  return CV_MECHANISM_EVENT_COUNT;
+}
+
+extern "C" double cv_mechanism_event_progress(int event_index) {
+  if (event_index < 0 || event_index >= CV_MECHANISM_EVENT_COUNT) return -1.0;
+  return kEventProgress[event_index];
+}
+
+extern "C" int cv_mechanism_event_change_count(int event_index) {
+  if (event_index < 0 || event_index >= CV_MECHANISM_EVENT_COUNT) return 0;
+  return kEventChangeCounts[event_index];
+}
+
+extern "C" int cv_mechanism_event_bond_index(int event_index, int change_index) {
+  if (event_index < 0 || event_index >= CV_MECHANISM_EVENT_COUNT ||
+      change_index < 0 || change_index >= kEventChangeCounts[event_index]) {
+    return -1;
+  }
+  return kEventBondIndices[event_index][change_index];
+}
+
+extern "C" double cv_mechanism_event_bond_before(int event_index, int change_index) {
+  const int bond_index = cv_mechanism_event_bond_index(event_index, change_index);
+  if (bond_index < 0) return -1.0;
+  return bondOrdersForEventStage(event_index, false)[bond_index];
+}
+
+extern "C" double cv_mechanism_event_bond_after(int event_index, int change_index) {
+  const int bond_index = cv_mechanism_event_bond_index(event_index, change_index);
+  if (bond_index < 0) return -1.0;
+  return bondOrdersForEventStage(event_index, true)[bond_index];
 }
 
 extern "C" const double *cv_mechanism_sample(double progress) {
@@ -217,9 +268,29 @@ extern "C" int cv_mechanism_validate(void) {
     }
   }
 
+  for (int event = 0; event < CV_MECHANISM_EVENT_COUNT; ++event) {
+    if (!(kEventProgress[event] > 0.0 && kEventProgress[event] <= 1.0) ||
+        kEventChangeCounts[event] <= 0 ||
+        kEventChangeCounts[event] > CV_MECHANISM_MAX_EVENT_CHANGES ||
+        (event > 0 && kEventProgress[event] <= kEventProgress[event - 1])) {
+      return 0;
+    }
+    const double *before_orders = bondOrdersForEventStage(event, false);
+    const double *after_orders = bondOrdersForEventStage(event, true);
+    for (int change = 0; change < kEventChangeCounts[event]; ++change) {
+      const int bond = kEventBondIndices[event][change];
+      if (bond < 0 || bond >= CV_MECHANISM_BOND_COUNT ||
+          before_orders[bond] == after_orders[bond] ||
+          before_orders[bond] < 0.0 || before_orders[bond] > 2.0 ||
+          after_orders[bond] < 0.0 || after_orders[bond] > 2.0) {
+        return 0;
+      }
+    }
+  }
+
   return 1;
 }
 
 extern "C" int cv_mechanism_engine_version(void) {
-  return 100;
+  return 110;
 }
