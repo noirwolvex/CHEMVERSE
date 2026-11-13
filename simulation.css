@@ -425,3 +425,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .fit-diagnostics > div { display: flex; justify-content: space-between; gap: 5px; color: #88a49e; font-size: 7px; }
 .fit-diagnostics b { color: #c5dfd5; font: 600 8px "Space Grotesk", sans-serif; direction: ltr; }
 .fit-warning { margin-top: 8px; color: #c7aa7c; }
+
+
+.fit-k-units {
+  margin-top: 6px;
+  color: #83bbb0;
+  direction: ltr;
+  text-align: center;
+  font: 600 8px "Space Grotesk", sans-serif;
+}
