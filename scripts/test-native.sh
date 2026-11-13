@@ -14,4 +14,9 @@ KINETICS_OUT="$OUT_DIR/chemverse-kinetics-engine-test"
   "$ROOT/cpp/kinetics_engine.cpp" "$ROOT/tests/kinetics_engine_test.cpp" -o "$KINETICS_OUT"
 "$KINETICS_OUT"
 
-rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT"
+FIT_OUT="$OUT_DIR/chemverse-experimental-fit-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/experimental_fit.cpp" "$ROOT/tests/experimental_fit_test.cpp" -o "$FIT_OUT"
+"$FIT_OUT"
+
+rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT"
