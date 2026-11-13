@@ -86,6 +86,7 @@ const concentrationFitKOutput = document.getElementById('concentration-fit-k');
 const concentrationFitMOutput = document.getElementById('concentration-fit-m');
 const concentrationFitNOutput = document.getElementById('concentration-fit-n');
 const concentrationFitR2Output = document.getElementById('concentration-fit-r2');
+const applyConcentrationFitButton = document.getElementById('apply-concentration-fit');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -459,6 +460,7 @@ async function readInitialRatesFile(file) {
   latestExperimentalFit = null;
   fitResults.hidden = true;
   applyFittedParametersButton.disabled = true;
+  applyConcentrationFitButton.disabled = true;
   analyzeInitialRatesButton.disabled = true;
   fitPreview.hidden = true;
   concentrationTimeResults.hidden = true;
@@ -581,6 +583,7 @@ function analyzeInitialRates() {
       latestExperimentalFit.temperatureC >= Number(temperature.min) &&
       latestExperimentalFit.temperatureC <= Number(temperature.max);
     applyFittedParametersButton.disabled = !canApplyToCurrentEngine;
+    applyConcentrationFitButton.disabled = latestExperimentalFit.sourceMethod !== 'concentration-time-derived-initial-rates' || !canApplyToCurrentEngine;
     setFitFileStatus(
       canApplyToCurrentEngine
         ? 'اكتملت الملاءمة بنجاح. يمكن اعتماد المعاملات في محرك المحاكاة؛ النتائج لا تثبت وحدها صحة النموذج أو الآلية.'
@@ -600,6 +603,7 @@ function analyzeInitialRates() {
     latestExperimentalFit = null;
     fitResults.hidden = true;
     applyFittedParametersButton.disabled = true;
+    applyConcentrationFitButton.disabled = true;
     setFitFileStatus(error.message || 'تعذّر تحليل البيانات.', 'is-error');
     return false;
   }
@@ -635,6 +639,7 @@ async function readConcentrationTimeFile(file) {
   latestExperimentalFit = null;
   fitResults.hidden = true;
   applyFittedParametersButton.disabled = true;
+  applyConcentrationFitButton.disabled = true;
   analyzeConcentrationTimeButton.disabled = true;
   concentrationTimePreview.hidden = true;
   concentrationTimeResults.hidden = true;
@@ -711,6 +716,7 @@ function analyzeConcentrationTime() {
   latestExperimentalFit = null;
   fitResults.hidden = true;
   applyFittedParametersButton.disabled = true;
+  applyConcentrationFitButton.disabled = true;
   concentrationTimeResults.hidden = true;
   clearConcentrationFitSummary();
 
@@ -790,6 +796,7 @@ function analyzeConcentrationTime() {
     if (incompatible.length > 0) {
       latestExperimentalFit = null;
       applyFittedParametersButton.disabled = true;
+      applyConcentrationFitButton.disabled = true;
       clearConcentrationFitSummary();
       setFitFileStatus(
         'توقّف التحليل: اختلاف سرعتي اختفاء A وB تجاوز حد السماح (' +
@@ -836,6 +843,7 @@ function analyzeConcentrationTime() {
   } catch (error) {
     latestExperimentalFit = null;
     applyFittedParametersButton.disabled = true;
+    applyConcentrationFitButton.disabled = true;
     fitResults.hidden = true;
     clearConcentrationFitSummary();
     setFitFileStatus(error.message || 'تعذّر تحليل بيانات التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
@@ -873,6 +881,9 @@ function applyExperimentalFitToSimulator() {
     'تم نقل k وm وn ودرجة الحرارة إلى محرك المحاكاة. طاقة التنشيط Ea لم تُستنتج من ملف درجة حرارة واحدة.',
     'is-ready'
   );
+  if (latestExperimentalFit.sourceMethod === 'concentration-time-derived-initial-rates') {
+    setFitFileStatus('تم اعتماد معاملات الملاءمة المستخرجة من بيانات التركيز مقابل الزمن في محرك المحاكاة.', 'is-ready', concentrationTimeStatus);
+  }
 }
 
 function downloadInitialRatesTemplate() {
@@ -1395,6 +1406,7 @@ analyzeConcentrationTimeButton.addEventListener('click', analyzeConcentrationTim
 downloadFitTemplateButton.addEventListener('click', downloadInitialRatesTemplate);
 analyzeInitialRatesButton.addEventListener('click', analyzeInitialRates);
 applyFittedParametersButton.addEventListener('click', applyExperimentalFitToSimulator);
+applyConcentrationFitButton.addEventListener('click', applyExperimentalFitToSimulator);
 document.getElementById('reset-sim').addEventListener('click', () => {
   playing = false;
   elapsed = 0;
