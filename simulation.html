@@ -118,6 +118,22 @@
             </div>
             <canvas id="reaction-chart" aria-label="منحنى تقدم التفاعل"></canvas>
             <div class="chart-axis"><span>0 s</span><span>Time (s)</span><span id="chart-duration">60 s</span></div>
+            <section class="mechanism-event-panel" aria-label="آلية التفاعل خطوة بخطوة" aria-live="polite">
+              <div class="mechanism-event-heading">
+                <div class="mechanism-event-copy">
+                  <span id="mechanism-event-kicker">START / REACTANTS</span>
+                  <b id="mechanism-event-title">نقطة البداية · المواد المتفاعلة</b>
+                </div>
+                <div class="mechanism-stepper" role="group" aria-label="التنقل بين أحداث الآلية">
+                  <button id="step-back" class="mechanism-step-button" type="button" aria-label="الحدث السابق" disabled>السابق</button>
+                  <output id="mechanism-step-indicator">00 / 02</output>
+                  <button id="step-forward" class="mechanism-step-button" type="button" aria-label="الحدث التالي" disabled>التالي</button>
+                </div>
+              </div>
+              <p id="mechanism-event-description">المتفاعلات قبل انتقال البروتون. استخدم التالي للانتقال إلى الحدث الأول.</p>
+              <div id="mechanism-bond-changes" class="bond-change-list"></div>
+              <p class="mechanism-event-note">البيانات تصف تغيّرات الروابط المبرمجة في نموذج C++؛ لا تمثل مساراً جزيئياً محسوباً أو زمناً حركياً مقاساً.</p>
+            </section>
           </div>
         </section>
 
