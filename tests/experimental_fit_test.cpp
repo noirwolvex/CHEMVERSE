@@ -54,6 +54,13 @@ int main() {
   assert(fit[5] > 0.0);
   assert(fit[6] > 0.0 && fit[7] > 0.0);
 
+  /* If log-rate has no variation, R-squared is undefined rather than 1 by convention. */
+  for (int i = 0; i < 6; ++i) setRow(i, a_values[i], b_values[i], 0.002);
+  fit = cv_fit_initial_rates(6, 25.0);
+  assert(fit && cv_fit_last_error() == 0);
+  assert(!std::isfinite(fit[3]));
+  assert(std::fabs(fit[1]) < 1.0e-6 && std::fabs(fit[2]) < 1.0e-6);
+
   /* Too few experiments cannot estimate residual uncertainty. */
   assert(!cv_fit_initial_rates(3, 25.0));
   assert(cv_fit_last_error() == 2);
