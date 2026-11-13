@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getDisplayProgress } from './reaction-stages.mjs';
+import { MECHANISM_CHECKPOINTS, getAdjacentMechanismCheckpoint } from './mechanism-timeline.mjs';
 import { parseInitialRatesCsv, INITIAL_RATES_CSV_TEMPLATE } from './experimental-data.mjs';
 import { parseConcentrationTimeCsv, CONCENTRATION_TIME_CSV_TEMPLATE } from './concentration-data.mjs';
 
@@ -13,6 +14,13 @@ const temperature = document.getElementById('temperature');
 const speedSelect = document.getElementById('speed-select');
 const playButton = document.getElementById('play-toggle');
 const playLabel = document.getElementById('play-label');
+const stepBackButton = document.getElementById('step-back');
+const stepForwardButton = document.getElementById('step-forward');
+const mechanismStepIndicator = document.getElementById('mechanism-step-indicator');
+const mechanismEventKicker = document.getElementById('mechanism-event-kicker');
+const mechanismEventTitle = document.getElementById('mechanism-event-title');
+const mechanismEventDescription = document.getElementById('mechanism-event-description');
+const mechanismBondChanges = document.getElementById('mechanism-bond-changes');
 const timeReadout = document.getElementById('time-readout');
 const temperatureReadout = document.getElementById('temperature-readout');
 const acidAmountInput = document.getElementById('acid-amount');
@@ -221,6 +229,9 @@ async function loadChemistryCore() {
     'cv_mechanism_atom_id', 'cv_mechanism_atom_element',
     'cv_mechanism_bond_atom_a', 'cv_mechanism_bond_atom_b',
     'cv_mechanism_bond_kind', 'cv_mechanism_stage',
+    'cv_mechanism_event_count', 'cv_mechanism_event_progress',
+    'cv_mechanism_event_change_count', 'cv_mechanism_event_bond_index',
+    'cv_mechanism_event_bond_before', 'cv_mechanism_event_bond_after',
     'cv_mechanism_sample', 'cv_mechanism_validate', 'cv_mechanism_engine_version'
   ];
   for (const name of mechanismRequired) {
@@ -228,8 +239,26 @@ async function loadChemistryCore() {
   }
   if (mechanismCore.cv_mechanism_validate() !== 1 ||
       mechanismCore.cv_mechanism_atom_count() !== MECHANISM_ATOM_IDS.length ||
-      mechanismCore.cv_mechanism_bond_count() !== 15) {
-    throw new Error('Atom-mapped mechanism identity/conservation validation failed.');
+      mechanismCore.cv_mechanism_bond_count() !== 15 ||
+      mechanismCore.cv_mechanism_event_count() !== 2) {
+    throw new Error('Atom-mapped mechanism identity/conservation/event validation failed.');
+  }
+  for (let event = 0; event < mechanismCore.cv_mechanism_event_count(); event += 1) {
+    const eventProgress = mechanismCore.cv_mechanism_event_progress(event);
+    const changeCount = mechanismCore.cv_mechanism_event_change_count(event);
+    if (!Number.isFinite(eventProgress) || eventProgress <= 0 || eventProgress > 1 ||
+        changeCount <= 0) {
+      throw new Error('Invalid mechanism event metadata at index ' + event);
+    }
+    for (let change = 0; change < changeCount; change += 1) {
+      const bondIndex = mechanismCore.cv_mechanism_event_bond_index(event, change);
+      const before = mechanismCore.cv_mechanism_event_bond_before(event, change);
+      const after = mechanismCore.cv_mechanism_event_bond_after(event, change);
+      if (bondIndex < 0 || bondIndex >= mechanismCore.cv_mechanism_bond_count() ||
+          before < 0 || before > 2 || after < 0 || after > 2 || before === after) {
+        throw new Error('Invalid mechanism bond change at event ' + event + ', change ' + change);
+      }
+    }
   }
 
   engineStatus.classList.add('is-ready');
@@ -1142,6 +1171,73 @@ function selectTrackedAtom(event) {
   selectedMechanismAtom.material.emissiveIntensity = 0.34;
 }
 
+const MECHANISM_EVENT_COPY = [
+  {
+    kicker: 'STEP 01 / PROTON TRANSFER',
+    title: 'انتقال البروتون',
+    description: 'ينتقل H-ACID من أكسجين حمض الأسيتيك إلى أكسجين البيكربونات. يتضمن السجل أيضاً تمثيل الأسيتات برابطة رنين موضعية وانتقال الارتباط الأيوني للصوديوم.'
+  },
+  {
+    kicker: 'STEP 02 / CARBONIC ACID DECOMPOSITION',
+    title: 'تفكك حمض الكربونيك',
+    description: 'تنفصل ذرة الكربون عن أكسجين الماء، وتتكون رابطة C=O الثانية في CO₂، وينتقل H-ACID إلى أكسجين الماء لتكوين H₂O.'
+  }
+];
+
+function formatBondOrder(order) {
+  return Number.isInteger(order) ? String(order) : order.toFixed(2);
+}
+
+function updateMechanismEventUI(progress) {
+  const stageCode = mechanismCore.cv_mechanism_stage(progress);
+  const completedEvents = MECHANISM_CHECKPOINTS.slice(1)
+    .filter((checkpoint) => progress >= checkpoint - 1e-9).length;
+  mechanismStepIndicator.textContent = String(completedEvents).padStart(2, '0') + ' / 02';
+  mechanismBondChanges.replaceChildren();
+
+  if (stageCode === 0) {
+    mechanismEventKicker.textContent = 'START / REACTANTS';
+    mechanismEventTitle.textContent = 'نقطة البداية · المواد المتفاعلة';
+    mechanismEventDescription.textContent =
+      'حمض الأسيتيك وبيكربونات الصوديوم قبل انتقال البروتون. استخدم التالي للانتقال إلى الحدث الأول.';
+    return;
+  }
+
+  const eventIndex = Math.min(stageCode - 1, MECHANISM_EVENT_COPY.length - 1);
+  const event = MECHANISM_EVENT_COPY[eventIndex];
+  const completed = progress >= mechanismCore.cv_mechanism_event_progress(eventIndex) - 1e-9;
+  mechanismEventKicker.textContent = event.kicker + (completed ? ' · COMPLETED' : ' · IN PROGRESS');
+  mechanismEventTitle.textContent = event.title;
+  mechanismEventDescription.textContent = event.description;
+
+  const changeCount = mechanismCore.cv_mechanism_event_change_count(eventIndex);
+  for (let change = 0; change < changeCount; change += 1) {
+    const bondIndex = mechanismCore.cv_mechanism_event_bond_index(eventIndex, change);
+    const atomA = mechanismCore.cv_mechanism_bond_atom_a(bondIndex);
+    const atomB = mechanismCore.cv_mechanism_bond_atom_b(bondIndex);
+    const kind = mechanismCore.cv_mechanism_bond_kind(bondIndex);
+    const before = mechanismCore.cv_mechanism_event_bond_before(eventIndex, change);
+    const after = mechanismCore.cv_mechanism_event_bond_after(eventIndex, change);
+
+    const card = document.createElement('div');
+    card.className = 'bond-change' + (kind === 1 ? ' is-ionic' : '');
+    const bondName = document.createElement('span');
+    bondName.className = 'bond-change-name';
+    bondName.textContent = MECHANISM_ATOM_IDS[atomA] + ' — ' + MECHANISM_ATOM_IDS[atomB];
+    const order = document.createElement('b');
+    order.className = 'bond-change-order';
+    order.textContent = formatBondOrder(before) + ' → ' + formatBondOrder(after);
+    const action = document.createElement('small');
+    action.className = 'bond-change-action';
+    action.textContent = kind === 1
+      ? 'تغيّر ارتباط أيوني'
+      : (before === 0 ? 'تكوّن رابطة'
+        : (after === 0 ? 'انكسار رابطة' : 'تغيّر رتبة الرابطة'));
+    card.append(bondName, order, action);
+    mechanismBondChanges.append(card);
+  }
+}
+
 function updateStageUI(progress, chemistryResult, visualDemo) {
   const stageCode = mechanismCore.cv_mechanism_stage(progress);
   const stage = ['reactants', 'intermediate', 'products'][stageCode] || 'reactants';
@@ -1174,6 +1270,7 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
   statusTitle.textContent = info.title;
   statusDescription.textContent = info.description;
   statusIcon.textContent = info.icon;
+  updateMechanismEventUI(progress);
 
   document.querySelectorAll('.stage-item').forEach((item) => {
     const itemStage = item.dataset.stage;
@@ -1216,6 +1313,13 @@ function updatePlaybackUI() {
     ((temperatureC - 20) / 40 * 100) + '%, #2a424a ' + ((temperatureC - 20) / 40 * 100) + '%, #2a424a 100%)';
   playButton.disabled = !simulationAvailable;
   timeline.disabled = !simulationAvailable;
+  const displayProgress = simulationAvailable
+    ? getDisplayProgress(elapsed, durationSeconds)
+    : 0;
+  stepBackButton.disabled = !simulationAvailable ||
+    Math.abs(getAdjacentMechanismCheckpoint(displayProgress, -1) - displayProgress) < 1e-9;
+  stepForwardButton.disabled = !simulationAvailable ||
+    Math.abs(getAdjacentMechanismCheckpoint(displayProgress, 1) - displayProgress) < 1e-9;
 }
 
 function drawChart(result, displayProgress, visualDemo) {
@@ -1294,6 +1398,17 @@ function togglePlayback() {
   if (!simulationAvailable) return;
   if (elapsed >= durationSeconds) elapsed = 0;
   playing = !playing;
+  previousFrame = 0;
+  refreshView();
+}
+
+function moveMechanismStep(direction) {
+  if (!simulationAvailable || !mechanismCore) return;
+  const currentProgress = getDisplayProgress(elapsed, durationSeconds);
+  const nextProgress = getAdjacentMechanismCheckpoint(currentProgress, direction);
+  if (Math.abs(nextProgress - currentProgress) < 1e-9) return;
+  playing = false;
+  elapsed = nextProgress * durationSeconds;
   previousFrame = 0;
   refreshView();
 }
@@ -1432,6 +1547,8 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 playButton.addEventListener('click', togglePlayback);
+stepBackButton.addEventListener('click', () => moveMechanismStep(-1));
+stepForwardButton.addEventListener('click', () => moveMechanismStep(1));
 initialRatesFileInput.addEventListener('change', () => {
   readInitialRatesFile(initialRatesFileInput.files && initialRatesFileInput.files[0]);
 });
