@@ -21,5 +21,13 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_kinetics_atom_balance_ok -Wl,--export=cv_kinetics_engine_version \
   -Wl,--strip-all "$ROOT/cpp/kinetics_engine.cpp" -o "$ROOT/wasm/kinetics_engine.wasm"
 
-printf 'Built %s and %s\n' \
-  "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm"
+# Experimental initial-rate parameter fitting module.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_fit_input_buffer -Wl,--export=cv_fit_initial_rates \
+  -Wl,--export=cv_fit_last_error -Wl,--export=cv_fit_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/experimental_fit.cpp" -o "$ROOT/wasm/experimental_fit.wasm"
+
+printf 'Built %s, %s, and %s\\n' \
+  "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" "$ROOT/wasm/experimental_fit.wasm"
