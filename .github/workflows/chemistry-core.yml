@@ -1,4 +1,7 @@
 name: Chemistry engines
+
+permissions:
+  contents: write
 on:
   push:
     paths:
@@ -85,6 +88,17 @@ jobs:
             process.exit(1);
           });
           NODE
+      - name: Publish validated WebAssembly binaries to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm
+          if git diff --cached --quiet; then
+            echo "Validated WebAssembly binaries are already up to date."
+          else
+            git commit -m "Update validated WebAssembly binaries"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
       - name: Upload validated WebAssembly modules
         uses: actions/upload-artifact@v4
         with:
