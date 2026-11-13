@@ -198,3 +198,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .scene-loading { opacity: 1; visibility: visible; transition: opacity .35s ease, visibility .35s ease; }
 .scene-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .molecule-view canvas { touch-action: none; }
+
+
+/* C++ stoichiometry engine and live amount readouts */
+.engine-status { display:flex; align-items:center; gap:9px; margin-top:13px; padding:9px 10px; border:1px solid rgba(114,217,197,.18); border-radius:5px; background:rgba(114,217,197,.055); }
+.engine-status > i { width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:#d8b985; box-shadow:0 0 8px rgba(216,185,133,.35); }
+.engine-status.is-ready > i { background:var(--accent); box-shadow:0 0 9px rgba(114,217,197,.65); }
+.engine-status.is-error > i { background:#ef7777; box-shadow:0 0 9px rgba(239,119,119,.5); }
+.engine-status b, .engine-status small { display:block; }
+.engine-status b { color:#cbe0d9; font:600 7px "Space Grotesk",sans-serif; letter-spacing:.12em; }
+.engine-status small { margin-top:3px; color:#87a4a0; font-size:8px; }
+.reagent-controls { margin-top:17px; padding:11px 10px 2px; border:1px solid rgba(114,217,197,.12); border-radius:6px; background:rgba(114,217,197,.035); }
+.reagent-controls > .summary-title { margin-bottom:4px; }
+.reagent-controls .control-block { margin-top:12px; }
+.calculation-summary { margin-top:18px; padding:11px 10px; border:1px solid rgba(114,217,197,.14); border-radius:6px; background:rgba(114,217,197,.045); }
+.calculation-summary .summary-title { margin-bottom:8px; }
+.calculation-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px solid rgba(180,214,205,.07); }
+.calculation-row span { color:#8ba3a1; font-size:8px; }
+.calculation-row b { color:#d1e7de; font:600 8px "Space Grotesk",sans-serif; text-align:left; }
+.calculation-integrity { margin-top:7px; padding-top:8px; border-top:1px solid rgba(180,214,205,.1); color:var(--accent); font-size:8px; }
+.calculation-integrity i { display:inline-block; width:5px; height:5px; margin-left:5px; border-radius:50%; background:var(--accent); }
+.calculation-integrity.is-error { color:#f08b8b; }
+.calculation-integrity.is-error i { background:#f08b8b; }

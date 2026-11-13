@@ -10,6 +10,19 @@ const playButton = document.getElementById('play-toggle');
 const playLabel = document.getElementById('play-label');
 const timeReadout = document.getElementById('time-readout');
 const temperatureReadout = document.getElementById('temperature-readout');
+const acidAmountInput = document.getElementById('acid-amount');
+const bicarbonateAmountInput = document.getElementById('bicarbonate-amount');
+const acidAmountReadout = document.getElementById('acid-amount-readout');
+const bicarbonateAmountReadout = document.getElementById('bicarbonate-amount-readout');
+const engineStatus = document.getElementById('engine-status');
+const engineState = document.getElementById('engine-state');
+const limitingReagentOutput = document.getElementById('limiting-reagent');
+const acidRemainingOutput = document.getElementById('acid-remaining');
+const bicarbonateRemainingOutput = document.getElementById('bicarbonate-remaining');
+const sodiumAcetateOutput = document.getElementById('sodium-acetate-output');
+const waterOutput = document.getElementById('water-output');
+const carbonDioxideOutput = document.getElementById('co2-output');
+const atomIntegrity = document.getElementById('atom-integrity');
 const progressReadout = document.getElementById('progress-readout');
 const stageCaption = document.getElementById('stage-caption');
 const moleculeLabel = document.getElementById('molecule-label');
@@ -19,7 +32,7 @@ const statusIcon = document.getElementById('status-icon');
 const chart = document.getElementById('reaction-chart');
 const chartContext = chart.getContext('2d');
 
-const DURATION = 18;
+const DURATION = 12;
 const atomPalette = {
   C: { color: 0x9eafb5, radius: 0.235, roughness: 0.3, metalness: 0.22 },
   H: { color: 0xf1f5ef, radius: 0.135, roughness: 0.22, metalness: 0.08 },
@@ -37,12 +50,64 @@ let elapsed = 0;
 let playing = false;
 let playbackSpeed = 1;
 let temperatureC = 25;
+let acidAmountMmol = Number(acidAmountInput.value);
+let bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
+let chemistryCore = null;
 let species = {};
 
 const smoothStep = (a, b, value) => {
   const t = THREE.MathUtils.clamp((value - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
+
+async function loadChemistryCore() {
+  const response = await fetch(new URL('../wasm/chemistry_core.wasm', import.meta.url));
+  if (!response.ok) throw new Error('WebAssembly core request failed: HTTP ' + response.status);
+  const bytes = await response.arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(bytes, {});
+  const api = instance.exports;
+  const required = ['memory', 'cv_calculate_reaction', 'cv_demo_progress', 'cv_reaction_is_balanced', 'cv_engine_version'];
+  for (const name of required) if (!(name in api)) throw new Error('Missing WebAssembly export: ' + name);
+  if (api.cv_reaction_is_balanced() !== 1) throw new Error('C++ reaction formula validation failed.');
+  chemistryCore = api;
+  engineStatus.classList.add('is-ready');
+  engineState.textContent = 'متصل · الإصدار ' + (api.cv_engine_version() / 100).toFixed(2);
+}
+
+function calculateChemistry(timeSeconds) {
+  if (!chemistryCore) throw new Error('C++ chemistry core is not loaded.');
+  const progress = chemistryCore.cv_demo_progress(timeSeconds);
+  const pointer = chemistryCore.cv_calculate_reaction(acidAmountMmol, bicarbonateAmountMmol, progress);
+  const memory = chemistryCore.memory.buffer;
+  const values = new Float64Array(memory, pointer, 7);
+  const flags = new Int32Array(memory, pointer + 56, 3);
+  const result = {
+    progress: values[0], extent: values[1],
+    acidRemaining: values[2], bicarbonateRemaining: values[3],
+    sodiumAcetate: values[4], water: values[5], carbonDioxide: values[6],
+    limitingReagent: flags[0], atomBalanceOk: flags[1] === 1, errorCode: flags[2]
+  };
+  if (result.errorCode !== 0 || !result.atomBalanceOk) {
+    throw new Error('C++ chemistry core rejected the input or detected an atom-balance error.');
+  }
+  return result;
+}
+function formatMmol(value) { return value.toFixed(2) + ' mmol'; }
+function updateChemistryReadouts(result) {
+  acidAmountReadout.textContent = formatMmol(acidAmountMmol);
+  bicarbonateAmountReadout.textContent = formatMmol(bicarbonateAmountMmol);
+  acidRemainingOutput.textContent = formatMmol(result.acidRemaining);
+  bicarbonateRemainingOutput.textContent = formatMmol(result.bicarbonateRemaining);
+  sodiumAcetateOutput.textContent = formatMmol(result.sodiumAcetate);
+  waterOutput.textContent = formatMmol(result.water);
+  carbonDioxideOutput.textContent = formatMmol(result.carbonDioxide);
+  const labels = ['متساويان', 'حمض الأسيتيك', 'بيكربونات الصوديوم'];
+  limitingReagentOutput.textContent = labels[result.limitingReagent] || 'غير محدد';
+  atomIntegrity.classList.toggle('is-error', !result.atomBalanceOk);
+  atomIntegrity.lastChild.textContent = result.atomBalanceOk
+    ? ' حفظ الذرات متحقق'
+    : ' فشل التحقق من حفظ الذرات';
+}
 
 function makeMaterial(color, roughness = 0.35, metalness = 0.1) {
   return new THREE.MeshStandardMaterial({
@@ -254,32 +319,31 @@ function moveSpecies(group, x, y, z, time, phase, amplitude) {
   );
 }
 
-function updateMolecularScene(time) {
+function updateMolecularScene(time, result) {
+  // Temperature affects only schematic molecular vibration, not reaction kinetics.
   const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
   const vibration = 0.018 * temperatureFactor;
-  const reactantFade = 1 - smoothStep(5.0, 6.25, time);
-  const intermediateFade = smoothStep(5.25, 6.3, time) * (1 - smoothStep(9.1, 10.35, time));
-  const productFade = smoothStep(9.2, 10.65, time);
-  const approach = smoothStep(0, 5.2, time);
-
+  const progress = result.progress;
+  const intermediateFade = smoothStep(0.34, 0.48, progress) * (1 - smoothStep(0.68, 0.82, progress));
+  const acidVisibility = acidAmountMmol > 0 ? result.acidRemaining / acidAmountMmol : 0;
+  const bicarbonateVisibility = bicarbonateAmountMmol > 0 ? result.bicarbonateRemaining / bicarbonateAmountMmol : 0;
+  const approach = smoothStep(0, 0.45, progress);
   const acidX = THREE.MathUtils.lerp(-2.05, -0.88, approach);
   const bicarbonateX = THREE.MathUtils.lerp(2.05, 0.88, approach);
   moveSpecies(species.acetic, acidX, 0.03, 0, time, 0.4, vibration);
   moveSpecies(species.bicarbonate, bicarbonateX, -0.03, 0, time, 1.6, vibration);
-  setOpacity(species.acetic, reactantFade);
-  setOpacity(species.bicarbonate, reactantFade);
-
+  setOpacity(species.acetic, acidVisibility);
+  setOpacity(species.bicarbonate, bicarbonateVisibility);
   moveSpecies(species.acetate, -1.12, 0.03, 0, time, 1.0, vibration * 0.7);
   moveSpecies(species.carbonic, 1.12, 0.02, 0, time, 2.1, vibration * 0.7);
   setOpacity(species.acetate, intermediateFade);
   setOpacity(species.carbonic, intermediateFade);
-
   moveSpecies(species.sodiumAcetate, -1.82, 0.12, 0, time, 0.7, vibration * 0.45);
   moveSpecies(species.carbonDioxide, 1.25, 0.72, 0, time, 1.8, vibration * 0.9);
   moveSpecies(species.water, 2.75, -1.03, 0.28, time, 2.7, vibration * 0.6);
-  setOpacity(species.sodiumAcetate, productFade);
-  setOpacity(species.carbonDioxide, productFade);
-  setOpacity(species.water, productFade);
+  setOpacity(species.sodiumAcetate, progress);
+  setOpacity(species.carbonDioxide, progress);
+  setOpacity(species.water, progress);
 }
 
 function currentStage(time) {
@@ -329,8 +393,8 @@ function updateStageUI(time) {
     );
   });
 
-  const completion = Math.round(smoothStep(1.2, 12.0, time) * 100);
-  progressReadout.textContent = completion + '%';
+  const chemistry = calculateChemistry(time);
+  progressReadout.textContent = Math.round(chemistry.progress * 100) + '%';
 }
 
 function formatTime(value) {
@@ -341,7 +405,7 @@ function formatTime(value) {
 function updatePlaybackUI() {
   playLabel.textContent = playing ? 'إيقاف مؤقت' : (elapsed >= DURATION ? 'إعادة التشغيل' : 'ابدأ التفاعل');
   playButton.querySelector('.play-icon').textContent = playing ? 'Ⅱ' : '▶';
-  timeReadout.textContent = formatTime(elapsed) + ' / 00:18';
+  timeReadout.textContent = formatTime(elapsed) + ' / 00:12';
   timeline.value = String(elapsed);
   timeline.style.background = 'linear-gradient(to left, #72d9c5 0%, #72d9c5 ' +
     (elapsed / DURATION * 100) + '%, #2a424a ' + (elapsed / DURATION * 100) + '%, #2a424a 100%)';
@@ -350,7 +414,7 @@ function updatePlaybackUI() {
     ((temperatureC - 20) / 40 * 100) + '%, #2a424a ' + ((temperatureC - 20) / 40 * 100) + '%, #2a424a 100%)';
 }
 
-function drawChart() {
+function drawChart(result) {
   const width = chart.clientWidth || 500;
   const height = chart.clientHeight || 70;
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -374,7 +438,7 @@ function drawChart() {
   for (let i = 0; i <= 100; i += 1) {
     const x = left + (right - left) * i / 100;
     const t = DURATION * i / 100;
-    const yValue = smoothStep(1.2, 12.0, t);
+    const yValue = chemistryCore.cv_demo_progress(t);
     const y = bottom - (bottom - top) * yValue;
     if (i === 0) chartContext.moveTo(x, y);
     else chartContext.lineTo(x, y);
@@ -387,8 +451,7 @@ function drawChart() {
   chartContext.shadowBlur = 0;
 
   const progressX = left + (right - left) * elapsed / DURATION;
-  const progressYValue = smoothStep(1.2, 12.0, elapsed);
-  const progressY = bottom - (bottom - top) * progressYValue;
+  const progressY = bottom - (bottom - top) * result.progress;
   chartContext.beginPath();
   chartContext.arc(progressX, progressY, 3.5, 0, Math.PI * 2);
   chartContext.fillStyle = '#e1fff5';
@@ -400,10 +463,12 @@ function drawChart() {
 }
 
 function refreshView() {
-  updateMolecularScene(elapsed);
+  const result = calculateChemistry(elapsed);
+  updateMolecularScene(elapsed, result);
   updateStageUI(elapsed);
+  updateChemistryReadouts(result);
   updatePlaybackUI();
-  drawChart();
+  drawChart(result);
 }
 
 function togglePlayback() {
@@ -419,14 +484,16 @@ function animate(timestamp) {
   previousFrame = timestamp;
 
   if (playing) {
-    const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
-    elapsed = Math.min(DURATION, elapsed + delta * playbackSpeed * temperatureFactor);
+    elapsed = Math.min(DURATION, elapsed + delta * playbackSpeed);
     if (elapsed >= DURATION) playing = false;
   }
 
-  updateMolecularScene(elapsed);
+  const result = calculateChemistry(elapsed);
+  updateMolecularScene(elapsed, result);
   updateStageUI(elapsed);
+  updateChemistryReadouts(result);
   updatePlaybackUI();
+  drawChart(result);
   orbit.update();
   renderer.render(scene, camera);
 }
@@ -499,7 +566,7 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  drawChart();
+  drawChart(calculateChemistry(elapsed));
 }
 
 playButton.addEventListener('click', togglePlayback);
@@ -525,6 +592,14 @@ temperature.addEventListener('input', () => {
 speedSelect.addEventListener('change', () => {
   playbackSpeed = Number(speedSelect.value);
 });
+acidAmountInput.addEventListener('input', () => {
+  acidAmountMmol = Number(acidAmountInput.value);
+  refreshView();
+});
+bicarbonateAmountInput.addEventListener('input', () => {
+  bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
+  refreshView();
+});
 window.addEventListener('resize', onResize);
 window.addEventListener('beforeunload', () => {
   if (animationFrame) window.cancelAnimationFrame(animationFrame);
@@ -532,11 +607,17 @@ window.addEventListener('beforeunload', () => {
   if (renderer) renderer.dispose();
 });
 
-try {
-  initScene();
-  refreshView();
-  animate(0);
-} catch (error) {
-  console.error('CHEMVERSE molecular simulator failed:', error);
-  loading.textContent = 'تعذر تجهيز المحاكي. حدّث الصفحة أو تحقق من دعم WebGL.';
+async function startSimulator() {
+  try {
+    await loadChemistryCore();
+    initScene();
+    refreshView();
+    animate(0);
+  } catch (error) {
+    console.error('CHEMVERSE molecular simulator failed:', error);
+    engineStatus.classList.add('is-error');
+    engineState.textContent = 'فشل تحميل نواة C++ / WebAssembly';
+    loading.textContent = 'تعذر تشغيل محرك الكيمياء. تأكد من وجود wasm/chemistry_core.wasm ثم حدّث الصفحة.';
+  }
 }
+startSimulator();

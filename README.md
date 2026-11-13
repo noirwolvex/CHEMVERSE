@@ -44,9 +44,24 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - The 3D ball-and-stick view shows the reactants, the proton-transfer intermediate (acetate + carbonic acid), and the products (sodium acetate, water and carbon dioxide).
 - Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, change playback speed and adjust the illustrative temperature setting.
 - The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
-- This first pass is a staged educational visualization. Temperature changes the illustrative playback/vibration only; it is not a measured reaction-rate model, molecular-dynamics calculation or quantum-chemistry simulation. Atom sizes and bond lengths are schematic.
-- The current molecular presentation is implemented in JavaScript / Three.js. A verified C++ / WebAssembly chemistry calculation core is a subsequent development step, not part of this first visual prototype.
+- A C++ / WebAssembly core computes reaction extent, the limiting reagent, remaining reactants, product millimoles and an atom-conservation check from the selected initial millimole amounts.
+- The default inputs are 10 mmol acetic acid and 8 mmol sodium bicarbonate; at full conversion the bicarbonate is limiting, 2 mmol acetic acid remains and 8 mmol of each product is calculated.
+- The time slider drives an educational progress value in the C++ core. It is a playback schedule, not measured reaction kinetics. Temperature controls schematic vibration only; it does not change the calculated reaction rate.
+- Atom sizes, bond lengths, molecular arrangement and transition timing remain schematic. This is not molecular dynamics or quantum chemistry.
 
 ## Next development stage
 
 Extend the validated reaction catalogue, add experimentally sourced kinetics and concentration models, then integrate the C++ / WebAssembly chemistry core and an AI explanation assistant that uses the simulation's actual data.
+
+
+## C++ / WebAssembly chemistry core
+
+- **cpp/chemistry_core.cpp** — stoichiometry, limiting-reagent calculation and atom-conservation validation.
+- **cpp/chemistry_core.h** — stable C ABI result structure consumed by JavaScript.
+- **wasm/chemistry_core.wasm** — browser-loadable WebAssembly module used by the simulator.
+- **tests/chemistry_core_test.cpp** — native tests for balanced inputs, limiting reagents, partial conversion and invalid input.
+- **scripts/test-native.sh** — run the C++ test suite with g++.
+- **scripts/build-wasm.sh** — compile the core with Clang for wasm32.
+- **.github/workflows/chemistry-core.yml** — run native tests and validate WebAssembly exports on GitHub Actions.
+
+Run the native test suite from the repository root with **bash scripts/test-native.sh** (Git Bash or WSL), or compile the source and test file with a local C++17 compiler. Build WebAssembly with **bash scripts/build-wasm.sh** and Clang's wasm32 target. The committed .wasm file is included for static browser use.

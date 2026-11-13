@@ -123,20 +123,34 @@
         <aside class="panel controls-panel">
           <div class="panel-kicker">02 / CONTROL DECK</div>
           <h2>لوحة التحكم</h2>
-          <p class="panel-intro">تحكم في تشغيل النموذج وشاهد كيف تتغير الحركة مع الظروف المختارة.</p>
+          <p class="panel-intro">تحكم في كميات المواد وشاهد الحسابات الناتجة مباشرة من نواة الكيمياء.</p>
+          <div class="engine-status" id="engine-status" aria-live="polite">
+            <i></i><span><b>C++ / WEBASSEMBLY CORE</b><small id="engine-state">جاري تحميل النواة...</small></span>
+          </div>
 
           <div class="playback-controls">
             <button id="play-toggle" class="primary-control" type="button"><span class="play-icon">▶</span><span id="play-label">ابدأ التفاعل</span></button>
             <button id="reset-sim" class="secondary-control" type="button" aria-label="إعادة التفاعل">↺</button>
           </div>
 
+          <div class="reagent-controls">
+            <div class="summary-title">كميات المواد الابتدائية</div>
+            <div class="control-block">
+              <div class="control-label"><label for="acid-amount">حمض الأسيتيك</label><output id="acid-amount-readout">10 mmol</output></div>
+              <input id="acid-amount" class="range-input reagent-range" type="range" min="1" max="20" step="1" value="10">
+            </div>
+            <div class="control-block">
+              <div class="control-label"><label for="bicarbonate-amount">بيكربونات الصوديوم</label><output id="bicarbonate-amount-readout">8 mmol</output></div>
+              <input id="bicarbonate-amount" class="range-input reagent-range" type="range" min="1" max="20" step="1" value="8">
+            </div>
+          </div>
           <div class="control-block">
-            <div class="control-label"><label for="timeline">الزمن الافتراضي</label><output id="time-readout">00:00 / 00:18</output></div>
-            <input id="timeline" class="range-input" type="range" min="0" max="18" step="0.05" value="0">
+            <div class="control-label"><label for="timeline">زمن العرض</label><output id="time-readout">00:00 / 00:12</output></div>
+            <input id="timeline" class="range-input" type="range" min="0" max="12" step="0.05" value="0">
           </div>
 
           <div class="control-block">
-            <div class="control-label"><label for="temperature">درجة الحرارة</label><output id="temperature-readout">25°C</output></div>
+            <div class="control-label"><label for="temperature">درجة الحرارة · اهتزاز مرئي</label><output id="temperature-readout">25°C</output></div>
             <input id="temperature" class="range-input temperature-range" type="range" min="20" max="60" step="1" value="25">
             <div class="range-ends"><span>20°C</span><span>60°C</span></div>
           </div>
@@ -156,14 +170,24 @@
             <div><small>حالة المحاكاة</small><b id="status-title">جاهز للبدء</b><p id="status-description">ابدأ لمشاهدة اقتراب الجزيئات.</p></div>
           </div>
 
+          <div class="calculation-summary">
+            <div class="summary-title">نتائج الحساب الكيميائي · C++</div>
+            <div class="calculation-row"><span>المتفاعل المحدِّد</span><b id="limiting-reagent">بيكربونات الصوديوم</b></div>
+            <div class="calculation-row"><span>حمض الأسيتيك المتبقي</span><b id="acid-remaining">2.00 mmol</b></div>
+            <div class="calculation-row"><span>البيكربونات المتبقية</span><b id="bicarbonate-remaining">0.00 mmol</b></div>
+            <div class="calculation-row"><span>أسيتات الصوديوم</span><b id="sodium-acetate-output">0.00 mmol</b></div>
+            <div class="calculation-row"><span>الماء</span><b id="water-output">0.00 mmol</b></div>
+            <div class="calculation-row"><span>ثاني أكسيد الكربون</span><b id="co2-output">0.00 mmol</b></div>
+            <div class="calculation-integrity" id="atom-integrity"><i></i> حفظ الذرات متحقق</div>
+          </div>
           <div class="products-summary">
-            <div class="summary-title">النواتج النهائية</div>
+            <div class="summary-title">النواتج الكيميائية</div>
             <div class="product-row"><span class="product-symbol acetate">Ac</span><span><b>أسيتات الصوديوم</b><small>CH₃COONa</small></span></div>
             <div class="product-row"><span class="product-symbol water">H₂O</span><span><b>الماء</b><small>H₂O</small></span></div>
             <div class="product-row"><span class="product-symbol carbon">CO₂</span><span><b>ثاني أكسيد الكربون</b><small>CO₂</small></span></div>
           </div>
 
-          <div class="science-note"><b>ملاحظة علمية</b><p>هذه نسخة تعليمية مبسطة تعرض البنية والروابط وتسلسل التفاعل. الحركة وتأثير الحرارة نوعيان توضيحيان، وليسا قياساً تجريبياً لسرعة التفاعل أو محاكاة كمّية.</p></div>
+          <div class="science-note"><b>نطاق النموذج</b><p>نواة C++ تحسب التقدّم الستوكيومتري والمتفاعل المحدِّد وكميات المتبقيات والنواتج وتتحقق من حفظ الذرات. الجدول الزمني للعرض تعليمي، وتأثير الحرارة بصري على الاهتزاز فقط؛ لا توجد بعد حركية تجريبية أو محاكاة كمّية.</p></div>
         </aside>
       </section>
       <footer class="sim-footer"><span>CHEMVERSE MOLECULAR LAB</span><span>LEARN · OBSERVE · DISCOVER</span><span>MODEL 001 / ACID–BICARBONATE</span></footer>

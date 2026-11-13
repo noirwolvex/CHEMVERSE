@@ -1,0 +1,24 @@
+name: Chemistry core
+on:
+  push:
+    paths: ['cpp/**', 'tests/**', 'scripts/**', 'wasm/**', '.github/workflows/chemistry-core.yml']
+  pull_request:
+    paths: ['cpp/**', 'tests/**', 'scripts/**', 'wasm/**', '.github/workflows/chemistry-core.yml']
+jobs:
+  native-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run native chemistry tests
+        run: bash scripts/test-native.sh
+  wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build WebAssembly module
+        run: bash scripts/build-wasm.sh
+      - name: Validate WebAssembly module
+        run: |
+          node -e "const fs=require('fs');const b=fs.readFileSync('wasm/chemistry_core.wasm');WebAssembly.instantiate(b).then(({instance})=>{const e=instance.exports;if(e.cv_engine_version()!==100||e.cv_reaction_is_balanced()!==1)process.exit(1);const p=e.cv_calculate_reaction(10,8,0.5);const f=new Float64Array(e.memory.buffer);const o=p/8;if(Math.abs(f[o+1]-4)>1e-9||Math.abs(f[o+2]-6)>1e-9||Math.abs(f[o+4]-4)>1e-9)process.exit(1);console.log('WebAssembly module validation passed');}).catch(e=>{console.error(e);process.exit(1);});"
