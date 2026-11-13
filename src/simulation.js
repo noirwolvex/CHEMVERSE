@@ -657,10 +657,10 @@ async function readConcentrationTimeFile(file) {
       'is-ready',
       concentrationTimeStatus
     );
-    initialWindowPointsInput.max = String(maxPoints);
+    initialWindowPointsInput.max = String(minPoints);
     initialWindowPointsInput.min = '3';
-    initialWindowPointsInput.value = String(Math.min(5, maxPoints));
-    initialWindowPointsInput.disabled = maxPoints < 3 || minPoints < 3;
+    initialWindowPointsInput.value = String(Math.min(5, minPoints));
+    initialWindowPointsInput.disabled = minPoints < 3;
   } catch (error) {
     importedConcentrationSeries = null;
     setFitFileStatus(error.message || 'تعذر قراءة ملف التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
