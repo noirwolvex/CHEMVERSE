@@ -176,6 +176,45 @@
             <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. يُسجّل المرجع كنص فقط ولا يتحقق النظام آلياً من صحته أو من تطابقه مع القيم. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً. عند ترك حقول الحركية فارغة، يعمل عرض بصري متسلسل مدته 18 ثانية: المتفاعلات، ثم انتقال البروتون، ثم النواتج؛ ولا يعرض قيماً حركية أو كميات نواتج محسوبة.</p>
             <div class="kinetics-parameter-status" id="kinetics-parameter-status" aria-live="polite">الحركية غير مفعّلة: أدخل k والرتبتين التجريبيتين.</div>
           </section>
+          <section class="experimental-fit-panel" aria-labelledby="experimental-fit-title">
+            <div class="summary-title" id="experimental-fit-title">تحليل البيانات التجريبية · EXPERIMENTAL FIT</div>
+            <p class="fit-intro">استورد قياسات السرعات الابتدائية من أربع تجارب مستقلة أو أكثر عند درجة حرارة واحدة لاستخراج k ورتبتي التفاعل بالانحدار.</p>
+            <div class="fit-import-actions">
+              <label class="fit-file-label" for="initial-rates-file">
+                <span>اختيار ملف CSV</span>
+                <input id="initial-rates-file" type="file" accept=".csv,text/csv">
+              </label>
+              <button id="download-fit-template" class="fit-secondary-button" type="button">تنزيل قالب CSV</button>
+            </div>
+            <div class="fit-file-status" id="fit-file-status" aria-live="polite">لم يتم استيراد بيانات بعد.</div>
+            <div class="fit-preview" id="fit-preview" hidden>
+              <div class="fit-preview-heading"><b>معاينة البيانات</b><span id="fit-preview-count">0 تجربة</span></div>
+              <div class="fit-table-wrap">
+                <table class="fit-data-table" dir="ltr">
+                  <thead><tr><th>ID</th><th>T (°C)</th><th>[A]₀ (M)</th><th>[B]₀ (M)</th><th>Rate (M/s)</th></tr></thead>
+                  <tbody id="fit-preview-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <button id="analyze-initial-rates" class="fit-primary-button" type="button" disabled>تحليل واستخراج المعاملات</button>
+            <div class="fit-results" id="fit-results" hidden>
+              <div class="fit-results-heading"><b>نتائج الملاءمة</b><span id="fit-temperature-result">—</span></div>
+              <div class="fit-parameter-grid">
+                <div><small>ثابت السرعة k</small><b id="fit-k-result">—</b></div>
+                <div><small>رتبة الحمض m</small><b id="fit-m-result">—</b></div>
+                <div><small>رتبة البيكربونات n</small><b id="fit-n-result">—</b></div>
+              </div>
+              <div class="fit-equation" id="fit-equation" dir="ltr">r = k[A]^m[B]^n</div>
+              <div class="fit-diagnostics">
+                <div><span>R²</span><b id="fit-r2-result">—</b></div>
+                <div><span>RMSE ln(rate)</span><b id="fit-rmse-result">—</b></div>
+                <div><span>SE(m) / SE(n)</span><b id="fit-orders-se-result">—</b></div>
+                <div><span>SE(k)</span><b id="fit-k-se-result">—</b></div>
+              </div>
+              <p class="fit-warning">هذه ملاءمة إحصائية للبيانات المدخلة عند درجة الحرارة المسجلة. جودة الملاءمة لا تثبت وحدها صحة الآلية الكيميائية أو خلو القياسات من الانحياز.</p>
+              <button id="apply-fitted-parameters" class="fit-apply-button" type="button" disabled>اعتماد k و m و n في محرك المحاكاة</button>
+            </div>
+          </section>
           <div class="control-block">
             <div class="control-label"><label for="timeline">زمن العرض</label><output id="time-readout">00:00 / 00:12</output></div>
             <input id="timeline" class="range-input" type="range" min="0" max="60" step="0.05" value="0" disabled>
