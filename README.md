@@ -37,6 +37,16 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - **styles.css** — responsive interface styling.
 - **src/main.js** — Three.js room, furniture, equipment, first-person movement, player collision and interaction logic.
 
+## Molecular simulator — first experiment
+
+- Open **Molecular Simulator** from the laboratory header or visit **simulation.html**.
+- The first educational model demonstrates the balanced reaction: CH3COOH + NaHCO3 → CH3COONa + H2O + CO2.
+- The 3D ball-and-stick view shows the reactants, the proton-transfer intermediate (acetate + carbonic acid), and the products (sodium acetate, water and carbon dioxide).
+- Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, change playback speed and adjust the illustrative temperature setting.
+- The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
+- This first pass is a staged educational visualization. Temperature changes the illustrative playback/vibration only; it is not a measured reaction-rate model, molecular-dynamics calculation or quantum-chemistry simulation. Atom sizes and bond lengths are schematic.
+- The current molecular presentation is implemented in JavaScript / Three.js. A verified C++ / WebAssembly chemistry calculation core is a subsequent development step, not part of this first visual prototype.
+
 ## Next development stage
 
-The next stage can add object selection and placement, interaction with glassware, safe experiment logic, scoring and a C++ / WebAssembly chemistry simulation core.
+Extend the validated reaction catalogue, add experimentally sourced kinetics and concentration models, then integrate the C++ / WebAssembly chemistry core and an AI explanation assistant that uses the simulation's actual data.
