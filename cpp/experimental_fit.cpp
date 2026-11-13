@@ -209,7 +209,7 @@ extern "C" const double *cv_fit_initial_rates(int row_count, double temperature_
   const double standard_error_log_k = sqrtApprox(maxValue(0.0, variance_log_k));
   const double standard_error_k = k * standard_error_log_k;
   const double rmse = sqrtApprox(sse * inverse_count);
-  const double r_squared = sst > 1.0e-24 ? 1.0 - sse / sst : (sse <= 1.0e-24 ? 1.0 : 0.0);
+  const double r_squared = sst > 1.0e-24 ? 1.0 - sse / sst : __builtin_nan("");
 
   result[0] = k;
   result[1] = order_a;
