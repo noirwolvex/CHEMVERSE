@@ -220,3 +220,79 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calculation-integrity i { display:inline-block; width:5px; height:5px; margin-left:5px; border-radius:50%; background:var(--accent); }
 .calculation-integrity.is-error { color:#f08b8b; }
 .calculation-integrity.is-error i { background:#f08b8b; }
+
+
+/* Reaction kinetics inputs and computed concentration readouts */
+.kinetics-controls {
+  margin-top: 17px;
+  padding: 11px 10px 10px;
+  border: 1px solid rgba(114,217,197,.18);
+  border-radius: 6px;
+  background: rgba(114,217,197,.04);
+}
+.kinetics-controls > .summary-title { margin-bottom: 9px; }
+.kinetics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 8px;
+}
+.kinetics-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: #b9cfca;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.kinetics-field-wide { grid-column: 1 / -1; }
+.kinetics-field input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 7px;
+  direction: ltr;
+  text-align: left;
+  color: #e2f1eb;
+  border: 1px solid rgba(176,215,211,.16);
+  border-radius: 4px;
+  background: #0d202b;
+  outline: none;
+  font: 500 9px "Space Grotesk", sans-serif;
+}
+.kinetics-field input::placeholder { color: #648083; font: 500 7px "IBM Plex Sans Arabic", sans-serif; }
+.kinetics-field input:focus { border-color: rgba(114,217,197,.62); box-shadow: 0 0 0 2px rgba(114,217,197,.07); }
+.kinetics-units { margin-top: 8px; color: #8cc8b8; direction: ltr; text-align: left; font: 600 8px "Space Grotesk", sans-serif; }
+.kinetics-help { margin: 7px 0 0; color: #829d9c; font-size: 8px; line-height: 1.75; }
+.kinetics-parameter-status {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border-right: 2px solid #d8b985;
+  border-radius: 3px;
+  color: #d9bd8e;
+  background: rgba(216,185,133,.06);
+  font-size: 8px;
+  line-height: 1.6;
+}
+.kinetics-parameter-status.is-ready {
+  color: var(--accent);
+  border-right-color: var(--accent);
+  background: rgba(114,217,197,.06);
+}
+.kinetics-parameter-status.is-error {
+  color: #f08b8b;
+  border-right-color: #f08b8b;
+  background: rgba(240,139,139,.06);
+}
+.primary-control:disabled, .range-input:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+@media (max-width: 1180px) {
+  .kinetics-grid { gap: 8px 6px; }
+  .kinetics-field { font-size: 7px; }
+}
+@media (max-width: 650px) {
+  .kinetics-field { font-size: 9px; }
+  .kinetics-field input { height: 36px; }
+}
