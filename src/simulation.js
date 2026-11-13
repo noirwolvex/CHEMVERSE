@@ -689,7 +689,7 @@ function drawChart(result, displayProgress, visualDemo) {
     const rightIndex = Math.min(Math.max(0, sampleCount - 1), leftIndex + 1);
     const fraction = position - leftIndex;
     const yValue = visualDemo
-      ? displayProgress
+      ? (i / 100)
       : (sampleCount > 1
         ? kineticsCurve[leftIndex].progress +
           (kineticsCurve[rightIndex].progress - kineticsCurve[leftIndex].progress) * fraction
