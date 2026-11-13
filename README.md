@@ -75,7 +75,7 @@ The C++ kinetics module is separate from the existing stoichiometry calculator:
 - Initial amounts (mmol) and solution volume (mL) are converted to molar concentrations. A Runge–Kutta 4 integrator with adaptive step-size control generates the time series.
 - The optional Arrhenius correction uses `k(T) = k(Tref) exp[-Ea/R (1/T - 1/Tref)]`. It is enabled only when activation energy is supplied. Without Ea, temperature does not change the calculated rate constant.
 - Kinetic orders are independent experimental inputs. They are not inferred from the balanced chemical equation. The rate-constant units must match the selected overall order.
-- The interface intentionally leaves `k`, `m`, and `n` blank until experimentally sourced values are available. It does not invent reaction-specific kinetic data.
+- The interface intentionally leaves `k`, `m`, and `n` blank until experimentally sourced values are available. It does not invent reaction-specific kinetic data. A non-empty source field is a user-entered provenance note only: the application does not automatically verify the DOI/URL, the publication contents, or whether its conditions match the entered parameters.
 
 The model currently assumes a homogeneous liquid phase, fixed volume, and a single 1:1 reaction extent. It does not yet simulate gas–liquid CO2 transfer, acid/base equilibria, ionic-strength effects, the full elementary reaction mechanism, or molecular dynamics. Molecule motion remains an illustrative visualization driven by the calculated conversion, not an atomistic simulation.
 
