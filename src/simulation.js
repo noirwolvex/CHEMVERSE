@@ -687,11 +687,11 @@ function drawChart(result) {
   chartContext.stroke();
 }
 
-function refreshView() {
-  buildKineticsCurve();
+function refreshView(rebuildKinetics = false) {
+  if (rebuildKinetics) buildKineticsCurve();
   const result = calculateChemistry(elapsed);
   updateMolecularScene(elapsed, result);
-  updateStageUI(elapsed, result);
+  updateStageUI(result.progress, result);
   updateChemistryReadouts(result);
   updatePlaybackUI();
   drawChart(result);
@@ -717,7 +717,7 @@ function animate(timestamp) {
 
   const result = calculateChemistry(elapsed);
   updateMolecularScene(elapsed, result);
-  updateStageUI(elapsed, result);
+  updateStageUI(result.progress, result);
   updateChemistryReadouts(result);
   updatePlaybackUI();
   drawChart(result);
@@ -810,11 +810,12 @@ document.getElementById('reset-camera').addEventListener('click', () => {
 timeline.addEventListener('input', () => {
   playing = false;
   elapsed = Number(timeline.value);
-  refreshView();
+  refreshView(false);
 });
 temperature.addEventListener('input', () => {
+  playing = false;
   temperatureC = Number(temperature.value);
-  refreshView();
+  refreshView(true);
 });
 speedSelect.addEventListener('change', () => {
   playbackSpeed = Number(speedSelect.value);
@@ -823,13 +824,13 @@ acidAmountInput.addEventListener('input', () => {
   playing = false;
   elapsed = 0;
   acidConcentrationM = Number(acidAmountInput.value);
-  refreshView();
+  refreshView(true);
 });
 bicarbonateAmountInput.addEventListener('input', () => {
   playing = false;
   elapsed = 0;
   bicarbonateConcentrationM = Number(bicarbonateAmountInput.value);
-  refreshView();
+  refreshView(true);
 });
 for (const input of [
   volumeInput, rateConstantInput, acidOrderInput, bicarbonateOrderInput,
@@ -838,7 +839,7 @@ for (const input of [
   input.addEventListener('change', () => {
     playing = false;
     elapsed = 0;
-    refreshView();
+    refreshView(true);
   });
 }
 window.addEventListener('resize', onResize);
@@ -852,7 +853,7 @@ async function startSimulator() {
   try {
     await loadChemistryCore();
     initScene();
-    refreshView();
+    refreshView(true);
     animate(0);
   } catch (error) {
     console.error('CHEMVERSE molecular simulator failed:', error);
