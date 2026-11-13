@@ -643,3 +643,51 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .mechanism-stepper { align-self: flex-end; }
   .bond-change-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Viewport fallback for browsers that reject or do not expose the Fullscreen API. */
+html.molecule-fullscreen-fallback-active {
+  overflow: hidden;
+}
+.molecule-panel.is-fullscreen-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: #0e1d28;
+}
+.molecule-panel.is-fullscreen-fallback .molecule-toolbar {
+  height: 68px;
+  flex-basis: 68px;
+  padding-inline: clamp(18px, 3vw, 42px);
+}
+.molecule-panel.is-fullscreen-fallback .molecule-view {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.molecule-panel.is-fullscreen-fallback .scene-title b {
+  font-size: 11px;
+}
+.molecule-panel.is-fullscreen-fallback .scene-title small,
+.molecule-panel.is-fullscreen-fallback .view-hint {
+  font-size: 10px;
+}
+.molecule-panel.is-fullscreen-fallback .scene-overlay-label,
+.molecule-panel.is-fullscreen-fallback .scene-scale-note {
+  font-size: 9px;
+}
+.molecule-panel.is-fullscreen-fallback .atom-legend {
+  min-height: 54px;
+  font-size: 10px;
+  gap: 26px;
+}
+.molecule-panel.is-fullscreen-fallback .atom-legend i {
+  width: 10px;
+  height: 10px;
+}
