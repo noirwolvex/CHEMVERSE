@@ -16,7 +16,7 @@ double bondOrder(const double *sample, int bond_index) {
 }
 
 int main() {
-  assert(cv_mechanism_engine_version() == 100);
+  assert(cv_mechanism_engine_version() == 110);
   assert(cv_mechanism_validate() == 1);
   assert(cv_mechanism_atom_count() == 14);
   assert(cv_mechanism_bond_count() == 15);
@@ -71,6 +71,37 @@ int main() {
   assert(near(bondOrder(products, 10), 1.0)); // Original bicarbonate OH stays with water
   assert(near(bondOrder(products, 12), 1.0)); // H-acid joins water oxygen
   assert(near(bondOrder(products, 14), 1.0)); // Na+ remains associated with acetate
+
+  /* Timeline event metadata must match the C++ mechanism's keyframe bond orders. */
+  assert(cv_mechanism_event_count() == CV_MECHANISM_EVENT_COUNT);
+  const int expected_event_counts[] = {6, 4};
+  const double expected_event_progress[] = {0.50, 1.00};
+  for (int event = 0; event < CV_MECHANISM_EVENT_COUNT; ++event) {
+    assert(cv_mechanism_event_change_count(event) == expected_event_counts[event]);
+    assert(near(cv_mechanism_event_progress(event), expected_event_progress[event]));
+    for (int change = 0; change < expected_event_counts[event]; ++change) {
+      const int bond = cv_mechanism_event_bond_index(event, change);
+      assert(bond >= 0 && bond < CV_MECHANISM_BOND_COUNT);
+      const double before_expected = event == 0
+        ? bondOrder(cv_mechanism_sample(0.0), bond)
+        : bondOrder(cv_mechanism_sample(0.50), bond);
+      const double before_reported = cv_mechanism_event_bond_before(event, change);
+      const double after_reported = cv_mechanism_event_bond_after(event, change);
+      const double after_expected = event == 0
+        ? bondOrder(cv_mechanism_sample(0.50), bond)
+        : bondOrder(cv_mechanism_sample(1.0), bond);
+      assert(near(before_reported, before_expected));
+      assert(near(after_reported, after_expected));
+      assert(!near(before_reported, after_reported));
+    }
+  }
+  assert(cv_mechanism_event_count() == 2);
+  assert(near(cv_mechanism_event_progress(0), 0.50));
+  assert(cv_mechanism_event_progress(-1) < 0.0);
+  assert(cv_mechanism_event_change_count(2) == 0);
+  assert(cv_mechanism_event_bond_index(0, 6) == -1);
+  assert(cv_mechanism_event_bond_before(1, 4) < 0.0);
+  assert(cv_mechanism_event_bond_after(-1, 0) < 0.0);
 
   /* All 14 mapped atom records survive every sampled frame with finite coordinates. */
   const double sample_points[] = {0.0, 0.20, 1.0 / 3.0, 0.50, 2.0 / 3.0, 0.75, 0.90, 1.0};
