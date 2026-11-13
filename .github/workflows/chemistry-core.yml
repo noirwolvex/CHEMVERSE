@@ -85,3 +85,12 @@ jobs:
             process.exit(1);
           });
           NODE
+      - name: Upload validated WebAssembly modules
+        uses: actions/upload-artifact@v4
+        with:
+          name: chemverse-wasm-${{ github.sha }}
+          path: |
+            wasm/chemistry_core.wasm
+            wasm/kinetics_engine.wasm
+          if-no-files-found: error
+          retention-days: 14
