@@ -434,3 +434,59 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   text-align: center;
   font: 600 8px "Space Grotesk", sans-serif;
 }
+
+
+.concentration-time-panel {
+  margin-top: 12px;
+  padding: 11px 10px 10px;
+  border: 1px solid rgba(114,217,197,.28);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgba(114,217,197,.075), rgba(13,32,43,.58));
+}
+.concentration-time-panel > .summary-title { margin-bottom: 7px; }
+.concentration-time-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 9px;
+}
+.concentration-time-options .kinetics-field {
+  min-width: 0;
+}
+.concentration-time-options .kinetics-field input {
+  width: 100%;
+  min-width: 0;
+}
+.concentration-time-results {
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(176,215,211,.12);
+}
+.concentration-slope-table { min-width: 510px; }
+.concentration-fit-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+}
+.concentration-fit-summary > div {
+  min-width: 0;
+  padding: 7px 6px;
+  border: 1px solid rgba(114,217,197,.16);
+  border-radius: 4px;
+  background: rgba(114,217,197,.05);
+}
+.concentration-fit-summary small {
+  display: block;
+  color: #83a39b;
+  font-size: 7px;
+}
+.concentration-fit-summary b {
+  display: block;
+  margin-top: 4px;
+  color: #dff9ef;
+  direction: ltr;
+  text-align: left;
+  font: 600 10px "Space Grotesk", sans-serif;
+  overflow-wrap: anywhere;
+}
