@@ -42,7 +42,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - Open **Molecular Simulator** from the laboratory header or visit **simulation.html**.
 - The first educational model demonstrates the balanced reaction: CH3COOH + NaHCO3 → CH3COONa + H2O + CO2.
 - The 3D ball-and-stick view shows the reactants, the proton-transfer intermediate (acetate + carbonic acid), and the products (sodium acetate, water and carbon dioxide).
-- Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, move to the previous/next mechanism checkpoint, inspect the C++ event bond-change records, change playback speed and adjust the illustrative temperature setting.
+- Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, move to the previous/next mechanism checkpoint, inspect the C++ event bond-change records, change playback speed and adjust the illustrative temperature setting. Pressing **Start** automatically opens the molecular view in fullscreen; use the fullscreen control or **Esc** to return.
 - The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
 - A C++ / WebAssembly core computes reaction extent, the limiting reagent, remaining reactants, product millimoles and an atom-conservation check from the selected initial millimole amounts.
 - The default inputs are 10 mmol acetic acid and 8 mmol sodium bicarbonate; at full conversion the bicarbonate is limiting, 2 mmol acetic acid remains and 8 mmol of each product is calculated.
