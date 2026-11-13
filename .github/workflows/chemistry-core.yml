@@ -37,6 +37,8 @@ jobs:
         run: node --test tests/reaction-stages.test.mjs
       - name: Test experimental CSV validation
         run: node --test tests/experimental-data.test.mjs
+      - name: Test concentration-time CSV validation
+        run: node --test tests/concentration-data.test.mjs
 
   wasm-build:
     runs-on: ubuntu-latest
@@ -112,7 +114,35 @@ jobs:
                 fitResult[3] < 0.999999) {
               throw new Error('Experimental fit did not recover known k, m, n parameters');
             }
-            console.log('Stoichiometry, kinetics, and experimental fitting WebAssembly validation passed');
+            const concentrationFit = await WebAssembly.instantiate(fs.readFileSync('wasm/concentration_fit.wasm'), {});
+            const cf = concentrationFit.instance.exports;
+            const concentrationNames = ['memory', 'cv_concentration_fit_input_buffer',
+              'cv_concentration_fit_initial_rates', 'cv_concentration_fit_last_error',
+              'cv_concentration_fit_engine_version'];
+            for (const name of concentrationNames) {
+              if (!(name in cf)) throw new Error('Missing concentration-fit export: ' + name);
+            }
+            if (cf.cv_concentration_fit_engine_version() !== 100) {
+              throw new Error('Unexpected concentration-fit engine version');
+            }
+            const concentrationPointer = cf.cv_concentration_fit_input_buffer();
+            const concentrationInput = new Float64Array(cf.memory.buffer, concentrationPointer, 5 * 3);
+            for (let i = 0; i < 5; i++) {
+              concentrationInput[i * 3] = i;
+              concentrationInput[i * 3 + 1] = 0.4 - 0.01 * i;
+              concentrationInput[i * 3 + 2] = 0.3 - 0.01 * i;
+            }
+            const concentrationResultPointer = cf.cv_concentration_fit_initial_rates(5, 0.2);
+            if (!concentrationResultPointer || cf.cv_concentration_fit_last_error() !== 0) {
+              throw new Error('Concentration-time slope extraction failed');
+            }
+            const concentrationResult = new Float64Array(cf.memory.buffer, concentrationResultPointer, 14);
+            if (Math.abs(concentrationResult[4] - 0.01) > 1e-9 ||
+                Math.abs(concentrationResult[9] - 0.01) > 1e-9 ||
+                concentrationResult[13] !== 1) {
+              throw new Error('Concentration-time regression returned incorrect rates');
+            }
+            console.log('Stoichiometry, kinetics, experimental fitting, and concentration-time validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -122,7 +152,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -137,5 +167,6 @@ jobs:
             wasm/chemistry_core.wasm
             wasm/kinetics_engine.wasm
             wasm/experimental_fit.wasm
+            wasm/concentration_fit.wasm
           if-no-files-found: error
           retention-days: 14
