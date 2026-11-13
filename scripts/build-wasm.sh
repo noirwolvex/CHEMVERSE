@@ -29,5 +29,16 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_fit_last_error -Wl,--export=cv_fit_engine_version \
   -Wl,--strip-all "$ROOT/cpp/experimental_fit.cpp" -o "$ROOT/wasm/experimental_fit.wasm"
 
-printf 'Built %s, %s, and %s\\n' \
-  "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" "$ROOT/wasm/experimental_fit.wasm"
+# Concentration-time initial-slope module; isolated memory and ABI.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_concentration_fit_input_buffer \
+  -Wl,--export=cv_concentration_fit_initial_rates \
+  -Wl,--export=cv_concentration_fit_last_error \
+  -Wl,--export=cv_concentration_fit_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/concentration_fit.cpp" -o "$ROOT/wasm/concentration_fit.wasm"
+
+printf 'Built %s, %s, %s, and %s\\n' \
+  "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
+  "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm"
