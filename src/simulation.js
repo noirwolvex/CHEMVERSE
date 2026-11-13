@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { getDisplayProgress, getReactionStage, getStageVisuals } from './reaction-stages.mjs';
+import { getDisplayProgress } from './reaction-stages.mjs';
 import { parseInitialRatesCsv, INITIAL_RATES_CSV_TEMPLATE } from './experimental-data.mjs';
 import { parseConcentrationTimeCsv, CONCENTRATION_TIME_CSV_TEMPLATE } from './concentration-data.mjs';
 
@@ -89,6 +89,8 @@ const concentrationFitMOutput = document.getElementById('concentration-fit-m');
 const concentrationFitNOutput = document.getElementById('concentration-fit-n');
 const concentrationFitR2Output = document.getElementById('concentration-fit-r2');
 const applyConcentrationFitButton = document.getElementById('apply-concentration-fit');
+const mechanismReadout = document.getElementById('mechanism-readout');
+const atomSelectionReadout = document.getElementById('atom-selection-readout');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -128,10 +130,23 @@ let chemistryCore = null;
 let kineticsCore = null;
 let fittingCore = null;
 let concentrationFitCore = null;
+let mechanismCore = null;
+let mechanismAtoms = [];
+let mechanismBonds = [];
+let selectedMechanismAtom = null;
+let atomRaycaster = null;
+let atomPointer = null;
 let importedExperiments = null;
 let importedConcentrationSeries = null;
 let latestExperimentalFit = null;
-let species = {};
+const MECHANISM_ATOM_IDS = [
+  'AC-C1', 'AC-C2', 'AC-O1', 'AC-O2', 'AC-Hacid',
+  'AC-Hm1', 'AC-Hm2', 'AC-Hm3', 'BC-Na', 'BC-C',
+  'BC-O1', 'BC-O2', 'BC-O3', 'BC-H'
+];
+const ATOMIC_NUMBER_TO_SYMBOL = { 1: 'H', 6: 'C', 8: 'O', 11: 'Na' };
+const ATOMIC_NUMBER_TO_NAME = { 1: 'Hydrogen', 6: 'Carbon', 8: 'Oxygen', 11: 'Sodium' };
+const MECHANISM_ATOM_STRIDE = 4;
 
 const smoothStep = (a, b, value) => {
   const t = THREE.MathUtils.clamp((value - a) / (b - a), 0, 1);
@@ -192,11 +207,35 @@ async function loadChemistryCore() {
     }
   }
 
+  const mechanismResponse = await fetch(new URL('../wasm/reaction_mechanism.wasm', import.meta.url));
+  if (!mechanismResponse.ok) {
+    throw new Error('Atom-mapped mechanism WebAssembly request failed: HTTP ' + mechanismResponse.status);
+  }
+  const mechanismBytes = await mechanismResponse.arrayBuffer();
+  const mechanismInstance = await WebAssembly.instantiate(mechanismBytes, {});
+  mechanismCore = mechanismInstance.instance.exports;
+  const mechanismRequired = [
+    'memory', 'cv_mechanism_atom_count', 'cv_mechanism_bond_count',
+    'cv_mechanism_atom_id', 'cv_mechanism_atom_element',
+    'cv_mechanism_bond_atom_a', 'cv_mechanism_bond_atom_b',
+    'cv_mechanism_bond_kind', 'cv_mechanism_stage',
+    'cv_mechanism_sample', 'cv_mechanism_validate', 'cv_mechanism_engine_version'
+  ];
+  for (const name of mechanismRequired) {
+    if (!(name in mechanismCore)) throw new Error('Missing atom-mapped mechanism export: ' + name);
+  }
+  if (mechanismCore.cv_mechanism_validate() !== 1 ||
+      mechanismCore.cv_mechanism_atom_count() !== MECHANISM_ATOM_IDS.length ||
+      mechanismCore.cv_mechanism_bond_count() !== 15) {
+    throw new Error('Atom-mapped mechanism identity/conservation validation failed.');
+  }
+
   engineStatus.classList.add('is-ready');
   engineState.textContent = 'Stoichiometry v' + (api.cv_engine_version() / 100).toFixed(2) +
     ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2) +
     ' · Fit v' + (fittingCore.cv_fit_engine_version() / 100).toFixed(2) +
-    ' · dC/dt v' + (concentrationFitCore.cv_concentration_fit_engine_version() / 100).toFixed(2);
+    ' · dC/dt v' + (concentrationFitCore.cv_concentration_fit_engine_version() / 100).toFixed(2) +
+    ' · Mechanism v' + (mechanismCore.cv_mechanism_engine_version() / 100).toFixed(2);
   if (importedExperiments) analyzeInitialRatesButton.disabled = false;
   if (importedConcentrationSeries) analyzeConcentrationTimeButton.disabled = false;
 }
@@ -910,259 +949,227 @@ function makeMaterial(color, roughness = 0.35, metalness = 0.1) {
   });
 }
 
-function addBond(group, start, end, order, color = 0xb5c7c6) {
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = direction.length();
-  if (length < 0.001) return;
-
-  const axis = direction.clone().normalize();
-  let perpendicular = new THREE.Vector3(0, 0, 1).cross(axis);
-  if (perpendicular.lengthSq() < 0.01) perpendicular.set(1, 0, 0);
-  perpendicular.normalize();
-
-  const count = order >= 2 ? 2 : 1;
-  const offsets = count === 1 ? [0] : [-0.075, 0.075];
-  for (const offset of offsets) {
-    const midpoint = start.clone().add(end).multiplyScalar(0.5).addScaledVector(perpendicular, offset);
-    const geometry = new THREE.CylinderGeometry(0.07, 0.07, length, 14, 1, false);
-    const material = makeMaterial(color, 0.48, 0.12);
-    const bond = new THREE.Mesh(geometry, material);
-    bond.position.copy(midpoint);
-    bond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
-    group.add(bond);
+function createTrackedAtom(index) {
+  const atomId = mechanismCore.cv_mechanism_atom_id(index);
+  const elementCode = mechanismCore.cv_mechanism_atom_element(index);
+  const symbol = ATOMIC_NUMBER_TO_SYMBOL[elementCode];
+  const style = atomPalette[symbol];
+  if (!style || atomId === 0 || !MECHANISM_ATOM_IDS[index]) {
+    throw new Error('Invalid atom map entry at index ' + index);
   }
+
+  const geometry = new THREE.SphereGeometry(style.radius, 32, 24);
+  const material = makeMaterial(style.color, style.roughness, style.metalness);
+  material.emissive = new THREE.Color(style.color);
+  material.emissiveIntensity = elementCode === 8 ? 0.075 : 0.04;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.atomIndex = index;
+  mesh.userData.atomId = MECHANISM_ATOM_IDS[index];
+  mesh.userData.numericAtomId = atomId;
+  mesh.userData.element = symbol;
+  mesh.userData.elementName = ATOMIC_NUMBER_TO_NAME[elementCode];
+  mesh.userData.baseEmissiveIntensity = material.emissiveIntensity;
+  scene.add(mesh);
+  return mesh;
 }
 
-function createSpecies(definition) {
-  const group = new THREE.Group();
-  group.name = definition.name;
-  const positions = definition.atoms.map((atom) => new THREE.Vector3(...atom.position));
-
-  for (let index = 0; index < definition.atoms.length; index += 1) {
-    const atom = definition.atoms[index];
-    const style = atomPalette[atom.element];
-    const geometry = new THREE.SphereGeometry(style.radius, 28, 22);
-    const material = makeMaterial(style.color, style.roughness, style.metalness);
-    material.emissive = new THREE.Color(style.color);
-    material.emissiveIntensity = atom.element === 'O' ? 0.055 : 0.025;
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(positions[index]);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData.element = atom.element;
-    group.add(mesh);
+function createTrackedBond(index) {
+  const atomA = mechanismCore.cv_mechanism_bond_atom_a(index);
+  const atomB = mechanismCore.cv_mechanism_bond_atom_b(index);
+  const kind = mechanismCore.cv_mechanism_bond_kind(index);
+  if (atomA < 0 || atomB < 0 || atomA >= mechanismAtoms.length ||
+      atomB >= mechanismAtoms.length || atomA === atomB) {
+    throw new Error('Invalid mechanism bond endpoint at index ' + index);
   }
 
-  for (const [from, to, order] of definition.bonds) {
-    addBond(group, positions[from], positions[to], order);
-  }
-
-  if (definition.ionicPair) {
-    const [from, to] = definition.ionicPair;
-    const points = [positions[from], positions[to]];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  if (kind === 1) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0.001, 0)
+    ]);
     const material = new THREE.LineDashedMaterial({
       color: 0xb39af0,
       dashSize: 0.09,
       gapSize: 0.075,
       transparent: true,
-      opacity: 0.8
+      opacity: 0,
+      depthWrite: false
     });
     const line = new THREE.Line(geometry, material);
-    line.computeLineDistances();
-    group.add(line);
+    line.frustumCulled = false;
+    scene.add(line);
+    return { atomA, atomB, kind, line };
   }
 
-  group.userData.basePosition = new THREE.Vector3(...definition.position);
-  group.userData.baseRotation = definition.rotation || [0, 0, 0];
-  group.userData.visualScale = definition.scale || 0.88;
-  group.scale.setScalar(group.userData.visualScale);
-  group.position.copy(group.userData.basePosition);
-  scene.add(group);
-  return group;
+  const rods = [];
+  for (let rodIndex = 0; rodIndex < 2; rodIndex += 1) {
+    const geometry = new THREE.CylinderGeometry(0.06, 0.06, 1, 12, 1, false);
+    const material = makeMaterial(0xb5c7c6, 0.48, 0.12);
+    material.transparent = true;
+    material.opacity = 0;
+    material.depthWrite = false;
+    const rod = new THREE.Mesh(geometry, material);
+    rod.visible = false;
+    rod.frustumCulled = false;
+    scene.add(rod);
+    rods.push(rod);
+  }
+  return { atomA, atomB, kind, rods };
 }
 
 function buildMolecularScene() {
-  species.acetic = createSpecies({
-    name: 'Acetic acid',
-    position: [-2.05, 0.02, 0],
-    atoms: [
-      { element: 'C', position: [-0.85, 0, 0] },
-      { element: 'C', position: [0.52, 0, 0] },
-      { element: 'O', position: [1.15, 0.78, 0] },
-      { element: 'O', position: [1.15, -0.78, 0] },
-      { element: 'H', position: [2.02, -0.86, 0] },
-      { element: 'H', position: [-1.17, 0.85, 0] },
-      { element: 'H', position: [-1.43, -0.46, 0.72] },
-      { element: 'H', position: [-1.43, -0.46, -0.72] }
-    ],
-    bonds: [[0,1,1],[1,2,2],[1,3,1],[3,4,1],[0,5,1],[0,6,1],[0,7,1]]
-  });
+  const atomCount = mechanismCore.cv_mechanism_atom_count();
+  const bondCount = mechanismCore.cv_mechanism_bond_count();
+  if (atomCount !== MECHANISM_ATOM_IDS.length) {
+    throw new Error('Unexpected atom-map size: ' + atomCount);
+  }
 
-  species.bicarbonate = createSpecies({
-    name: 'Sodium bicarbonate',
-    position: [2.05, -0.02, 0],
-    atoms: [
-      { element: 'Na', position: [1.75, 0.46, 0] },
-      { element: 'C', position: [0, 0, 0] },
-      { element: 'O', position: [0, 1.13, 0] },
-      { element: 'O', position: [0.96, -0.56, 0] },
-      { element: 'O', position: [-0.96, -0.56, 0] },
-      { element: 'H', position: [-1.74, -0.96, 0] }
-    ],
-    bonds: [[1,2,2],[1,3,1],[1,4,1],[4,5,1]],
-    ionicPair: [3,0]
-  });
+  mechanismAtoms = [];
+  mechanismBonds = [];
+  for (let index = 0; index < atomCount; index += 1) {
+    mechanismAtoms.push(createTrackedAtom(index));
+  }
+  for (let index = 0; index < bondCount; index += 1) {
+    mechanismBonds.push(createTrackedBond(index));
+  }
 
-  species.acetate = createSpecies({
-    name: 'Acetate ion',
-    position: [-1.18, 0.03, 0],
-    atoms: [
-      { element: 'C', position: [-0.83, 0, 0] },
-      { element: 'C', position: [0.52, 0, 0] },
-      { element: 'O', position: [1.16, 0.77, 0] },
-      { element: 'O', position: [1.16, -0.77, 0] },
-      { element: 'H', position: [-1.16, 0.85, 0] },
-      { element: 'H', position: [-1.42, -0.46, 0.72] },
-      { element: 'H', position: [-1.42, -0.46, -0.72] }
-    ],
-    bonds: [[0,1,1],[1,2,2],[1,3,1],[0,4,1],[0,5,1],[0,6,1]]
-  });
-
-  species.carbonic = createSpecies({
-    name: 'Carbonic acid',
-    position: [1.16, 0, 0],
-    atoms: [
-      { element: 'C', position: [0, 0, 0] },
-      { element: 'O', position: [-1.06, 0, 0] },
-      { element: 'O', position: [0.58, 0.82, 0] },
-      { element: 'H', position: [1.34, 1.02, 0] },
-      { element: 'O', position: [0.58, -0.82, 0] },
-      { element: 'H', position: [1.34, -1.02, 0] }
-    ],
-    bonds: [[0,1,2],[0,2,1],[2,3,1],[0,4,1],[4,5,1]]
-  });
-
-  species.sodiumAcetate = createSpecies({
-    name: 'Sodium acetate',
-    position: [-1.68, 0.16, 0],
-    atoms: [
-      { element: 'Na', position: [2.0, -0.28, 0] },
-      { element: 'C', position: [-0.83, 0, 0] },
-      { element: 'C', position: [0.52, 0, 0] },
-      { element: 'O', position: [1.16, 0.77, 0] },
-      { element: 'O', position: [1.16, -0.77, 0] },
-      { element: 'H', position: [-1.16, 0.85, 0] },
-      { element: 'H', position: [-1.42, -0.46, 0.72] },
-      { element: 'H', position: [-1.42, -0.46, -0.72] }
-    ],
-    bonds: [[1,2,1],[2,3,2],[2,4,1],[1,5,1],[1,6,1],[1,7,1]],
-    ionicPair: [4,0]
-  });
-
-  species.carbonDioxide = createSpecies({
-    name: 'Carbon dioxide',
-    position: [1.24, 0.7, 0],
-    atoms: [
-      { element: 'O', position: [-1.25, 0, 0] },
-      { element: 'C', position: [0, 0, 0] },
-      { element: 'O', position: [1.25, 0, 0] }
-    ],
-    bonds: [[0,1,2],[1,2,2]]
-  });
-
-  species.water = createSpecies({
-    name: 'Water',
-    position: [2.55, -1.03, 0.3],
-    atoms: [
-      { element: 'O', position: [0, 0, 0] },
-      { element: 'H', position: [-0.78, 0.57, 0] },
-      { element: 'H', position: [0.78, 0.57, 0] }
-    ],
-    bonds: [[0,1,1],[0,2,1]]
-  });
-
-  for (const group of Object.values(species)) setOpacity(group, 0);
+  atomSelectionReadout.textContent = 'انقر على أي ذرة لعرض معرّفها الثابت';
+  mechanismReadout.textContent = atomCount + ' ATOMS TRACKED · ' + bondCount + ' BOND RECORDS';
 }
 
-function setOpacity(group, opacity) {
-  group.visible = opacity > 0.015;
-  group.traverse((object) => {
-    if (object.material) {
-      object.material.opacity = opacity;
-      object.material.transparent = true;
-      object.material.depthWrite = opacity > 0.94;
+function updateCovalentBond(bond, order) {
+  const start = mechanismAtoms[bond.atomA].position;
+  const end = mechanismAtoms[bond.atomB].position;
+  const direction = new THREE.Vector3().subVectors(end, start);
+  const length = direction.length();
+  const mainOpacity = THREE.MathUtils.clamp(order, 0, 1);
+  const secondOpacity = THREE.MathUtils.clamp(order - 1, 0, 1);
+
+  if (length < 0.0001 || mainOpacity < 0.01) {
+    bond.rods[0].visible = false;
+    bond.rods[1].visible = false;
+    return;
+  }
+
+  const axis = direction.normalize();
+  let perpendicular = new THREE.Vector3().crossVectors(axis, new THREE.Vector3(0, 0, 1));
+  if (perpendicular.lengthSq() < 0.01) {
+    perpendicular = new THREE.Vector3().crossVectors(axis, new THREE.Vector3(1, 0, 0));
+  }
+  perpendicular.normalize();
+  const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  const doubleBondOffset = 0.085;
+
+  for (let rodIndex = 0; rodIndex < 2; rodIndex += 1) {
+    const opacity = rodIndex === 0 ? mainOpacity : secondOpacity;
+    const rod = bond.rods[rodIndex];
+    rod.visible = opacity > 0.015;
+    if (!rod.visible) continue;
+    rod.position.copy(midpoint);
+    if (order > 1.01) {
+      rod.position.addScaledVector(perpendicular, rodIndex === 0 ? -doubleBondOffset : doubleBondOffset);
     }
-  });
+    rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    rod.scale.set(1, length, 1);
+    rod.material.opacity = opacity;
+  }
 }
 
-function moveSpecies(group, x, y, z, time, phase, amplitude) {
-  if (!group) return;
-  group.position.set(
-    x + Math.sin(time * 2.2 + phase) * amplitude,
-    y + Math.cos(time * 2.7 + phase) * amplitude * 0.7,
-    z + Math.sin(time * 1.8 + phase) * amplitude
-  );
-  group.rotation.set(
-    Math.sin(time * 0.72 + phase) * 0.08,
-    Math.cos(time * 0.48 + phase) * 0.11,
-    Math.sin(time * 0.91 + phase) * 0.065
-  );
+function updateIonicBond(bond, order) {
+  const start = mechanismAtoms[bond.atomA].position;
+  const end = mechanismAtoms[bond.atomB].position;
+  const opacity = THREE.MathUtils.clamp(order, 0, 1) * 0.78;
+  bond.line.visible = opacity > 0.015;
+  if (!bond.line.visible) return;
+  bond.line.geometry.setFromPoints([start, end]);
+  bond.line.computeLineDistances();
+  bond.line.material.opacity = opacity;
 }
 
-function updateMolecularScene(time, result, displayProgress, visualDemo) {
-  // Temperature-dependent vibration is illustrative; only supplied Ea changes k(T).
+function updateMolecularScene(time, displayProgress) {
+  const samplePointer = mechanismCore.cv_mechanism_sample(displayProgress);
+  if (!samplePointer) throw new Error('Reaction mechanism returned an empty sample.');
+  const sampleFieldCount =
+    mechanismCore.cv_mechanism_atom_count() * MECHANISM_ATOM_STRIDE +
+    mechanismCore.cv_mechanism_bond_count();
+  const sample = new Float64Array(mechanismCore.memory.buffer, samplePointer, sampleFieldCount);
   const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
-  const vibration = 0.018 * temperatureFactor;
-  const progress = displayProgress;
-  const visuals = getStageVisuals(progress);
-  const intermediateFade = visuals.intermediate;
-  const acidVisibility = visualDemo
-    ? visuals.reactants
-    : (acidAmountMmol > 0 ? result.acidRemaining / acidAmountMmol : 0);
-  const bicarbonateVisibility = visualDemo
-    ? visuals.reactants
-    : (bicarbonateAmountMmol > 0 ? result.bicarbonateRemaining / bicarbonateAmountMmol : 0);
-  const acidX = THREE.MathUtils.lerp(-2.05, -0.88, visuals.approach);
-  const bicarbonateX = THREE.MathUtils.lerp(2.05, 0.88, visuals.approach);
-  moveSpecies(species.acetic, acidX, 0.03, 0, time, 0.4, vibration);
-  moveSpecies(species.bicarbonate, bicarbonateX, -0.03, 0, time, 1.6, vibration);
-  setOpacity(species.acetic, acidVisibility);
-  setOpacity(species.bicarbonate, bicarbonateVisibility);
-  moveSpecies(species.acetate, -1.12, 0.03, 0, time, 1.0, vibration * 0.7);
-  moveSpecies(species.carbonic, 1.12, 0.02, 0, time, 2.1, vibration * 0.7);
-  setOpacity(species.acetate, intermediateFade);
-  setOpacity(species.carbonic, intermediateFade);
-  moveSpecies(species.sodiumAcetate, -1.82, 0.12, 0, time, 0.7, vibration * 0.45);
-  moveSpecies(species.carbonDioxide, 1.25, 0.72, 0, time, 1.8, vibration * 0.9);
-  moveSpecies(species.water, 2.75, -1.03, 0.28, time, 2.7, vibration * 0.6);
-  setOpacity(species.sodiumAcetate, visuals.products);
-  setOpacity(species.carbonDioxide, visuals.products);
-  setOpacity(species.water, visuals.products);
+  const vibration = 0.004 * temperatureFactor;
+
+  for (let index = 0; index < mechanismAtoms.length; index += 1) {
+    const offset = index * MECHANISM_ATOM_STRIDE;
+    const atom = mechanismAtoms[index];
+    atom.position.set(
+      sample[offset] + Math.sin(time * 2.1 + index * 0.73) * vibration,
+      sample[offset + 1] + Math.cos(time * 2.4 + index * 0.61) * vibration,
+      sample[offset + 2] + Math.sin(time * 1.8 + index * 0.49) * vibration
+    );
+  }
+
+  const bondOffset = mechanismAtoms.length * MECHANISM_ATOM_STRIDE;
+  for (let index = 0; index < mechanismBonds.length; index += 1) {
+    const bond = mechanismBonds[index];
+    const order = THREE.MathUtils.clamp(sample[bondOffset + index], 0, 2);
+    if (bond.kind === 1) updateIonicBond(bond, order);
+    else updateCovalentBond(bond, order);
+  }
+}
+
+function selectTrackedAtom(event) {
+  if (!renderer || mechanismAtoms.length === 0) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  atomPointer.set(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  atomRaycaster.setFromCamera(atomPointer, camera);
+  const intersections = atomRaycaster.intersectObjects(mechanismAtoms, false);
+  if (intersections.length === 0) return;
+
+  if (selectedMechanismAtom) {
+    selectedMechanismAtom.scale.setScalar(1);
+    selectedMechanismAtom.material.emissiveIntensity =
+      selectedMechanismAtom.userData.baseEmissiveIntensity;
+  }
+  selectedMechanismAtom = intersections[0].object;
+  selectedMechanismAtom.scale.setScalar(1.22);
+  selectedMechanismAtom.material.emissiveIntensity = 0.34;
+  atomSelectionReadout.textContent =
+    selectedMechanismAtom.userData.atomId + ' · ' +
+    selectedMechanismAtom.userData.element + ' / ' +
+    selectedMechanismAtom.userData.elementName +
+    ' — هوية الذرة ثابتة خلال جميع مراحل التفاعل';
 }
 
 function updateStageUI(progress, chemistryResult, visualDemo) {
-  const stage = getReactionStage(progress);
+  const stageCode = mechanismCore.cv_mechanism_stage(progress);
+  const stage = ['reactants', 'intermediate', 'products'][stageCode] || 'reactants';
   const descriptions = {
     reactants: {
-      caption: 'الجزيئات تقترب استعداداً للتفاعل',
-      label: 'REACTANTS / MOLECULES APPROACHING',
+      caption: '14 ذرة بهويات ثابتة · المواد المتفاعلة',
+      label: 'REACTANTS / STABLE ATOM MAP',
       title: 'المواد المتفاعلة',
-      description: 'تقترب جزيئات حمض الأسيتيك وبيكربونات الصوديوم.',
+      description: 'حمض الأسيتيك وبيكربونات الصوديوم. يحتفظ كل عنصر ذري بمعرّف واحد طوال مسار التفاعل.',
+      readout: '14 ATOMS · REACTANT BONDS',
       icon: '◌'
     },
     intermediate: {
-      caption: 'انتقال بروتون وتكوّن حمض الكربونيك',
-      label: 'INTERMEDIATE / PROTON TRANSFER',
-      title: 'مرحلة انتقال البروتون',
-      description: 'ينتقل بروتون إلى أيون البيكربونات، فيتكوّن حمض الكربونيك وأيون الأسيتات.',
+      caption: 'انتقال H-ACID إلى O-BIC-O2',
+      label: 'STEP 01 / PROTON TRANSFER',
+      title: 'انتقال البروتون',
+      description: 'تنكسر رابطة O-AC-Hacid وتتكون رابطة O-BIC-O2-Hacid. ينتقل ارتباط Na+ الأيوني من البيكربونات إلى الأسيتات.',
+      readout: 'H-ACID → O-BIC-O2 · ACETATE + H₂CO₃',
       icon: '↗'
     },
     products: {
-      caption: 'تفكك حمض الكربونيك وظهور النواتج',
-      label: 'PRODUCTS / REACTION COMPLETE',
-      title: 'تكوّنت النواتج',
-      description: 'يتفكك حمض الكربونيك إلى ماء وثاني أكسيد الكربون.',
+      caption: 'تفكك H₂CO₃ إلى H₂O و CO₂',
+      label: 'STEP 02 / CARBONIC ACID DECOMPOSITION',
+      title: 'تكوّن النواتج',
+      description: 'تتحول رابطة C-BIC-O2 إلى رابطة مزدوجة في CO₂، وينتقل H-ACID إلى O-BIC-O3 لتكوين الماء. تبقى ذرات الأسيتات والصوديوم محفوظة.',
+      readout: 'H₂O + CO₂ · ALL 14 ATOMS RETAINED',
       icon: '✓'
     }
   };
@@ -1172,6 +1179,7 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
   statusTitle.textContent = info.title;
   statusDescription.textContent = info.description;
   statusIcon.textContent = info.icon;
+  mechanismReadout.textContent = info.readout;
 
   document.querySelectorAll('.stage-item').forEach((item) => {
     const itemStage = item.dataset.stage;
@@ -1182,7 +1190,7 @@ function updateStageUI(progress, chemistryResult, visualDemo) {
     );
   });
 
-  progressReadout.textContent = visualDemo ? 'عرض بصري' : Math.round(chemistryResult.progress * 100) + '%';
+  progressReadout.textContent = visualDemo ? 'عرض آلي' : Math.round(chemistryResult.progress * 100) + '%';
 }
 
 function formatTime(value) {
@@ -1281,7 +1289,7 @@ function refreshView(rebuildKinetics = false) {
   const displayProgress = simulationAvailable
     ? getDisplayProgress(elapsed, durationSeconds)
     : result.progress;
-  updateMolecularScene(elapsed, result, displayProgress, visualDemo);
+  updateMolecularScene(elapsed, displayProgress);
   updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
   updatePlaybackUI();
@@ -1311,7 +1319,7 @@ function animate(timestamp) {
   const displayProgress = simulationAvailable
     ? getDisplayProgress(elapsed, durationSeconds)
     : result.progress;
-  updateMolecularScene(elapsed, result, displayProgress, visualDemo);
+  updateMolecularScene(elapsed, displayProgress);
   updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
   updatePlaybackUI();
@@ -1336,6 +1344,10 @@ function initScene() {
   renderer.toneMappingExposure = 1.25;
   renderer.domElement.setAttribute('aria-label', 'نموذج ثلاثي الأبعاد لجزيئات التفاعل الكيميائي');
   view.appendChild(renderer.domElement);
+
+  atomRaycaster = new THREE.Raycaster();
+  atomPointer = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', selectTrackedAtom);
 
   orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enableDamping = true;
