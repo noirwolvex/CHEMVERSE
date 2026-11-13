@@ -31,8 +31,23 @@ const statusDescription = document.getElementById('status-description');
 const statusIcon = document.getElementById('status-icon');
 const chart = document.getElementById('reaction-chart');
 const chartContext = chart.getContext('2d');
+const volumeInput = document.getElementById('volume-ml');
+const rateConstantInput = document.getElementById('rate-constant');
+const acidOrderInput = document.getElementById('acid-order');
+const bicarbonateOrderInput = document.getElementById('bicarbonate-order');
+const referenceTemperatureInput = document.getElementById('reference-temperature');
+const activationEnergyInput = document.getElementById('activation-energy');
+const durationInput = document.getElementById('duration-seconds');
+const kineticsParameterStatus = document.getElementById('kinetics-parameter-status');
+const rateConstantUnit = document.getElementById('rate-constant-unit');
+const acidConcentrationOutput = document.getElementById('acid-concentration-output');
+const bicarbonateConcentrationOutput = document.getElementById('bicarbonate-concentration-output');
+const reactionRateOutput = document.getElementById('reaction-rate-output');
+const effectiveKOutput = document.getElementById('effective-k-output');
+const chartDuration = document.getElementById('chart-duration');
 
-const DURATION = 12;
+const KINETICS_SAMPLE_COUNT = 121;
+const KINETICS_MAX_STEP_SECONDS = 0.05;
 const atomPalette = {
   C: { color: 0x9eafb5, radius: 0.235, roughness: 0.3, metalness: 0.22 },
   H: { color: 0xf1f5ef, radius: 0.135, roughness: 0.22, metalness: 0.08 },
@@ -52,6 +67,16 @@ let playbackSpeed = 1;
 let temperatureC = 25;
 let acidAmountMmol = Number(acidAmountInput.value);
 let bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
+let volumeMl = Number(volumeInput.value);
+let durationSeconds = Number(durationInput.value);
+let rateConstant = null;
+let acidReactionOrder = null;
+let bicarbonateReactionOrder = null;
+let referenceTemperatureC = Number(referenceTemperatureInput.value);
+let activationEnergyKJ = null;
+let kineticsCurve = null;
+let kineticsConfigured = false;
+let effectiveRateConstant = 0;
 let chemistryCore = null;
 let species = {};
 
@@ -66,7 +91,7 @@ async function loadChemistryCore() {
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {});
   const api = instance.exports;
-  const required = ['memory', 'cv_calculate_reaction', 'cv_demo_progress', 'cv_reaction_is_balanced', 'cv_engine_version'];
+  const required = ['memory', 'cv_calculate_reaction', 'cv_reaction_is_balanced', 'cv_engine_version', 'cv_kinetics_simulate', 'cv_kinetics_last_error', 'cv_kinetics_last_steps', 'cv_kinetics_effective_k', 'cv_kinetics_atom_balance_ok', 'cv_kinetics_engine_version'];
   for (const name of required) if (!(name in api)) throw new Error('Missing WebAssembly export: ' + name);
   if (api.cv_reaction_is_balanced() !== 1) throw new Error('C++ reaction formula validation failed.');
   chemistryCore = api;
@@ -74,21 +99,178 @@ async function loadChemistryCore() {
   engineState.textContent = 'متصل · الإصدار ' + (api.cv_engine_version() / 100).toFixed(2);
 }
 
+function optionalNumber(input) {
+  const value = input.value.trim();
+  if (value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function updateRateConstantUnits() {
+  if (acidReactionOrder === null || bicarbonateReactionOrder === null ||
+      !Number.isFinite(acidReactionOrder) || !Number.isFinite(bicarbonateReactionOrder)) {
+    rateConstantUnit.textContent = 'أدخل رتبتي التفاعل لمعرفة وحدات k.';
+    return;
+  }
+  const exponent = 1 - acidReactionOrder - bicarbonateReactionOrder;
+  const power = Math.abs(exponent) < 1e-9 ? '' :
+    (Math.abs(exponent - 1) < 1e-9 ? 'M·' : 'M^' + exponent.toFixed(2).replace(/\.00$/, '') + '·');
+  rateConstantUnit.textContent = 'وحدات k: ' + power + 's⁻¹ · الرتبة الكلية = ' +
+    (acidReactionOrder + bicarbonateReactionOrder).toFixed(2);
+}
+
+function buildKineticsCurve() {
+  rateConstant = optionalNumber(rateConstantInput);
+  acidReactionOrder = optionalNumber(acidOrderInput);
+  bicarbonateReactionOrder = optionalNumber(bicarbonateOrderInput);
+  activationEnergyKJ = optionalNumber(activationEnergyInput);
+  volumeMl = Number(volumeInput.value);
+  durationSeconds = Number(durationInput.value);
+  referenceTemperatureC = Number(referenceTemperatureInput.value);
+  updateRateConstantUnits();
+
+  const hasOrders = acidReactionOrder !== null && bicarbonateReactionOrder !== null;
+  const hasActivationEnergy = activationEnergyKJ !== null;
+  const valid = Number.isFinite(volumeMl) && volumeMl > 0 &&
+    Number.isFinite(durationSeconds) && durationSeconds > 0 && durationSeconds <= 1.0e7 &&
+    Number.isFinite(referenceTemperatureC) && referenceTemperatureC > -273.15 &&
+    Number.isFinite(rateConstant) && rateConstant > 0 &&
+    hasOrders && Number.isFinite(acidReactionOrder) && Number.isFinite(bicarbonateReactionOrder) &&
+    acidReactionOrder >= 0 && bicarbonateReactionOrder >= 0 &&
+    acidReactionOrder <= 4 && bicarbonateReactionOrder <= 4 &&
+    acidReactionOrder + bicarbonateReactionOrder <= 6 &&
+    (!hasActivationEnergy || (Number.isFinite(activationEnergyKJ) && activationEnergyKJ >= 0));
+
+  timeline.max = String(Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 60);
+  chartDuration.textContent = timeline.max + ' s';
+
+  if (!valid) {
+    kineticsCurve = null;
+    kineticsConfigured = false;
+    effectiveRateConstant = 0;
+    kineticsParameterStatus.classList.remove('is-ready', 'is-error');
+    kineticsParameterStatus.textContent =
+      'الحركية غير مفعّلة: أدخل k موجبة ورتبتي التفاعل التجريبيتين وحجم المحلول.';
+    playButton.disabled = true;
+    timeline.disabled = true;
+    return false;
+  }
+
+  const pointer = chemistryCore.cv_kinetics_simulate(
+    acidAmountMmol, bicarbonateAmountMmol, volumeMl,
+    rateConstant, acidReactionOrder, bicarbonateReactionOrder,
+    temperatureC, referenceTemperatureC,
+    hasActivationEnergy ? activationEnergyKJ : 0,
+    hasActivationEnergy ? 1 : 0,
+    durationSeconds,
+    Math.min(KINETICS_MAX_STEP_SECONDS, durationSeconds / (KINETICS_SAMPLE_COUNT - 1)),
+    KINETICS_SAMPLE_COUNT
+  );
+
+  if (pointer === 0 || chemistryCore.cv_kinetics_last_error() !== 0) {
+    const errorCode = chemistryCore.cv_kinetics_last_error();
+    kineticsCurve = null;
+    kineticsConfigured = false;
+    effectiveRateConstant = 0;
+    kineticsParameterStatus.classList.remove('is-ready');
+    kineticsParameterStatus.classList.add('is-error');
+    kineticsParameterStatus.textContent = errorCode === 3
+      ? 'تجاوز التكامل العددي حد الخطوات. راجع k ومدة المحاكاة.'
+      : 'تعذر حساب المنحنى؛ تحقق من المدخلات (رمز المحرك ' + errorCode + ').';
+    playButton.disabled = true;
+    timeline.disabled = true;
+    return false;
+  }
+
+  const raw = new Float64Array(
+    chemistryCore.memory.buffer,
+    pointer,
+    KINETICS_SAMPLE_COUNT * 6
+  );
+  kineticsCurve = [];
+  for (let index = 0; index < KINETICS_SAMPLE_COUNT; index += 1) {
+    const offset = index * 6;
+    kineticsCurve.push({
+      time: raw[offset],
+      progress: raw[offset + 1],
+      extent: raw[offset + 2],
+      acidRemaining: raw[offset + 3],
+      bicarbonateRemaining: raw[offset + 4],
+      rate: raw[offset + 5]
+    });
+  }
+
+  effectiveRateConstant = chemistryCore.cv_kinetics_effective_k();
+  kineticsConfigured = chemistryCore.cv_kinetics_atom_balance_ok() === 1;
+  if (!kineticsConfigured) throw new Error('Kinetics engine failed stoichiometric conservation validation.');
+
+  kineticsParameterStatus.classList.remove('is-error');
+  kineticsParameterStatus.classList.add('is-ready');
+  kineticsParameterStatus.textContent =
+    'اكتمل حساب المنحنى بـ ' + chemistryCore.cv_kinetics_last_steps() +
+    ' خطوة تكامل. ' +
+    (hasActivationEnergy
+      ? 'تم تطبيق أرهينيوس على k حسب درجة الحرارة.'
+      : 'لم تُدخل Ea؛ الحرارة لا تغيّر k حسابياً، والاهتزاز البصري تخطيطي فقط.');
+  playButton.disabled = false;
+  timeline.disabled = false;
+  return true;
+}
+
+function sampleKineticsAtTime(timeSeconds) {
+  if (!kineticsCurve || kineticsCurve.length < 2) {
+    return {
+      progress: 0,
+      extent: 0,
+      acidRemaining: acidAmountMmol,
+      bicarbonateRemaining: bicarbonateAmountMmol,
+      rate: 0
+    };
+  }
+  const position = THREE.MathUtils.clamp(timeSeconds / durationSeconds, 0, 1) *
+    (kineticsCurve.length - 1);
+  const leftIndex = Math.floor(position);
+  const rightIndex = Math.min(kineticsCurve.length - 1, leftIndex + 1);
+  const fraction = position - leftIndex;
+  const left = kineticsCurve[leftIndex];
+  const right = kineticsCurve[rightIndex];
+  const mix = (key) => left[key] + (right[key] - left[key]) * fraction;
+  return {
+    progress: mix('progress'),
+    extent: mix('extent'),
+    acidRemaining: mix('acidRemaining'),
+    bicarbonateRemaining: mix('bicarbonateRemaining'),
+    rate: mix('rate')
+  };
+}
+
 function calculateChemistry(timeSeconds) {
   if (!chemistryCore) throw new Error('C++ chemistry core is not loaded.');
-  const progress = chemistryCore.cv_demo_progress(timeSeconds);
-  const pointer = chemistryCore.cv_calculate_reaction(acidAmountMmol, bicarbonateAmountMmol, progress);
+  const kinetic = sampleKineticsAtTime(timeSeconds);
+  const pointer = chemistryCore.cv_calculate_reaction(
+    acidAmountMmol, bicarbonateAmountMmol, kinetic.progress
+  );
   const memory = chemistryCore.memory.buffer;
-  const values = new Float64Array(memory, pointer, 7);
   const flags = new Int32Array(memory, pointer + 56, 3);
+  const kineticBalanced = !kineticsConfigured || chemistryCore.cv_kinetics_atom_balance_ok() === 1;
   const result = {
-    progress: values[0], extent: values[1],
-    acidRemaining: values[2], bicarbonateRemaining: values[3],
-    sodiumAcetate: values[4], water: values[5], carbonDioxide: values[6],
-    limitingReagent: flags[0], atomBalanceOk: flags[1] === 1, errorCode: flags[2]
+    progress: kinetic.progress,
+    extent: kinetic.extent,
+    acidRemaining: kinetic.acidRemaining,
+    bicarbonateRemaining: kinetic.bicarbonateRemaining,
+    sodiumAcetate: kinetic.extent,
+    water: kinetic.extent,
+    carbonDioxide: kinetic.extent,
+    limitingReagent: flags[0],
+    atomBalanceOk: flags[1] === 1 && kineticBalanced,
+    errorCode: flags[2],
+    rate: kinetic.rate,
+    acidConcentration: volumeMl > 0 ? kinetic.acidRemaining / volumeMl : 0,
+    bicarbonateConcentration: volumeMl > 0 ? kinetic.bicarbonateRemaining / volumeMl : 0,
+    effectiveK: effectiveRateConstant
   };
   if (result.errorCode !== 0 || !result.atomBalanceOk) {
-    throw new Error('C++ chemistry core rejected the input or detected an atom-balance error.');
+    throw new Error('C++ chemistry core rejected the input or detected a conservation error.');
   }
   return result;
 }
@@ -107,6 +289,10 @@ function updateChemistryReadouts(result) {
   atomIntegrity.lastChild.textContent = result.atomBalanceOk
     ? ' حفظ الذرات متحقق'
     : ' فشل التحقق من حفظ الذرات';
+  acidConcentrationOutput.textContent = result.acidConcentration.toExponential(3) + ' M';
+  bicarbonateConcentrationOutput.textContent = result.bicarbonateConcentration.toExponential(3) + ' M';
+  reactionRateOutput.textContent = result.rate.toExponential(3) + ' M/s';
+  effectiveKOutput.textContent = kineticsConfigured ? result.effectiveK.toExponential(3) : '—';
 }
 
 function makeMaterial(color, roughness = 0.35, metalness = 0.1) {
@@ -320,7 +506,7 @@ function moveSpecies(group, x, y, z, time, phase, amplitude) {
 }
 
 function updateMolecularScene(time, result) {
-  // Temperature affects only schematic molecular vibration, not reaction kinetics.
+  // Vibration remains schematic; only supplied Ea data can adjust k(T) via Arrhenius.
   const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
   const vibration = 0.018 * temperatureFactor;
   const progress = result.progress;
@@ -347,14 +533,14 @@ function updateMolecularScene(time, result) {
   setOpacity(species.water, productVisibility);
 }
 
-function currentStage(time) {
-  if (time < 5.8) return 'reactants';
-  if (time < 10) return 'intermediate';
+function currentStage(progress) {
+  if (progress < 0.34) return 'reactants';
+  if (progress < 0.82) return 'intermediate';
   return 'products';
 }
 
-function updateStageUI(time, chemistryResult) {
-  const stage = currentStage(time);
+function updateStageUI(progress, chemistryResult) {
+  const stage = currentStage(progress);
   const descriptions = {
     reactants: {
       caption: 'الجزيئات تقترب استعداداً للتفاعل',
@@ -398,20 +584,28 @@ function updateStageUI(time, chemistryResult) {
 }
 
 function formatTime(value) {
-  const seconds = Math.floor(value);
-  return '00:' + String(seconds).padStart(2, '0');
+  const total = Math.max(0, Math.floor(value));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return hours > 0
+    ? String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0')
+    : String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
 
 function updatePlaybackUI() {
-  playLabel.textContent = playing ? 'إيقاف مؤقت' : (elapsed >= DURATION ? 'إعادة التشغيل' : 'ابدأ التفاعل');
+  playLabel.textContent = playing ? 'إيقاف مؤقت' : (elapsed >= durationSeconds ? 'إعادة التشغيل' : 'ابدأ التفاعل');
   playButton.querySelector('.play-icon').textContent = playing ? 'Ⅱ' : '▶';
-  timeReadout.textContent = formatTime(elapsed) + ' / 00:12';
+  timeReadout.textContent = formatTime(elapsed) + ' / ' + formatTime(durationSeconds);
+  timeline.max = String(durationSeconds);
   timeline.value = String(elapsed);
   timeline.style.background = 'linear-gradient(to left, #72d9c5 0%, #72d9c5 ' +
-    (elapsed / DURATION * 100) + '%, #2a424a ' + (elapsed / DURATION * 100) + '%, #2a424a 100%)';
+    (elapsed / durationSeconds * 100) + '%, #2a424a ' + (elapsed / durationSeconds * 100) + '%, #2a424a 100%)';
   temperatureReadout.textContent = temperatureC + '°C';
   temperature.style.background = 'linear-gradient(to left, #72d9c5 0%, #72d9c5 ' +
     ((temperatureC - 20) / 40 * 100) + '%, #2a424a ' + ((temperatureC - 20) / 40 * 100) + '%, #2a424a 100%)';
+  playButton.disabled = !kineticsConfigured;
+  timeline.disabled = !kineticsConfigured;
 }
 
 function drawChart(result) {
@@ -437,8 +631,15 @@ function drawChart(result) {
   chartContext.beginPath();
   for (let i = 0; i <= 100; i += 1) {
     const x = left + (right - left) * i / 100;
-    const t = DURATION * i / 100;
-    const yValue = chemistryCore.cv_demo_progress(t);
+    const sampleCount = kineticsCurve ? kineticsCurve.length : 0;
+    const position = sampleCount > 1 ? (i / 100) * (sampleCount - 1) : 0;
+    const leftIndex = Math.floor(position);
+    const rightIndex = Math.min(Math.max(0, sampleCount - 1), leftIndex + 1);
+    const fraction = position - leftIndex;
+    const yValue = sampleCount > 1
+      ? kineticsCurve[leftIndex].progress +
+        (kineticsCurve[rightIndex].progress - kineticsCurve[leftIndex].progress) * fraction
+      : 0;
     const y = bottom - (bottom - top) * yValue;
     if (i === 0) chartContext.moveTo(x, y);
     else chartContext.lineTo(x, y);
@@ -450,7 +651,7 @@ function drawChart(result) {
   chartContext.stroke();
   chartContext.shadowBlur = 0;
 
-  const progressX = left + (right - left) * elapsed / DURATION;
+  const progressX = left + (right - left) * elapsed / durationSeconds;
   const progressY = bottom - (bottom - top) * result.progress;
   chartContext.beginPath();
   chartContext.arc(progressX, progressY, 3.5, 0, Math.PI * 2);
@@ -463,6 +664,7 @@ function drawChart(result) {
 }
 
 function refreshView() {
+  buildKineticsCurve();
   const result = calculateChemistry(elapsed);
   updateMolecularScene(elapsed, result);
   updateStageUI(elapsed, result);
@@ -472,7 +674,8 @@ function refreshView() {
 }
 
 function togglePlayback() {
-  if (elapsed >= DURATION) elapsed = 0;
+  if (!kineticsConfigured) return;
+  if (elapsed >= durationSeconds) elapsed = 0;
   playing = !playing;
   previousFrame = 0;
   refreshView();
@@ -484,8 +687,8 @@ function animate(timestamp) {
   previousFrame = timestamp;
 
   if (playing) {
-    elapsed = Math.min(DURATION, elapsed + delta * playbackSpeed);
-    if (elapsed >= DURATION) playing = false;
+    elapsed = Math.min(durationSeconds, elapsed + delta * playbackSpeed);
+    if (elapsed >= durationSeconds) playing = false;
   }
 
   const result = calculateChemistry(elapsed);
@@ -593,13 +796,27 @@ speedSelect.addEventListener('change', () => {
   playbackSpeed = Number(speedSelect.value);
 });
 acidAmountInput.addEventListener('input', () => {
+  playing = false;
+  elapsed = 0;
   acidAmountMmol = Number(acidAmountInput.value);
   refreshView();
 });
 bicarbonateAmountInput.addEventListener('input', () => {
+  playing = false;
+  elapsed = 0;
   bicarbonateAmountMmol = Number(bicarbonateAmountInput.value);
   refreshView();
 });
+for (const input of [
+  volumeInput, rateConstantInput, acidOrderInput, bicarbonateOrderInput,
+  referenceTemperatureInput, activationEnergyInput, durationInput
+]) {
+  input.addEventListener('change', () => {
+    playing = false;
+    elapsed = 0;
+    refreshView();
+  });
+}
 window.addEventListener('resize', onResize);
 window.addEventListener('beforeunload', () => {
   if (animationFrame) window.cancelAnimationFrame(animationFrame);
