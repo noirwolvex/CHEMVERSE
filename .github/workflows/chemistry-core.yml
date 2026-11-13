@@ -35,6 +35,8 @@ jobs:
         run: node --input-type=module --check < src/simulation.js
       - name: Test sequential reaction-stage timing
         run: node --test tests/reaction-stages.test.mjs
+      - name: Test experimental CSV validation
+        run: node --test tests/experimental-data.test.mjs
 
   wasm-build:
     runs-on: ubuntu-latest
@@ -84,7 +86,33 @@ jobs:
                 throw new Error('Conversion must not decrease over time');
               }
             }
-            console.log('Stoichiometry and kinetics WebAssembly validation passed');
+            const fitting = await WebAssembly.instantiate(fs.readFileSync('wasm/experimental_fit.wasm'), {});
+            const f = fitting.instance.exports;
+            const fitNames = ['memory', 'cv_fit_input_buffer', 'cv_fit_initial_rates',
+              'cv_fit_last_error', 'cv_fit_engine_version'];
+            for (const name of fitNames) if (!(name in f)) throw new Error('Missing fitting export: ' + name);
+            if (f.cv_fit_engine_version() !== 100) throw new Error('Unexpected fitting engine version');
+            const inputPointer = f.cv_fit_input_buffer();
+            const fitInput = new Float64Array(f.memory.buffer, inputPointer, 6 * 3);
+            const aValues = [0.10, 0.20, 0.40, 0.15, 0.30, 0.25];
+            const bValues = [0.10, 0.10, 0.10, 0.20, 0.20, 0.40];
+            for (let i = 0; i < 6; i++) {
+              fitInput[i * 3] = aValues[i];
+              fitInput[i * 3 + 1] = bValues[i];
+              fitInput[i * 3 + 2] = 0.75 * Math.pow(aValues[i], 1.5) * Math.pow(bValues[i], 0.5);
+            }
+            const fitPointer = f.cv_fit_initial_rates(6, 25);
+            if (!fitPointer || f.cv_fit_last_error() !== 0) {
+              throw new Error('Initial-rate parameter fitting failed: ' + f.cv_fit_last_error());
+            }
+            const fitResult = new Float64Array(f.memory.buffer, fitPointer, 12);
+            if (Math.abs(fitResult[0] - 0.75) > 2e-5 ||
+                Math.abs(fitResult[1] - 1.5) > 2e-5 ||
+                Math.abs(fitResult[2] - 0.5) > 2e-5 ||
+                fitResult[3] < 0.999999) {
+              throw new Error('Experimental fit did not recover known k, m, n parameters');
+            }
+            console.log('Stoichiometry, kinetics, and experimental fitting WebAssembly validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -94,7 +122,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -108,5 +136,6 @@ jobs:
           path: |
             wasm/chemistry_core.wasm
             wasm/kinetics_engine.wasm
+            wasm/experimental_fit.wasm
           if-no-files-found: error
           retention-days: 14
