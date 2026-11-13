@@ -341,9 +341,10 @@ function updateMolecularScene(time, result) {
   moveSpecies(species.sodiumAcetate, -1.82, 0.12, 0, time, 0.7, vibration * 0.45);
   moveSpecies(species.carbonDioxide, 1.25, 0.72, 0, time, 1.8, vibration * 0.9);
   moveSpecies(species.water, 2.75, -1.03, 0.28, time, 2.7, vibration * 0.6);
-  setOpacity(species.sodiumAcetate, progress);
-  setOpacity(species.carbonDioxide, progress);
-  setOpacity(species.water, progress);
+  const productVisibility = smoothStep(0.68, 0.88, progress);
+  setOpacity(species.sodiumAcetate, productVisibility);
+  setOpacity(species.carbonDioxide, productVisibility);
+  setOpacity(species.water, productVisibility);
 }
 
 function currentStage(time) {
@@ -352,7 +353,7 @@ function currentStage(time) {
   return 'products';
 }
 
-function updateStageUI(time) {
+function updateStageUI(time, chemistryResult) {
   const stage = currentStage(time);
   const descriptions = {
     reactants: {
@@ -393,8 +394,7 @@ function updateStageUI(time) {
     );
   });
 
-  const chemistry = calculateChemistry(time);
-  progressReadout.textContent = Math.round(chemistry.progress * 100) + '%';
+  progressReadout.textContent = Math.round(chemistryResult.progress * 100) + '%';
 }
 
 function formatTime(value) {
@@ -465,7 +465,7 @@ function drawChart(result) {
 function refreshView() {
   const result = calculateChemistry(elapsed);
   updateMolecularScene(elapsed, result);
-  updateStageUI(elapsed);
+  updateStageUI(elapsed, result);
   updateChemistryReadouts(result);
   updatePlaybackUI();
   drawChart(result);
@@ -490,7 +490,7 @@ function animate(timestamp) {
 
   const result = calculateChemistry(elapsed);
   updateMolecularScene(elapsed, result);
-  updateStageUI(elapsed);
+  updateStageUI(elapsed, result);
   updateChemistryReadouts(result);
   updatePlaybackUI();
   drawChart(result);
