@@ -105,6 +105,24 @@ This module implements the method of initial rates. It does not perform Arrheniu
 The fitting ABI and native tests are in `cpp/experimental_fit.h`, `cpp/experimental_fit.cpp`, and `tests/experimental_fit_test.cpp`. CSV parsing and browser tests are in `src/experimental-data.mjs` and `tests/experimental-data.test.mjs`. The browser module is `wasm/experimental_fit.wasm`, built by `scripts/build-wasm.sh`.
 
 
+
+## Atom-mapped reaction mechanism engine — v1
+
+The molecular view now uses a dedicated C++ atom-mapping engine instead of fading between separate, duplicated molecule meshes.
+
+- \`cpp/reaction_mechanism.h\` / \`cpp/reaction_mechanism.cpp\` define a stable map of 14 atoms for \`CH3COOH + NaHCO3\`.
+- Each atom has a persistent numeric ID and element identity. The map contains C₃H₅NaO₅ and is checked by \`cv_mechanism_validate()\`.
+- The engine samples continuous atom coordinates and bond orders for three presentation states: reactants, acetate + carbonic acid, and acetate + water + carbon dioxide.
+- The acid proton keeps one identity as it leaves the acetic-acid oxygen, attaches to the bicarbonate oxygen, and then moves to the second carbonic-acid oxygen to form water.
+- Covalent bond records persist through the sequence while their bond order changes. Sodium associations are drawn as dashed ionic contacts, not covalent bonds.
+- Click an atom in the 3D view to inspect its stable atom ID and element. The current step readout describes the bond and proton changes.
+
+The acetate carboxylate is drawn using one conventional localized resonance form for readability; the drawing does not imply that the two C–O bonds are physically fixed as single and double bonds. The sodium–acetate dashed line is a schematic ion association, not a claim of a fixed contact pair in solution.
+
+This v1 is an **atom-mapped, scripted mechanism visualization and bond-bookkeeping engine**. The C++ module verifies atom identity, element counts, bond endpoints, and the programmed order changes. Its interpolated coordinates are visual keyframes, not calculated reaction coordinates or molecular-dynamics trajectories. It does not calculate transition states, activation barriers, solvent effects, proton-transfer energetics, or quantum-mechanical electron density. Those require separate validated physical models and suitable input data.
+
+Native coverage is in \`tests/reaction_mechanism_test.cpp\`; the browser module is \`wasm/reaction_mechanism.wasm\`, built through \`scripts/build-wasm.sh\` and published by the chemistry GitHub Actions workflow.
+
 ## Concentration-time analyzer — v1
 
 The simulator can now derive initial rates from raw concentration-versus-time measurements before estimating the empirical rate law.
