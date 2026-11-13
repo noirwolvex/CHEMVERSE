@@ -256,7 +256,7 @@ function buildKineticsCurve() {
   chartDescription.textContent = 'منحنى محسوب من قانون السرعة والبيانات المدخلة.';
   kineticsParameterStatus.textContent =
     'اكتمل حساب المنحنى بـ ' + kineticsCore.cv_kinetics_last_steps() +
-    ' خطوة تكامل. المرجع الذي أدخلته لم يتم التحقق منه آلياً؛ التحقق هنا يخص المدخلات العددية وحفظ المادة في النموذج فقط. ' +
+    ' خطوة تكامل. منحنيات التركيز والحسابات تعتمد على المدخلات الحركية؛ تسلسل المشاهد الثلاثة توقيت توضيحي مستقل عنها. المرجع الذي أدخلته لم يتم التحقق منه آلياً. ' +
     (hasActivationEnergy
       ? 'تم تطبيق أرهينيوس على k حسب درجة الحرارة.'
       : 'لم تُدخل Ea؛ الحرارة لا تغيّر k حسابياً، والاهتزاز البصري تخطيطي فقط.');
@@ -559,7 +559,7 @@ function updateMolecularScene(time, result, displayProgress, visualDemo) {
   const temperatureFactor = 0.7 + ((temperatureC - 20) / 40) * 0.8;
   const vibration = 0.018 * temperatureFactor;
   const progress = displayProgress;
-  const visuals = getStageVisuals(progress, visualDemo);
+  const visuals = getStageVisuals(progress);
   const intermediateFade = visuals.intermediate;
   const acidVisibility = visualDemo
     ? visuals.reactants
@@ -586,7 +586,7 @@ function updateMolecularScene(time, result, displayProgress, visualDemo) {
 }
 
 function updateStageUI(progress, chemistryResult, visualDemo) {
-  const stage = getReactionStage(progress, visualDemo);
+  const stage = getReactionStage(progress);
   const descriptions = {
     reactants: {
       caption: 'الجزيئات تقترب استعداداً للتفاعل',
@@ -706,7 +706,8 @@ function drawChart(result, displayProgress, visualDemo) {
   chartContext.shadowBlur = 0;
 
   const progressX = left + (right - left) * elapsed / durationSeconds;
-  const progressY = bottom - (bottom - top) * displayProgress;
+  const chartProgress = visualDemo ? displayProgress : result.progress;
+  const progressY = bottom - (bottom - top) * chartProgress;
   chartContext.beginPath();
   chartContext.arc(progressX, progressY, 3.5, 0, Math.PI * 2);
   chartContext.fillStyle = '#e1fff5';
@@ -722,7 +723,7 @@ function refreshView(rebuildKinetics = false) {
   const result = calculateChemistry(elapsed);
   const visualDemo = simulationAvailable && !kineticsConfigured;
   const displayProgress = simulationAvailable
-    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    ? getDisplayProgress(elapsed, durationSeconds)
     : result.progress;
   updateMolecularScene(elapsed, result, displayProgress, visualDemo);
   updateStageUI(displayProgress, result, visualDemo);
@@ -752,7 +753,7 @@ function animate(timestamp) {
   const result = calculateChemistry(elapsed);
   const visualDemo = simulationAvailable && !kineticsConfigured;
   const displayProgress = simulationAvailable
-    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    ? getDisplayProgress(elapsed, durationSeconds)
     : result.progress;
   updateMolecularScene(elapsed, result, displayProgress, visualDemo);
   updateStageUI(displayProgress, result, visualDemo);
@@ -834,7 +835,7 @@ function onResize() {
   const result = calculateChemistry(elapsed);
   const visualDemo = simulationAvailable && !kineticsConfigured;
   const displayProgress = simulationAvailable
-    ? getDisplayProgress(elapsed, durationSeconds, result.progress, kineticsConfigured)
+    ? getDisplayProgress(elapsed, durationSeconds)
     : result.progress;
   drawChart(result, displayProgress, visualDemo);
 }
