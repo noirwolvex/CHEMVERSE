@@ -65,3 +65,18 @@ Extend the validated reaction catalogue, add experimentally sourced kinetics and
 - **.github/workflows/chemistry-core.yml** — run native tests and validate WebAssembly exports on GitHub Actions.
 
 Run the native test suite from the repository root with **bash scripts/test-native.sh** (Git Bash or WSL), or compile the source and test file with a local C++17 compiler. Build WebAssembly with **bash scripts/build-wasm.sh** and Clang's wasm32 target. The committed .wasm file is included for static browser use.
+
+## Reaction kinetics engine — v1
+
+The C++ kinetics module is separate from the existing stoichiometry calculator:
+
+- `cpp/kinetics_engine.h` / `cpp/kinetics_engine.cpp` expose a stable C ABI for native and WebAssembly use.
+- The v1 model is a constant-volume, well-mixed liquid reaction with 1:1 extent and the empirical rate law `r = k(T)[A]^m[B]^n`.
+- Initial amounts (mmol) and solution volume (mL) are converted to molar concentrations. A Runge–Kutta 4 integrator with adaptive step-size control generates the time series.
+- The optional Arrhenius correction uses `k(T) = k(Tref) exp[-Ea/R (1/T - 1/Tref)]`. It is enabled only when activation energy is supplied. Without Ea, temperature does not change the calculated rate constant.
+- Kinetic orders are independent experimental inputs. They are not inferred from the balanced chemical equation. The rate-constant units must match the selected overall order.
+- The interface intentionally leaves `k`, `m`, and `n` blank until experimentally sourced values are available. It does not invent reaction-specific kinetic data.
+
+The model currently assumes a homogeneous liquid phase, fixed volume, and a single 1:1 reaction extent. It does not yet simulate gas–liquid CO2 transfer, acid/base equilibria, ionic-strength effects, the full elementary reaction mechanism, or molecular dynamics. Molecule motion remains an illustrative visualization driven by the calculated conversion, not an atomistic simulation.
+
+Run `bash scripts/test-native.sh` to test both C++ engines. Run `bash scripts/build-wasm.sh` to build the combined browser module. The GitHub Actions workflow validates the native tests, JavaScript syntax, WebAssembly exports, and a deterministic kinetics smoke test.
