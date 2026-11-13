@@ -517,10 +517,17 @@ function analyzeInitialRates() {
     fitKSeResult.textContent = latestExperimentalFit.standardErrorK.toExponential(3);
 
     fitResults.hidden = false;
-    applyFittedParametersButton.disabled = false;
+    const canApplyToCurrentEngine =
+      latestExperimentalFit.k > 0 && latestExperimentalFit.k <= 1.0e100 &&
+      latestExperimentalFit.orderA >= 0 && latestExperimentalFit.orderA <= 4 &&
+      latestExperimentalFit.orderB >= 0 && latestExperimentalFit.orderB <= 4 &&
+      latestExperimentalFit.orderA + latestExperimentalFit.orderB <= 6;
+    applyFittedParametersButton.disabled = !canApplyToCurrentEngine;
     setFitFileStatus(
-      'اكتملت الملاءمة بنجاح. المعاملات تقديرات إحصائية للصفوف المدخلة وليست إثباتاً لصحة النموذج أو الآلية.',
-      'is-ready'
+      canApplyToCurrentEngine
+        ? 'اكتملت الملاءمة بنجاح. يمكن اعتماد المعاملات في محرك المحاكاة؛ النتائج لا تثبت وحدها صحة النموذج أو الآلية.'
+        : 'اكتملت الملاءمة، لكن رتبة أو ثابت السرعة خارج نطاق محرك المحاكاة الحالي. احفظ النتائج للتحليل ولا يمكن اعتمادها في هذا الإصدار.',
+      canApplyToCurrentEngine ? 'is-ready' : 'is-error'
     );
   } catch (error) {
     latestExperimentalFit = null;
