@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getDisplayProgress, getReactionStage, getStageVisuals } from './reaction-stages.mjs';
+import { parseInitialRatesCsv, INITIAL_RATES_CSV_TEMPLATE } from './experimental-data.mjs';
 
 const view = document.getElementById('molecule-view');
 const loading = document.getElementById('scene-loading');
@@ -49,6 +50,24 @@ const effectiveKOutput = document.getElementById('effective-k-output');
 const chartDuration = document.getElementById('chart-duration');
 const chartTitle = document.getElementById('chart-title');
 const chartDescription = document.getElementById('chart-description');
+const initialRatesFileInput = document.getElementById('initial-rates-file');
+const downloadFitTemplateButton = document.getElementById('download-fit-template');
+const analyzeInitialRatesButton = document.getElementById('analyze-initial-rates');
+const applyFittedParametersButton = document.getElementById('apply-fitted-parameters');
+const fitFileStatus = document.getElementById('fit-file-status');
+const fitPreview = document.getElementById('fit-preview');
+const fitPreviewCount = document.getElementById('fit-preview-count');
+const fitPreviewBody = document.getElementById('fit-preview-body');
+const fitResults = document.getElementById('fit-results');
+const fitTemperatureResult = document.getElementById('fit-temperature-result');
+const fitKResult = document.getElementById('fit-k-result');
+const fitMResult = document.getElementById('fit-m-result');
+const fitNResult = document.getElementById('fit-n-result');
+const fitEquation = document.getElementById('fit-equation');
+const fitR2Result = document.getElementById('fit-r2-result');
+const fitRmseResult = document.getElementById('fit-rmse-result');
+const fitOrdersSeResult = document.getElementById('fit-orders-se-result');
+const fitKSeResult = document.getElementById('fit-k-se-result');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -86,6 +105,9 @@ let simulationAvailable = false;
 let effectiveRateConstant = 0;
 let chemistryCore = null;
 let kineticsCore = null;
+let fittingCore = null;
+let importedExperiments = null;
+let latestExperimentalFit = null;
 let species = {};
 
 const smoothStep = (a, b, value) => {
@@ -119,9 +141,20 @@ async function loadChemistryCore() {
   for (const name of kineticsRequired) {
     if (!(name in kineticsCore)) throw new Error('Missing kinetics WebAssembly export: ' + name);
   }
+
+  const fitResponse = await fetch(new URL('../wasm/experimental_fit.wasm', import.meta.url));
+  if (!fitResponse.ok) throw new Error('Experimental fitting WebAssembly request failed: HTTP ' + fitResponse.status);
+  const fitBytes = await fitResponse.arrayBuffer();
+  const fitInstance = await WebAssembly.instantiate(fitBytes, {});
+  fittingCore = fitInstance.instance.exports;
+  const fitRequired = ['memory', 'cv_fit_input_buffer', 'cv_fit_initial_rates', 'cv_fit_last_error', 'cv_fit_engine_version'];
+  for (const name of fitRequired) {
+    if (!(name in fittingCore)) throw new Error('Missing fitting WebAssembly export: ' + name);
+  }
   engineStatus.classList.add('is-ready');
   engineState.textContent = 'Stoichiometry v' + (api.cv_engine_version() / 100).toFixed(2) +
-    ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2);
+    ' · Kinetics v' + (kineticsCore.cv_kinetics_engine_version() / 100).toFixed(2) +
+    ' · Fit v' + (fittingCore.cv_fit_engine_version() / 100).toFixed(2);
 }
 
 function optionalNumber(input) {
@@ -342,6 +375,190 @@ function updateChemistryReadouts(result) {
   bicarbonateConcentrationOutput.textContent = visualDemo ? '— M' : result.bicarbonateConcentration.toExponential(3) + ' M';
   reactionRateOutput.textContent = visualDemo ? 'غير محسوب' : result.rate.toExponential(3) + ' M/s';
   effectiveKOutput.textContent = kineticsConfigured ? result.effectiveK.toExponential(3) : '—';
+}
+
+
+function setFitFileStatus(message, state = '') {
+  fitFileStatus.classList.remove('is-error', 'is-ready');
+  if (state) fitFileStatus.classList.add(state);
+  fitFileStatus.textContent = message;
+}
+
+function renderExperimentPreview(dataset) {
+  fitPreviewBody.replaceChildren();
+  dataset.experiments.slice(0, 8).forEach((experiment) => {
+    const row = document.createElement('tr');
+    const values = [
+      experiment.id,
+      experiment.temperatureC.toFixed(3),
+      experiment.concentrationA.toExponential(3),
+      experiment.concentrationB.toExponential(3),
+      experiment.initialRate.toExponential(3)
+    ];
+    values.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    fitPreviewBody.appendChild(row);
+  });
+  fitPreviewCount.textContent = dataset.count + ' تجربة · ' + dataset.temperatureC + ' °C';
+  fitPreview.hidden = false;
+}
+
+async function readInitialRatesFile(file) {
+  importedExperiments = null;
+  latestExperimentalFit = null;
+  fitResults.hidden = true;
+  applyFittedParametersButton.disabled = true;
+  analyzeInitialRatesButton.disabled = true;
+  fitPreview.hidden = true;
+
+  if (!file) {
+    setFitFileStatus('لم يتم اختيار ملف.');
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+    setFitFileStatus('اختر ملف CSV بامتداد .csv فقط.', 'is-error');
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    setFitFileStatus('حجم الملف يتجاوز الحد المسموح (2 MB).', 'is-error');
+    return;
+  }
+
+  try {
+    const source = await file.text();
+    importedExperiments = parseInitialRatesCsv(source);
+    importedExperiments.fileName = file.name;
+    renderExperimentPreview(importedExperiments);
+    analyzeInitialRatesButton.disabled = !fittingCore;
+    setFitFileStatus(
+      'تم التحقق من بنية CSV: ' + importedExperiments.count +
+      ' تجارب عند ' + importedExperiments.temperatureC + ' °C. هذه مراجعة للبيانات والوحدات المعلنة، وليست تحققاً مستقلاً من القياسات.',
+      'is-ready'
+    );
+  } catch (error) {
+    importedExperiments = null;
+    setFitFileStatus(error.message || 'تعذر قراءة ملف CSV.', 'is-error');
+  }
+}
+
+function analyzeInitialRates() {
+  if (!importedExperiments || !fittingCore) {
+    setFitFileStatus('حمّل ملف CSV صالحاً أولاً.', 'is-error');
+    return;
+  }
+
+  try {
+    const count = importedExperiments.experiments.length;
+    const inputPointer = fittingCore.cv_fit_input_buffer();
+    const input = new Float64Array(
+      fittingCore.memory.buffer,
+      inputPointer,
+      count * 3
+    );
+    importedExperiments.experiments.forEach((experiment, index) => {
+      const offset = index * 3;
+      input[offset] = experiment.concentrationA;
+      input[offset + 1] = experiment.concentrationB;
+      input[offset + 2] = experiment.initialRate;
+    });
+
+    const resultPointer = fittingCore.cv_fit_initial_rates(count, importedExperiments.temperatureC);
+    const errorCode = fittingCore.cv_fit_last_error();
+    if (!resultPointer || errorCode !== 0) {
+      const messages = {
+        1: 'توجد مدخلات غير صالحة في البيانات الرقمية.',
+        2: 'يلزم أربع تجارب على الأقل لحساب الخطأ الإحصائي.',
+        3: 'تغيّرات التركيز غير مستقلة بما يكفي لفصل رتبتي A وB.',
+        4: 'حدث تجاوز عددي أثناء الملاءمة؛ راجع نطاق القيم.'
+      };
+      throw new Error(messages[errorCode] || 'فشل محرك الملاءمة (رمز ' + errorCode + ').');
+    }
+
+    const values = new Float64Array(
+      fittingCore.memory.buffer,
+      resultPointer,
+      12
+    );
+    latestExperimentalFit = {
+      k: values[0],
+      orderA: values[1],
+      orderB: values[2],
+      rSquared: values[3],
+      rmseLogRate: values[4],
+      residualStandardError: values[5],
+      standardErrorA: values[6],
+      standardErrorB: values[7],
+      standardErrorLogK: values[8],
+      standardErrorK: values[9],
+      experimentCount: values[10],
+      temperatureC: values[11],
+      fileName: importedExperiments.fileName
+    };
+
+    fitTemperatureResult.textContent = latestExperimentalFit.temperatureC.toFixed(2) + ' °C · ' +
+      latestExperimentalFit.experimentCount + ' تجارب';
+    fitKResult.textContent = latestExperimentalFit.k.toExponential(4);
+    fitMResult.textContent = latestExperimentalFit.orderA.toFixed(4);
+    fitNResult.textContent = latestExperimentalFit.orderB.toFixed(4);
+    fitEquation.textContent =
+      'r = ' + latestExperimentalFit.k.toExponential(4) +
+      ' [A]^' + latestExperimentalFit.orderA.toFixed(4) +
+      ' [B]^' + latestExperimentalFit.orderB.toFixed(4);
+    fitR2Result.textContent = Number.isFinite(latestExperimentalFit.rSquared)
+      ? latestExperimentalFit.rSquared.toFixed(6)
+      : 'غير معرّف';
+    fitRmseResult.textContent = latestExperimentalFit.rmseLogRate.toExponential(3);
+    fitOrdersSeResult.textContent =
+      latestExperimentalFit.standardErrorA.toExponential(2) + ' / ' +
+      latestExperimentalFit.standardErrorB.toExponential(2);
+    fitKSeResult.textContent = latestExperimentalFit.standardErrorK.toExponential(3);
+
+    fitResults.hidden = false;
+    applyFittedParametersButton.disabled = false;
+    setFitFileStatus(
+      'اكتملت الملاءمة بنجاح. المعاملات تقديرات إحصائية للصفوف المدخلة وليست إثباتاً لصحة النموذج أو الآلية.',
+      'is-ready'
+    );
+  } catch (error) {
+    latestExperimentalFit = null;
+    fitResults.hidden = true;
+    applyFittedParametersButton.disabled = true;
+    setFitFileStatus(error.message || 'تعذّر تحليل البيانات.', 'is-error');
+  }
+}
+
+function applyExperimentalFitToSimulator() {
+  if (!latestExperimentalFit) return;
+  playing = false;
+  elapsed = 0;
+  rateConstantInput.value = latestExperimentalFit.k.toPrecision(10);
+  acidOrderInput.value = latestExperimentalFit.orderA.toFixed(8);
+  bicarbonateOrderInput.value = latestExperimentalFit.orderB.toFixed(8);
+  referenceTemperatureInput.value = latestExperimentalFit.temperatureC.toFixed(6);
+  kineticsSourceInput.value =
+    'CSV fit: ' + latestExperimentalFit.fileName +
+    '; ' + latestExperimentalFit.experimentCount +
+    ' initial-rate experiments at ' + latestExperimentalFit.temperatureC + ' °C';
+  refreshView(true);
+  setFitFileStatus(
+    'تم نقل k وm وn ودرجة الحرارة إلى محرك المحاكاة. طاقة التنشيط Ea لم تُستنتج من ملف درجة حرارة واحدة.',
+    'is-ready'
+  );
+}
+
+function downloadInitialRatesTemplate() {
+  const blob = new Blob([INITIAL_RATES_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'chemverse-initial-rates-template.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function makeMaterial(color, roughness = 0.35, metalness = 0.1) {
@@ -841,6 +1058,12 @@ function onResize() {
 }
 
 playButton.addEventListener('click', togglePlayback);
+initialRatesFileInput.addEventListener('change', () => {
+  readInitialRatesFile(initialRatesFileInput.files && initialRatesFileInput.files[0]);
+});
+downloadFitTemplateButton.addEventListener('click', downloadInitialRatesTemplate);
+analyzeInitialRatesButton.addEventListener('click', analyzeInitialRates);
+applyFittedParametersButton.addEventListener('click', applyExperimentalFitToSimulator);
 document.getElementById('reset-sim').addEventListener('click', () => {
   playing = false;
   elapsed = 0;
