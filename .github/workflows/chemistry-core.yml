@@ -29,7 +29,7 @@ jobs:
       - name: Run native chemistry and kinetics tests
         run: bash scripts/test-native.sh
       - name: Check simulator JavaScript syntax
-        run: node --check src/simulation.js
+        run: node --input-type=module --check < src/simulation.js
 
   wasm-build:
     runs-on: ubuntu-latest
