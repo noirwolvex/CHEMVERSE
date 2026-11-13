@@ -93,10 +93,10 @@ const applyConcentrationFitButton = document.getElementById('apply-concentration
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
 const atomPalette = {
-  C: { color: 0x9eafb5, radius: 0.25, roughness: 0.3, metalness: 0.22 },
-  H: { color: 0xf1f5ef, radius: 0.15, roughness: 0.22, metalness: 0.08 },
-  O: { color: 0xed7774, radius: 0.22, roughness: 0.25, metalness: 0.12 },
-  Na: { color: 0xa98bf0, radius: 0.30, roughness: 0.28, metalness: 0.14 }
+  C: { color: 0x9eafb5, radius: 0.27, roughness: 0.3, metalness: 0.22 },
+  H: { color: 0xf1f5ef, radius: 0.165, roughness: 0.22, metalness: 0.08 },
+  O: { color: 0xed7774, radius: 0.24, roughness: 0.25, metalness: 0.12 },
+  Na: { color: 0xa98bf0, radius: 0.33, roughness: 0.28, metalness: 0.14 }
 };
 
 let renderer;
@@ -924,7 +924,7 @@ function addBond(group, start, end, order, color = 0xb5c7c6) {
   const offsets = count === 1 ? [0] : [-0.075, 0.075];
   for (const offset of offsets) {
     const midpoint = start.clone().add(end).multiplyScalar(0.5).addScaledVector(perpendicular, offset);
-    const geometry = new THREE.CylinderGeometry(0.06, 0.06, length, 12, 1, false);
+    const geometry = new THREE.CylinderGeometry(0.07, 0.07, length, 14, 1, false);
     const material = makeMaterial(color, 0.48, 0.12);
     const bond = new THREE.Mesh(geometry, material);
     bond.position.copy(midpoint);
@@ -975,7 +975,7 @@ function createSpecies(definition) {
 
   group.userData.basePosition = new THREE.Vector3(...definition.position);
   group.userData.baseRotation = definition.rotation || [0, 0, 0];
-  group.userData.visualScale = definition.scale || 0.82;
+  group.userData.visualScale = definition.scale || 0.88;
   group.scale.setScalar(group.userData.visualScale);
   group.position.copy(group.userData.basePosition);
   scene.add(group);
@@ -1326,7 +1326,7 @@ function initScene() {
   scene.fog = new THREE.Fog(0x0e1d28, 11, 24);
 
   camera = new THREE.PerspectiveCamera(40, view.clientWidth / view.clientHeight, 0.1, 60);
-  camera.position.set(0, 0.3, 8.8);
+  camera.position.set(0, 0.3, 7.6);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -1341,7 +1341,7 @@ function initScene() {
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.06;
   orbit.enablePan = true;
-  orbit.minDistance = 4.5;
+  orbit.minDistance = 3.8;
   orbit.maxDistance = 15;
   orbit.target.set(0, 0, 0);
   orbit.autoRotate = false;
@@ -1444,7 +1444,7 @@ document.getElementById('reset-sim').addEventListener('click', () => {
   refreshView();
 });
 document.getElementById('reset-camera').addEventListener('click', () => {
-  camera.position.set(0, 0.3, 8.8);
+  camera.position.set(0, 0.3, 7.6);
   orbit.target.set(0, 0, 0);
   orbit.update();
 });
