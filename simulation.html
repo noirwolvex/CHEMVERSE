@@ -112,7 +112,7 @@
 
           <div class="chart-panel">
             <div class="chart-head">
-              <div><b>التقدم الحركي المحسوب</b><small id="chart-description">بانتظار مدخلات حركية موثقة لاحتساب المنحنى.</small></div>
+              <div><b id="chart-title">تسلسل العرض البصري</b><small id="chart-description">مؤشر زمني لمراحل العرض فقط؛ لا يمثل تحولاً كيميائياً محسوباً.</small></div>
               <span class="chart-readout" id="progress-readout">0%</span>
             </div>
             <canvas id="reaction-chart" aria-label="منحنى تقدم التفاعل"></canvas>
@@ -165,15 +165,15 @@
               <label class="kinetics-field" for="activation-energy">طاقة التنشيط Ea (kJ/mol)
                 <input id="activation-energy" type="number" min="0" step="any" placeholder="اختياري لتأثير الحرارة" inputmode="decimal">
               </label>
-              <label class="kinetics-field kinetics-field-wide" for="duration-seconds">مدة المحاكاة (s)
-                <input id="duration-seconds" type="number" min="0.1" max="10000000" step="any" value="60" inputmode="decimal">
+              <label class="kinetics-field kinetics-field-wide" for="duration-seconds">مدة العرض / المحاكاة (s)
+                <input id="duration-seconds" type="number" min="0.1" max="10000000" step="any" value="18" inputmode="decimal">
               </label>
               <label class="kinetics-field kinetics-field-wide" for="kinetics-source">مرجع بيانات الحركية (DOI أو رابط أو وصف تجربة — إدخال يدوي)
                 <input id="kinetics-source" type="text" maxlength="500" placeholder="أدخل مرجع k ورتب التفاعل أو بيانات التجربة">
               </label>
             </div>
             <div class="kinetics-units" id="rate-constant-unit">وحدات k تعتمد على الرتبة الكلية m + n.</div>
-            <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. يُسجّل المرجع كنص فقط ولا يتحقق النظام آلياً من صحته أو من تطابقه مع القيم. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً.</p>
+            <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. يُسجّل المرجع كنص فقط ولا يتحقق النظام آلياً من صحته أو من تطابقه مع القيم. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً. عند ترك حقول الحركية فارغة، يعمل عرض بصري متسلسل مدته 18 ثانية: المتفاعلات، ثم انتقال البروتون، ثم النواتج؛ ولا يعرض قيماً حركية أو كميات نواتج محسوبة.</p>
             <div class="kinetics-parameter-status" id="kinetics-parameter-status" aria-live="polite">الحركية غير مفعّلة: أدخل k والرتبتين التجريبيتين.</div>
           </section>
           <div class="control-block">
