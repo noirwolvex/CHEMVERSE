@@ -1517,36 +1517,89 @@ function onResize() {
   drawChart(result, displayProgress, visualDemo);
 }
 
+function scheduleMolecularResize() {
+  window.requestAnimationFrame(() => {
+    onResize();
+    if (orbit) orbit.update();
+  });
+}
+
+function setFullscreenFallback(active) {
+  moleculePanel.classList.toggle('is-fullscreen-fallback', active);
+  document.documentElement.classList.toggle('molecule-fullscreen-fallback-active', active);
+  updateFullscreenButton();
+  scheduleMolecularResize();
+}
+
 function updateFullscreenButton() {
-  const isFullscreen = document.fullscreenElement === moleculePanel;
+  const isFullscreen = document.fullscreenElement === moleculePanel ||
+    moleculePanel.classList.contains('is-fullscreen-fallback');
   const label = isFullscreen ? 'إنهاء ملء الشاشة' : 'تكبير العرض إلى ملء الشاشة';
   fullscreenButton.textContent = isFullscreen ? '⤢' : '⛶';
   fullscreenButton.title = label;
   fullscreenButton.setAttribute('aria-label', label);
+  fullscreenButton.setAttribute('aria-pressed', String(isFullscreen));
+}
+
+async function enterMoleculeFullscreen() {
+  if (document.fullscreenElement === moleculePanel ||
+      moleculePanel.classList.contains('is-fullscreen-fallback') ||
+      document.fullscreenElement) {
+    return;
+  }
+
+  if (typeof moleculePanel.requestFullscreen !== 'function') {
+    setFullscreenFallback(true);
+    return;
+  }
+
+  try {
+    await moleculePanel.requestFullscreen();
+  } catch (error) {
+    console.warn('Automatic molecular view fullscreen request failed:', error);
+    if (!document.fullscreenElement) setFullscreenFallback(true);
+  }
 }
 
 async function toggleMoleculeFullscreen() {
   try {
     if (document.fullscreenElement === moleculePanel) {
       await document.exitFullscreen();
+    } else if (moleculePanel.classList.contains('is-fullscreen-fallback')) {
+      setFullscreenFallback(false);
     } else if (!document.fullscreenElement && moleculePanel.requestFullscreen) {
       await moleculePanel.requestFullscreen();
+    } else if (!document.fullscreenElement) {
+      setFullscreenFallback(true);
     }
   } catch (error) {
     console.warn('Molecular view fullscreen request failed:', error);
+    if (!document.fullscreenElement) setFullscreenFallback(true);
   }
 }
 
 fullscreenButton.addEventListener('click', toggleMoleculeFullscreen);
 document.addEventListener('fullscreenchange', () => {
   updateFullscreenButton();
-  window.requestAnimationFrame(() => {
-    onResize();
-    if (orbit) orbit.update();
-  });
+  scheduleMolecularResize();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' &&
+      moleculePanel.classList.contains('is-fullscreen-fallback')) {
+    setFullscreenFallback(false);
+  }
 });
 
-playButton.addEventListener('click', togglePlayback);
+function handlePlaybackButtonClick() {
+  const wasPlaying = playing;
+  togglePlayback();
+  if (!wasPlaying && playing) {
+    // Keep requestFullscreen in the original click activation so browsers allow it.
+    void enterMoleculeFullscreen();
+  }
+}
+
+playButton.addEventListener('click', handlePlaybackButtonClick);
 stepBackButton.addEventListener('click', () => moveMechanismStep(-1));
 stepForwardButton.addEventListener('click', () => moveMechanismStep(1));
 initialRatesFileInput.addEventListener('change', () => {
