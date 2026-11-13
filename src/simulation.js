@@ -425,6 +425,13 @@ function setFitFileStatus(message, state = '', target = fitFileStatus) {
   target.textContent = message;
 }
 
+function clearConcentrationFitSummary() {
+  concentrationFitKOutput.textContent = '—';
+  concentrationFitMOutput.textContent = '—';
+  concentrationFitNOutput.textContent = '—';
+  concentrationFitR2Output.textContent = '—';
+}
+
 function renderExperimentPreview(dataset) {
   fitPreviewBody.replaceChildren();
   dataset.experiments.slice(0, 8).forEach((experiment) => {
@@ -454,6 +461,8 @@ async function readInitialRatesFile(file) {
   applyFittedParametersButton.disabled = true;
   analyzeInitialRatesButton.disabled = true;
   fitPreview.hidden = true;
+  concentrationTimeResults.hidden = true;
+  clearConcentrationFitSummary();
 
   if (!file) {
     setFitFileStatus('لم يتم اختيار ملف.');
@@ -536,7 +545,8 @@ function analyzeInitialRates() {
       standardErrorK: values[9],
       experimentCount: values[10],
       temperatureC: values[11],
-      fileName: importedExperiments.fileName
+      fileName: importedExperiments.fileName,
+      sourceMethod: importedExperiments.method || 'initial-rates-log-linear'
     };
 
     fitTemperatureResult.textContent = latestExperimentalFit.temperatureC.toFixed(2) + ' °C · ' +
@@ -577,7 +587,7 @@ function analyzeInitialRates() {
         : 'اكتملت الملاءمة، لكن k أو الرتب أو درجة الحرارة خارج نطاق محرك المحاكاة الحالي. احتفظ بالنتائج للتحليل، ولا يمكن اعتمادها في هذا الإصدار.',
       canApplyToCurrentEngine ? 'is-ready' : 'is-error'
     );
-    if (concentrationFitKOutput) {
+    if (latestExperimentalFit.sourceMethod === 'concentration-time-derived-initial-rates') {
       concentrationFitKOutput.textContent = latestExperimentalFit.k.toExponential(4);
       concentrationFitMOutput.textContent = latestExperimentalFit.orderA.toFixed(4);
       concentrationFitNOutput.textContent = latestExperimentalFit.orderB.toFixed(4);
@@ -628,6 +638,8 @@ async function readConcentrationTimeFile(file) {
   analyzeConcentrationTimeButton.disabled = true;
   concentrationTimePreview.hidden = true;
   concentrationTimeResults.hidden = true;
+  initialWindowPointsInput.disabled = true;
+  clearConcentrationFitSummary();
 
   if (!file) {
     setFitFileStatus('لم يتم اختيار ملف بيانات تركيز مقابل الزمن.', '', concentrationTimeStatus);
@@ -649,7 +661,6 @@ async function readConcentrationTimeFile(file) {
     renderConcentrationTimePreview(importedConcentrationSeries);
     analyzeConcentrationTimeButton.disabled = !concentrationFitCore || !fittingCore;
     const minPoints = importedConcentrationSeries.minimumPoints;
-    const maxPoints = importedConcentrationSeries.maximumPoints;
     setFitFileStatus(
       'تم التحقق من بنية البيانات: ' + importedConcentrationSeries.count +
       ' تجارب و' + importedConcentrationSeries.totalSamples + ' قراءة عند ' +
@@ -660,9 +671,10 @@ async function readConcentrationTimeFile(file) {
     initialWindowPointsInput.max = String(minPoints);
     initialWindowPointsInput.min = '3';
     initialWindowPointsInput.value = String(Math.min(5, minPoints));
-    initialWindowPointsInput.disabled = minPoints < 3;
+    initialWindowPointsInput.disabled = false;
   } catch (error) {
     importedConcentrationSeries = null;
+    initialWindowPointsInput.disabled = true;
     setFitFileStatus(error.message || 'تعذر قراءة ملف التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
   }
 }
@@ -700,6 +712,7 @@ function analyzeConcentrationTime() {
   fitResults.hidden = true;
   applyFittedParametersButton.disabled = true;
   concentrationTimeResults.hidden = true;
+  clearConcentrationFitSummary();
 
   try {
     const pointCount = Number(initialWindowPointsInput.value);
@@ -777,6 +790,7 @@ function analyzeConcentrationTime() {
     if (incompatible.length > 0) {
       latestExperimentalFit = null;
       applyFittedParametersButton.disabled = true;
+      clearConcentrationFitSummary();
       setFitFileStatus(
         'توقّف التحليل: اختلاف سرعتي اختفاء A وB تجاوز حد السماح (' +
         tolerancePercent.toFixed(1) + '%) في ' + incompatible.map((item) => item.id).join('، ') +
@@ -823,6 +837,7 @@ function analyzeConcentrationTime() {
     latestExperimentalFit = null;
     applyFittedParametersButton.disabled = true;
     fitResults.hidden = true;
+    clearConcentrationFitSummary();
     setFitFileStatus(error.message || 'تعذّر تحليل بيانات التركيز مقابل الزمن.', 'is-error', concentrationTimeStatus);
   }
 }
