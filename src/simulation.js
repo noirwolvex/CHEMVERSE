@@ -155,7 +155,7 @@ function buildKineticsCurve() {
   bicarbonateAmountMmol = volumeIsValid ? bicarbonateConcentrationM * volumeMl : 0;
   const requestedDurationSeconds = Number(durationInput.value);
   durationSeconds = Number.isFinite(requestedDurationSeconds) && requestedDurationSeconds > 0
-    ? requestedDurationSeconds : 60;
+    ? requestedDurationSeconds : 18;
   referenceTemperatureC = Number(referenceTemperatureInput.value);
   updateRateConstantUnits();
 
@@ -172,7 +172,7 @@ function buildKineticsCurve() {
     kineticsSourceInput.value.trim().length > 0 &&
     (!hasActivationEnergy || (Number.isFinite(activationEnergyKJ) && activationEnergyKJ >= 0));
 
-  timeline.max = String(Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 60);
+  timeline.max = String(Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 18);
   chartDuration.textContent = timeline.max + ' s';
 
   if (!valid) {
