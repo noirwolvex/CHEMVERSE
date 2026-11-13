@@ -112,11 +112,11 @@
 
           <div class="chart-panel">
             <div class="chart-head">
-              <div><b>تقدم التفاعل</b><small>مؤشر توضيحي لتتابع مراحل التفاعل</small></div>
+              <div><b>التقدم الحركي المحسوب</b><small>منحنى ناتج عن تكامل قانون السرعة المدخل</small></div>
               <span class="chart-readout" id="progress-readout">0%</span>
             </div>
             <canvas id="reaction-chart" aria-label="منحنى تقدم التفاعل"></canvas>
-            <div class="chart-axis"><span>البداية</span><span>انتقال البروتون</span><span>النواتج</span></div>
+            <div class="chart-axis"><span>0 s</span><span>Time (s)</span><span id="chart-duration">60 s</span></div>
           </div>
         </section>
 
@@ -144,13 +144,42 @@
               <input id="bicarbonate-amount" class="range-input reagent-range" type="range" min="1" max="20" step="1" value="8">
             </div>
           </div>
+          <section class="kinetics-controls" aria-labelledby="kinetics-controls-title">
+            <div class="summary-title" id="kinetics-controls-title">مدخلات محرك الحركية · C++</div>
+            <div class="kinetics-grid">
+              <label class="kinetics-field" for="volume-ml">حجم المحلول (mL)
+                <input id="volume-ml" type="number" min="0.001" max="1000000" step="any" value="100" inputmode="decimal">
+              </label>
+              <label class="kinetics-field" for="rate-constant">ثابت السرعة k عند Tref
+                <input id="rate-constant" type="number" min="0" step="any" placeholder="مطلوب من بيانات تجريبية" inputmode="decimal">
+              </label>
+              <label class="kinetics-field" for="acid-order">رتبة CH₃COOH (m)
+                <input id="acid-order" type="number" min="0" max="4" step="0.1" placeholder="رتبة مقاسة" inputmode="decimal">
+              </label>
+              <label class="kinetics-field" for="bicarbonate-order">رتبة NaHCO₃ (n)
+                <input id="bicarbonate-order" type="number" min="0" max="4" step="0.1" placeholder="رتبة مقاسة" inputmode="decimal">
+              </label>
+              <label class="kinetics-field" for="reference-temperature">درجة الحرارة المرجعية (°C)
+                <input id="reference-temperature" type="number" min="-273.14" step="any" value="25" inputmode="decimal">
+              </label>
+              <label class="kinetics-field" for="activation-energy">طاقة التنشيط Ea (kJ/mol)
+                <input id="activation-energy" type="number" min="0" step="any" placeholder="اختياري لتأثير الحرارة" inputmode="decimal">
+              </label>
+              <label class="kinetics-field kinetics-field-wide" for="duration-seconds">مدة المحاكاة (s)
+                <input id="duration-seconds" type="number" min="0.1" max="10000000" step="any" value="60" inputmode="decimal">
+              </label>
+            </div>
+            <div class="kinetics-units" id="rate-constant-unit">وحدات k تعتمد على الرتبة الكلية m + n.</div>
+            <p class="kinetics-help">أدخل k والرتب من قياسات فعلية أو مصدر منشور. عند ترك Ea فارغة، لا يغيّر رفع الحرارة ثابت السرعة حسابياً.</p>
+            <div class="kinetics-parameter-status" id="kinetics-parameter-status" aria-live="polite">الحركية غير مفعّلة: أدخل k والرتبتين التجريبيتين.</div>
+          </section>
           <div class="control-block">
             <div class="control-label"><label for="timeline">زمن العرض</label><output id="time-readout">00:00 / 00:12</output></div>
-            <input id="timeline" class="range-input" type="range" min="0" max="12" step="0.05" value="0">
+            <input id="timeline" class="range-input" type="range" min="0" max="60" step="0.05" value="0" disabled>
           </div>
 
           <div class="control-block">
-            <div class="control-label"><label for="temperature">درجة الحرارة · اهتزاز مرئي</label><output id="temperature-readout">25°C</output></div>
+            <div class="control-label"><label for="temperature">درجة الحرارة · تصحيح أرهينيوس عند توفر Ea</label><output id="temperature-readout">25°C</output></div>
             <input id="temperature" class="range-input temperature-range" type="range" min="20" max="60" step="1" value="25">
             <div class="range-ends"><span>20°C</span><span>60°C</span></div>
           </div>
@@ -178,6 +207,10 @@
             <div class="calculation-row"><span>أسيتات الصوديوم</span><b id="sodium-acetate-output">0.00 mmol</b></div>
             <div class="calculation-row"><span>الماء</span><b id="water-output">0.00 mmol</b></div>
             <div class="calculation-row"><span>ثاني أكسيد الكربون</span><b id="co2-output">0.00 mmol</b></div>
+            <div class="calculation-row"><span>تركيز حمض الأسيتيك</span><b id="acid-concentration-output">— M</b></div>
+            <div class="calculation-row"><span>تركيز البيكربونات</span><b id="bicarbonate-concentration-output">— M</b></div>
+            <div class="calculation-row"><span>معدل التفاعل الحالي</span><b id="reaction-rate-output">— M/s</b></div>
+            <div class="calculation-row"><span>ثابت السرعة الفعال</span><b id="effective-k-output">—</b></div>
             <div class="calculation-integrity" id="atom-integrity"><i></i> حفظ الذرات متحقق</div>
           </div>
           <div class="products-summary">
@@ -187,7 +220,7 @@
             <div class="product-row"><span class="product-symbol carbon">CO₂</span><span><b>ثاني أكسيد الكربون</b><small>CO₂</small></span></div>
           </div>
 
-          <div class="science-note"><b>نطاق النموذج</b><p>نواة C++ تحسب التقدّم الستوكيومتري والمتفاعل المحدِّد وكميات المتبقيات والنواتج وتتحقق من حفظ الذرات. الجدول الزمني للعرض تعليمي، وتأثير الحرارة بصري على الاهتزاز فقط؛ لا توجد بعد حركية تجريبية أو محاكاة كمّية.</p></div>
+          <div class="science-note"><b>النموذج العلمي وحدوده</b><p>تحسب نواة C++ التغير مع الزمن وفق r = k(T)[A]^m[B]^n، مع حجم ثابت وتفاعل 1:1 في محلول متجانس. يجب إدخال k ورتب التفاعل من قياسات أو مرجع موثوق؛ لا تُستنتج الرتب من المعادلة الموزونة. تُطبّق معادلة أرهينيوس فقط عند إدخال طاقة التنشيط Ea ودرجة الحرارة المرجعية. العرض الجزيئي والاهتزازات ما زالت تخطيطية، والنموذج لا يحاكي انتقال CO₂ بين السائل والغاز أو الاتزان أو الآلية الجزيئية التفصيلية.</p></div>
         </aside>
       </section>
       <footer class="sim-footer"><span>CHEMVERSE MOLECULAR LAB</span><span>LEARN · OBSERVE · DISCOVER</span><span>MODEL 001 / ACID–BICARBONATE</span></footer>
