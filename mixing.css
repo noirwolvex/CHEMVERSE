@@ -142,3 +142,97 @@ button, a { font: inherit; }
 @media (max-width: 760px) { .mix-topbar { padding: 12px 16px; flex-wrap: wrap; } .topbar-center { display: none; } .mix-main { padding: 25px 14px 16px; } .mix-intro { align-items: start; flex-direction: column; gap: 13px; } .mix-layout { grid-template-columns: 1fr; } .analysis-panel { grid-column: auto; display: flex; } .reactor-stage { min-height: 390px; height: 390px; } .mix-footer { align-items: flex-start; flex-direction: column; gap: 10px; } .mix-footer p { text-align: left; } }
 @media (max-width: 420px) { .environment-tag { display:none; } .reagent-panel,.reactor-panel,.analysis-panel { padding: 13px; } .reagent-card { min-height: 136px; } .reagent-copy b { font-size: 7px; } .mix-topbar .brand-copy strong { font-size: 13px; } .back-link { padding: 7px 8px; font-size: 7px; } }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
+
+/* Extended reagent library, pouring animation, precipitation, and science notes. */
+.bottle-green { --bottle-color: #9acb85; }
+.bottle-silver { --bottle-color: #c6d5e4; }
+.reagent-grid { grid-auto-rows: minmax(145px, auto); }
+.pour-source {
+  position: absolute; z-index: 5; top: 91px; width: 92px; height: 154px;
+  opacity: 0; pointer-events: none; transition: opacity .18s ease;
+}
+.pour-source-left { left: calc(50% - 190px); }
+.pour-source-right { right: calc(50% - 190px); }
+.pour-bottle {
+  position: absolute; top: 0; left: 23px; width: 38px; height: 58px;
+  border: 1px solid rgba(221,246,238,.75); border-radius: 5px 5px 9px 9px;
+  background: linear-gradient(100deg,rgba(229,255,248,.25),rgba(174,221,213,.08) 45%,rgba(230,255,248,.2));
+  box-shadow: inset 5px 0 9px rgba(229,255,248,.12),0 8px 18px rgba(0,0,0,.2);
+  transform-origin: 50% 13px;
+}
+.pour-bottle-neck {
+  position: absolute; top: -12px; left: 10px; width: 16px; height: 13px;
+  border: 1px solid rgba(221,246,238,.7); border-radius: 3px 3px 0 0;
+  background: rgba(194,230,222,.18);
+}
+.pour-bottle-fluid {
+  position: absolute; left: 3px; right: 3px; bottom: 3px; height: 26px;
+  border-radius: 2px 2px 7px 7px; background: var(--source-liquid,#82cfc0);
+  box-shadow: 0 0 12px var(--source-liquid,#82cfc0); opacity: .8;
+}
+.pour-source-label {
+  position: absolute; left: 0; right: 0; bottom: 0; color: #b7d8ce;
+  text-align: center; font: 700 6px "Space Grotesk",sans-serif; letter-spacing: .08em; white-space: nowrap;
+}
+.pour-stream {
+  position: absolute; top: 46px; left: 49px; width: 5px; height: 0;
+  border-radius: 8px; opacity: 0;
+  background: linear-gradient(to bottom,var(--source-liquid,#82cfc0),rgba(184,245,229,.75),transparent);
+  box-shadow: 0 0 10px var(--source-liquid,#82cfc0); transform-origin: top center;
+}
+.pour-source-left .pour-stream { transform: rotate(-34deg); }
+.pour-source-right .pour-stream { transform: rotate(34deg); }
+.reactor-stage[data-phase="pouring"] .pour-source { opacity: 1; }
+.reactor-stage[data-phase="pouring"] .pour-source-left .pour-bottle { animation: pour-tilt-left .72s .08s ease-in-out forwards; }
+.reactor-stage[data-phase="pouring"] .pour-source-right .pour-bottle { animation: pour-tilt-right .72s .08s ease-in-out forwards; }
+.reactor-stage[data-phase="pouring"] .pour-stream {
+  height: 116px; opacity: .9; animation: pour-flow .62s .38s ease-in-out infinite;
+}
+.reactor-stage[data-phase="pouring"] .mix-vessel { animation: vessel-receive .72s ease-in-out infinite alternate; }
+@keyframes pour-tilt-left { to { transform: rotate(52deg) translateY(2px); } }
+@keyframes pour-tilt-right { to { transform: rotate(-52deg) translateY(2px); } }
+@keyframes pour-flow { 0%,100% { opacity: .36; } 50% { opacity: 1; } }
+@keyframes vessel-receive { from { transform: translateY(0); } to { transform: translateY(3px); } }
+.precipitate-layer { position: absolute; z-index: 4; inset: 0; overflow: hidden; pointer-events: none; }
+.precipitate-particle {
+  position: absolute; bottom: 7px; width: var(--particle-size,5px); height: var(--particle-size,5px);
+  border-radius: 50%; background: #f1f3e9; box-shadow: 0 0 5px rgba(255,255,240,.8);
+  opacity: 0; transform: translateY(-145px);
+  animation: sediment-settle var(--settle-duration,1.2s) cubic-bezier(.18,.72,.28,1) forwards;
+  animation-delay: var(--settle-delay,0s);
+}
+@keyframes sediment-settle {
+  0% { opacity: 0; transform: translateY(-145px) scale(.6); }
+  55% { opacity: .9; }
+  100% { opacity: .82; transform: translateY(0) scale(1); }
+}
+.reactor-stage[data-effect="precipitate"] .vessel-liquid {
+  background: linear-gradient(180deg,rgba(238,241,228,.72),rgba(201,215,205,.58));
+  opacity: .74; filter: blur(1.2px);
+}
+.reactor-stage[data-effect="precipitate"] .stage-flash { animation: stage-flash .65s ease-out 1; }
+.science-detail {
+  display: grid; gap: 5px; margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid rgba(194,224,217,.1);
+}
+.science-detail > span {
+  color: #78bfb0; font: 700 7px "Space Grotesk",sans-serif; letter-spacing: .13em;
+}
+.science-detail p { margin: 0; color: #a9bfba; font-size: 9px; line-height: 1.65; }
+.model-note {
+  margin: 11px 0 0 !important; padding: 8px 9px;
+  border-left: 2px solid rgba(124,207,187,.48);
+  color: #7f9998 !important; background: rgba(69,125,116,.07); font-size: 8px !important;
+}
+.outcome-card { max-height: 510px; overflow-y: auto; scrollbar-color: rgba(111,183,169,.5) rgba(9,26,33,.4); scrollbar-width: thin; }
+@media (max-width: 760px) {
+  .pour-source-left { left: calc(50% - 162px); }
+  .pour-source-right { right: calc(50% - 162px); }
+  .pour-source { top: 87px; transform: scale(.88); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reactor-stage[data-phase="pouring"] .pour-bottle,
+  .reactor-stage[data-phase="pouring"] .pour-stream,
+  .reactor-stage[data-phase="pouring"] .mix-vessel,
+  .precipitate-particle { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
