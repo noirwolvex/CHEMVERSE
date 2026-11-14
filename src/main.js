@@ -1,10 +1,15 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {
+  STATION_INTERACTION_DISTANCE,
+  resolveStationInteraction
+} from './station-interaction.mjs';
 
 const root = document.getElementById('scene-root');
 const loadingScreen = document.getElementById('loading-screen');
 const stationPanel = document.getElementById('station-panel');
+const stationInteractionHint = document.getElementById('station-interaction-hint');
 
 const LAB = {
   width: 24,
@@ -456,6 +461,7 @@ function init() {
   }
 
   raycaster = new THREE.Raycaster();
+  raycaster.far = STATION_INTERACTION_DISTANCE;
 
   controls.addEventListener('lock', () => {
     document.body.classList.add('player-locked');
@@ -483,16 +489,52 @@ function init() {
   animate();
 }
 
-function inspectStationAtCrosshair() {
+function getStationTargetAtCrosshair() {
+  if (!raycaster || !camera) return null;
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   const hits = raycaster.intersectObjects(stationGroups, true);
-  const station = hits.length ? findStation(hits[0].object) : null;
-  if (station) {
-    selectStation(station);
+  if (hits.length === 0) return null;
+
+  const station = findStation(hits[0].object);
+  if (!station) return null;
+  const stationNumber = station.userData.stationNumber;
+  const action = resolveStationInteraction(stationNumber, hits[0].distance);
+  return action ? { station, stationNumber, distance: hits[0].distance, action } : null;
+}
+
+function updateStationInteractionHint() {
+  const target = controls && controls.isLocked ? getStationTargetAtCrosshair() : null;
+  const canOpenReaction = target && target.action === 'open-reaction-001';
+  stationInteractionHint.classList.toggle('is-visible', Boolean(canOpenReaction));
+  stationInteractionHint.setAttribute('aria-hidden', String(!canOpenReaction));
+}
+
+function inspectStationAtCrosshair() {
+  const target = getStationTargetAtCrosshair();
+  if (target) {
+    selectStation(target.station);
     return true;
   }
   selectStation(null);
   return false;
+}
+
+function activateStationAtCrosshair() {
+  const target = getStationTargetAtCrosshair();
+  if (!target) {
+    selectStation(null);
+    return false;
+  }
+
+  if (target.action === 'open-reaction-001') {
+    movementKeys.clear();
+    playerVelocity.set(0, 0, 0);
+    window.location.assign(new URL('../simulation.html', import.meta.url).href);
+    return true;
+  }
+
+  selectStation(target.station);
+  return true;
 }
 
 function onCanvasClick() {
@@ -508,7 +550,7 @@ function onKeyDown(event) {
   }
   if (key === 'e' && !event.repeat && controls && controls.isLocked) {
     event.preventDefault();
-    inspectStationAtCrosshair();
+    activateStationAtCrosshair();
   }
 }
 
@@ -638,6 +680,7 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
   const moving = updatePlayerMovement(delta);
+  updateStationInteractionHint();
   // Subtle instrument glints bring a little life to the otherwise calm workspace.
   for (let i = 0; i < stationGroups.length; i += 1) {
     const top = stationGroups[i].userData.top;
