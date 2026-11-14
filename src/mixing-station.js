@@ -1,4 +1,5 @@
 import { REAGENTS, evaluateMixture } from './reagent-mixer.mjs';
+import { getReactionVisualProfile } from './reaction-visuals.mjs';
 
 const bottleButtons = [...document.querySelectorAll('[data-reagent]')];
 const selectedCount = document.getElementById('selected-count');
@@ -10,6 +11,8 @@ const stage = document.getElementById('reactor-stage');
 const liquid = document.getElementById('vessel-liquid');
 const bubbleLayer = document.getElementById('bubble-layer');
 const precipitateLayer = document.getElementById('precipitate-layer');
+const reactionParticleLayer = document.getElementById('reaction-particle-layer');
+const colourSwirl = document.getElementById('colour-swirl');
 const stageStatus = document.getElementById('stage-status');
 const visualLabel = document.getElementById('visual-label');
 const outcomeType = document.getElementById('outcome-type');
@@ -90,47 +93,73 @@ function setPourSources() {
   });
 }
 
-function renderBubbles() {
+function renderBubbles(count) {
   bubbleLayer.replaceChildren();
-  for (let index = 0; index < 18; index += 1) {
+  for (let index = 0; index < count; index += 1) {
     const bubble = document.createElement('span');
     bubble.className = 'bubble';
-    bubble.style.left = String(7 + ((index * 37) % 86)) + '%';
-    bubble.style.setProperty('--bubble-size', String(5 + (index % 4) * 3) + 'px');
-    bubble.style.setProperty('--bubble-delay', String((index % 6) * -0.22) + 's');
-    bubble.style.setProperty('--bubble-duration', String(1.25 + (index % 4) * 0.22) + 's');
+    bubble.style.left = String(4 + ((index * 47) % 92)) + '%';
+    bubble.style.setProperty('--bubble-size', String(5 + (index % 6) * 2) + 'px');
+    bubble.style.setProperty('--bubble-delay', String((index % 9) * -0.13) + 's');
+    bubble.style.setProperty('--bubble-duration', String(0.72 + (index % 5) * 0.14) + 's');
     bubbleLayer.append(bubble);
   }
 }
 
-function renderPrecipitate() {
+function renderSplashParticles(count, colour) {
+  reactionParticleLayer.replaceChildren();
+  for (let index = 0; index < count; index += 1) {
+    const angle = Math.PI + (Math.PI * index) / Math.max(1, count - 1);
+    const distance = 58 + (index % 6) * 13;
+    const travelX = Math.cos(angle) * distance;
+    const peakY = Math.sin(angle) * distance - 24;
+    const endY = peakY + 86;
+    const particle = document.createElement('span');
+    particle.className = 'reaction-splash-particle';
+    particle.style.setProperty('--spray-x', String(travelX.toFixed(1)) + 'px');
+    particle.style.setProperty('--spray-y-peak', String(peakY.toFixed(1)) + 'px');
+    particle.style.setProperty('--spray-y-end', String(endY.toFixed(1)) + 'px');
+    particle.style.setProperty('--spray-delay', String((index % 8) * 0.025) + 's');
+    particle.style.setProperty('--spray-duration', String(1.05 + (index % 5) * 0.12) + 's');
+    particle.style.setProperty('--spray-size', String(4 + (index % 5) * 2) + 'px');
+    particle.style.setProperty('--spray-color', colour);
+    reactionParticleLayer.append(particle);
+  }
+}
+
+function renderPrecipitate(count) {
   precipitateLayer.replaceChildren();
-  for (let index = 0; index < 34; index += 1) {
+  for (let index = 0; index < count; index += 1) {
     const particle = document.createElement('i');
     particle.className = 'precipitate-particle';
-    particle.style.left = String(7 + ((index * 29) % 86)) + '%';
-    particle.style.setProperty('--particle-size', String(3 + (index % 4)) + 'px');
-    particle.style.setProperty('--settle-delay', String((index % 7) * 0.075) + 's');
-    particle.style.setProperty('--settle-duration', String(0.9 + (index % 5) * 0.12) + 's');
+    particle.style.left = String(4 + ((index * 29) % 92)) + '%';
+    particle.style.setProperty('--particle-size', String(3 + (index % 5)) + 'px');
+    particle.style.setProperty('--settle-delay', String((index % 9) * 0.045) + 's');
+    particle.style.setProperty('--settle-duration', String(0.85 + (index % 5) * 0.16) + 's');
     precipitateLayer.append(particle);
   }
 }
 
 function renderOutcome(outcome) {
+  const profile = getReactionVisualProfile(outcome.effect);
+  if (!profile) return;
+
   stage.dataset.effect = outcome.effect;
-  stage.dataset.phase = 'result';
+  stage.dataset.phase = 'reaction';
   stage.style.setProperty('--liquid-color', outcome.color);
-  liquid.style.height = outcome.effect === 'foam-burst' ? '46%' :
-    outcome.effect === 'quiet' ? '28%' :
-    outcome.effect === 'precipitate' ? '48%' : '36%';
+  liquid.style.height = profile.liquidHeight;
 
   bubbleLayer.replaceChildren();
   precipitateLayer.replaceChildren();
-  if (outcome.effect === 'foam-burst') renderBubbles();
-  if (outcome.effect === 'precipitate') renderPrecipitate();
+  reactionParticleLayer.replaceChildren();
+  colourSwirl.classList.remove('is-active');
+  if (profile.bubbleCount) renderBubbles(profile.bubbleCount);
+  if (profile.splashCount) renderSplashParticles(profile.splashCount, outcome.color);
+  if (profile.precipitateCount) renderPrecipitate(profile.precipitateCount);
+  if (profile.colourSwirl) colourSwirl.classList.add('is-active');
 
-  stageStatus.textContent = outcome.phenomenon;
-  visualLabel.textContent = outcome.visualLabel;
+  stageStatus.textContent = outcome.effect === 'foam-burst' ? 'VIGOROUS CO₂ RELEASE' : outcome.phenomenon;
+  visualLabel.textContent = outcome.effect === 'foam-burst' ? 'BUBBLES / FOAM ERUPTION' : outcome.visualLabel;
   outcomeType.textContent = outcome.phenomenon;
   outcomeTitle.textContent = outcome.title;
   outcomeDescription.textContent = outcome.description;
@@ -139,8 +168,17 @@ function renderOutcome(outcome) {
   outcomeEquation.textContent = outcome.netIonicEquation
     ? outcome.equation + ' | Net ionic: ' + outcome.netIonicEquation
     : outcome.equation;
-  mixButtonLabel.textContent = 'MIX AGAIN';
-  mixButton.disabled = selectedReagents.size !== 2;
+
+  mixButtonLabel.textContent = 'REACTION IN PROGRESS…';
+  mixButton.disabled = true;
+  const activeRun = runToken;
+  pourTimer = window.setTimeout(() => {
+    if (activeRun !== runToken) return;
+    pourTimer = null;
+    stage.dataset.phase = 'result';
+    mixButtonLabel.textContent = 'MIX AGAIN';
+    mixButton.disabled = selectedReagents.size !== 2;
+  }, profile.phaseDurationMs);
 }
 
 function mixSelectedReagents() {
@@ -158,6 +196,8 @@ function mixSelectedReagents() {
   mixButtonLabel.textContent = 'POURING…';
   bubbleLayer.replaceChildren();
   precipitateLayer.replaceChildren();
+  reactionParticleLayer.replaceChildren();
+  colourSwirl.classList.remove('is-active');
 
   const activeRun = runToken;
   pourTimer = window.setTimeout(() => {
@@ -186,6 +226,8 @@ function clearPreviousOutcome() {
   liquid.style.height = '10%';
   bubbleLayer.replaceChildren();
   precipitateLayer.replaceChildren();
+  reactionParticleLayer.replaceChildren();
+  colourSwirl.classList.remove('is-active');
   stageStatus.textContent = 'AWAITING TWO REAGENTS';
   visualLabel.textContent = 'MIXTURE CHANGED';
   resetSciencePanel();
@@ -201,6 +243,8 @@ function resetVessel() {
   liquid.style.height = '10%';
   bubbleLayer.replaceChildren();
   precipitateLayer.replaceChildren();
+  reactionParticleLayer.replaceChildren();
+  colourSwirl.classList.remove('is-active');
   stageStatus.textContent = 'AWAITING TWO REAGENTS';
   visualLabel.textContent = 'NO MIXTURE';
   resetSciencePanel();

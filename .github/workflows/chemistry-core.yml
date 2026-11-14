@@ -37,6 +37,8 @@ jobs:
         run: node --test tests/station-interaction.test.mjs
       - name: Test safe reagent mixing outcomes
         run: node --test tests/reagent-mixer.test.mjs
+      - name: Test reaction presentation profiles
+        run: node --test tests/reaction-visuals.test.mjs
       - name: Check mixing station JavaScript syntax
         run: node --input-type=module --check < src/mixing-station.js
       - name: Test sequential reaction-stage timing
