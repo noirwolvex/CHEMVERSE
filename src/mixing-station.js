@@ -13,6 +13,8 @@ const bubbleLayer = document.getElementById('bubble-layer');
 const precipitateLayer = document.getElementById('precipitate-layer');
 const reactionParticleLayer = document.getElementById('reaction-particle-layer');
 const colourSwirl = document.getElementById('colour-swirl');
+const fluidVortex = document.getElementById('fluid-vortex');
+const mixingCurrentLayer = document.getElementById('mixing-current-layer');
 const stageStatus = document.getElementById('stage-status');
 const visualLabel = document.getElementById('visual-label');
 const outcomeType = document.getElementById('outcome-type');
@@ -140,6 +142,30 @@ function renderPrecipitate(count) {
   }
 }
 
+function renderMixingCurrents(count, colour) {
+  mixingCurrentLayer.replaceChildren();
+  for (let index = 0; index < count; index += 1) {
+    const current = document.createElement('i');
+    current.className = 'mixing-current';
+    current.style.left = String(8 + ((index * 37) % 84)) + '%';
+    current.style.top = String(12 + ((index * 23) % 76)) + '%';
+    current.style.setProperty('--current-angle', String((index * 137.5) % 360) + 'deg');
+    current.style.setProperty('--current-delay', String((index % 10) * -0.12) + 's');
+    current.style.setProperty('--current-duration', String(1.2 + (index % 6) * 0.18) + 's');
+    current.style.setProperty('--current-colour', colour);
+    mixingCurrentLayer.append(current);
+  }
+}
+
+function clearReactionLayers() {
+  bubbleLayer.replaceChildren();
+  precipitateLayer.replaceChildren();
+  reactionParticleLayer.replaceChildren();
+  mixingCurrentLayer.replaceChildren();
+  colourSwirl.classList.remove('is-active');
+  fluidVortex.classList.remove('is-active');
+}
+
 function renderOutcome(outcome) {
   const profile = getReactionVisualProfile(outcome.effect);
   if (!profile) return;
@@ -149,17 +175,23 @@ function renderOutcome(outcome) {
   stage.style.setProperty('--liquid-color', outcome.color);
   liquid.style.height = profile.liquidHeight;
 
-  bubbleLayer.replaceChildren();
-  precipitateLayer.replaceChildren();
-  reactionParticleLayer.replaceChildren();
-  colourSwirl.classList.remove('is-active');
+  clearReactionLayers();
   if (profile.bubbleCount) renderBubbles(profile.bubbleCount);
   if (profile.splashCount) renderSplashParticles(profile.splashCount, outcome.color);
   if (profile.precipitateCount) renderPrecipitate(profile.precipitateCount);
+  if (profile.currentCount) renderMixingCurrents(profile.currentCount, outcome.color);
   if (profile.colourSwirl) colourSwirl.classList.add('is-active');
+  if (profile.fluidVortex) fluidVortex.classList.add('is-active');
 
-  stageStatus.textContent = outcome.effect === 'foam-burst' ? 'VIGOROUS CO₂ RELEASE' : outcome.phenomenon;
-  visualLabel.textContent = outcome.effect === 'foam-burst' ? 'BUBBLES / FOAM ERUPTION' : outcome.visualLabel;
+  const stageLabels = {
+    'foam-burst': ['VIGOROUS CO₂ RELEASE', 'BUBBLES / FOAM ERUPTION'],
+    precipitate: ['PRECIPITATE CLOUD / SETTLING', 'WHITE SOLID / PARTICLE CLOUD'],
+    'colour-shift': ['INDICATOR COLOUR TRANSITION', outcome.visualLabel],
+    'mixing-vortex': ['VIGOROUS FLUID VORTEX', outcome.visualLabel]
+  };
+  const [statusLabel, effectLabel] = stageLabels[outcome.effect] || [outcome.phenomenon, outcome.visualLabel];
+  stageStatus.textContent = statusLabel;
+  visualLabel.textContent = effectLabel;
   outcomeType.textContent = outcome.phenomenon;
   outcomeTitle.textContent = outcome.title;
   outcomeDescription.textContent = outcome.description;
@@ -169,7 +201,7 @@ function renderOutcome(outcome) {
     ? outcome.equation + ' | Net ionic: ' + outcome.netIonicEquation
     : outcome.equation;
 
-  mixButtonLabel.textContent = 'REACTION IN PROGRESS…';
+  mixButtonLabel.textContent = outcome.effect === 'mixing-vortex' ? 'FLUID MIXING IN PROGRESS…' : 'REACTION IN PROGRESS…';
   mixButton.disabled = true;
   const activeRun = runToken;
   pourTimer = window.setTimeout(() => {
@@ -194,10 +226,7 @@ function mixSelectedReagents() {
   visualLabel.textContent = 'TRANSFER IN PROGRESS';
   mixButton.disabled = true;
   mixButtonLabel.textContent = 'POURING…';
-  bubbleLayer.replaceChildren();
-  precipitateLayer.replaceChildren();
-  reactionParticleLayer.replaceChildren();
-  colourSwirl.classList.remove('is-active');
+  clearReactionLayers();
 
   const activeRun = runToken;
   pourTimer = window.setTimeout(() => {
@@ -224,10 +253,7 @@ function clearPreviousOutcome() {
   stage.dataset.effect = 'idle';
   stage.style.setProperty('--liquid-color', '#82cfc0');
   liquid.style.height = '10%';
-  bubbleLayer.replaceChildren();
-  precipitateLayer.replaceChildren();
-  reactionParticleLayer.replaceChildren();
-  colourSwirl.classList.remove('is-active');
+  clearReactionLayers();
   stageStatus.textContent = 'AWAITING TWO REAGENTS';
   visualLabel.textContent = 'MIXTURE CHANGED';
   resetSciencePanel();
@@ -241,10 +267,7 @@ function resetVessel() {
   stage.dataset.effect = 'idle';
   stage.style.setProperty('--liquid-color', '#82cfc0');
   liquid.style.height = '10%';
-  bubbleLayer.replaceChildren();
-  precipitateLayer.replaceChildren();
-  reactionParticleLayer.replaceChildren();
-  colourSwirl.classList.remove('is-active');
+  clearReactionLayers();
   stageStatus.textContent = 'AWAITING TWO REAGENTS';
   visualLabel.textContent = 'NO MIXTURE';
   resetSciencePanel();
