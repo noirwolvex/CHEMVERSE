@@ -24,7 +24,8 @@ test('stations 01–05 keep their existing inspection action', () => {
 test('the E interaction uses the physical key code on non-English keyboard layouts', () => {
   assert.equal(isInteractionKey('KeyE', 'ث'), true);
   assert.equal(isInteractionKey('KeyE', 'e'), true);
-  assert.equal(isInteractionKey('KeyF', 'e'), true);
+  assert.equal(isInteractionKey('KeyF', 'e'), false);
+  assert.equal(isInteractionKey(undefined, 'e'), true);
   assert.equal(isInteractionKey('KeyF', 'ف'), false);
 });
 
