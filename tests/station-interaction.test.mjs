@@ -2,10 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   STATION_INTERACTION_DISTANCE,
+  MIXING_STATION_NUMBER,
   REACTION_STATION_NUMBER,
   isInteractionKey,
   resolveStationInteraction
 } from '../src/station-interaction.mjs';
+
+test('station 05 opens the reagent mixing lab only inside interaction range', () => {
+  assert.equal(MIXING_STATION_NUMBER, 5);
+  assert.equal(resolveStationInteraction(5, 0), 'open-mixing-station');
+  assert.equal(resolveStationInteraction(5, 4), 'open-mixing-station');
+  assert.equal(resolveStationInteraction(5, STATION_INTERACTION_DISTANCE), 'open-mixing-station');
+  assert.equal(resolveStationInteraction(5, STATION_INTERACTION_DISTANCE + 0.01), null);
+});
 
 test('station 06 opens REACTION 001 only inside interaction range', () => {
   assert.equal(REACTION_STATION_NUMBER, 6);
@@ -15,8 +24,8 @@ test('station 06 opens REACTION 001 only inside interaction range', () => {
   assert.equal(resolveStationInteraction(6, STATION_INTERACTION_DISTANCE + 0.01), null);
 });
 
-test('stations 01–05 keep their existing inspection action', () => {
-  for (let station = 1; station <= 5; station += 1) {
+test('stations 01–04 keep their existing inspection action', () => {
+  for (let station = 1; station <= 4; station += 1) {
     assert.equal(resolveStationInteraction(station, 2), 'inspect-station');
   }
 });
