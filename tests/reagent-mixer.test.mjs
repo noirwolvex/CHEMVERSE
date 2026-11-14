@@ -68,9 +68,11 @@ test('bicarbonate and carbonate each demonstrate an alkaline indicator response'
 });
 
 test('neutral indicator and non-indicator pairs do not invent a reaction', () => {
-  assert.equal(evaluateMixture(['salt', 'indicator']).key, 'neutral-indicator');
-  assert.equal(evaluateMixture(['salt', 'sugar']).key, 'no-visible-reaction');
-  assert.equal(evaluateMixture(['vinegar', 'citric-acid']).key, 'no-visible-reaction');
+  const neutralIndicator = evaluateMixture(['salt', 'indicator']);
+  assert.equal(neutralIndicator.key, 'neutral-indicator');
+  assert.equal(neutralIndicator.effect, 'mixing-vortex');
+  assert.equal(evaluateMixture(['salt', 'sugar']).effect, 'mixing-vortex');
+  assert.equal(evaluateMixture(['vinegar', 'citric-acid']).effect, 'mixing-vortex');
 });
 
 test('every valid outcome includes explanation, observation, equation, and model limits', () => {
