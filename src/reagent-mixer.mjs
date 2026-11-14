@@ -91,20 +91,20 @@ const outcomes = Object.freeze({
   neutralIndicator: Object.freeze({
     key: 'neutral-indicator', title: 'No strong colour shift',
     phenomenon: 'NEAR-NEUTRAL INDICATOR',
-    description: 'Salt or sugar solution does not make this indicator strongly acidic or alkaline in the simplified model.',
-    explanation: 'Sodium chloride is a salt of a strong acid and a strong base, while sucrose does not appreciably ionise in water. Neither is represented as strongly changing indicator pH here.',
-    observation: 'The purple shade remains mostly unchanged.',
+    description: 'Salt or sugar solution keeps the red-cabbage indicator close to its original purple tone in this simplified model.',
+    explanation: 'Sodium chloride and sucrose do not create a strong acidic or alkaline response here. The animated vortex represents the physical circulation of the poured liquids, not a new chemical reaction.',
+    observation: 'The purple indicator circulates in visible currents, then settles without a strong colour shift or gas formation.',
     equation: 'No net chemical reaction represented',
-    effect: 'quiet', color: '#927cc7', visualLabel: 'PURPLE / NEAR NEUTRAL', modelLimit: commonLimit
+    effect: 'mixing-vortex', color: '#927cc7', visualLabel: 'PURPLE / NEAR NEUTRAL', modelLimit: commonLimit
   }),
   noVisibleReaction: Object.freeze({
     key: 'no-visible-reaction', title: 'No visible chemical reaction',
     phenomenon: 'MIXTURE / NO VISIBLE CHANGE',
-    description: 'These solutions mix without a visible gas, precipitate or indicator response in this teaching model.',
-    explanation: 'The selected pair has no represented driving process such as gas formation, an insoluble product, or an indicator colour response under these simplified assumptions.',
-    observation: 'The liquid remains clear; no gas or solid is shown. No visible change does not prove that no particles interact.',
+    description: 'This pair has no visible chemical reaction in the simplified model, but the poured liquids still create a strong, animated fluid vortex.',
+    explanation: 'No gas-forming, precipitating, or indicator-changing process is represented for this pair. The swirling currents and small liquid droplets show physical mixing only; they are not evidence of a chemical reaction.',
+    observation: 'Watch the two liquid streams curl into a rotating vortex and then settle. No reaction gas or new solid is shown.',
     equation: 'No net ionic reaction represented',
-    effect: 'quiet', color: '#9bb8c1', visualLabel: 'NO VISIBLE CHANGE', modelLimit: commonLimit
+    effect: 'mixing-vortex', color: '#9bb8c1', visualLabel: 'FLUID VORTEX / NO CHEMICAL CHANGE', modelLimit: commonLimit
   })
 });
 
