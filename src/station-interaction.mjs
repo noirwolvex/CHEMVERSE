@@ -1,5 +1,10 @@
-export const STATION_INTERACTION_DISTANCE = 5.5;
+export const STATION_INTERACTION_DISTANCE = 7.5;
 export const LAB_STATION_COUNT = 6;
+export const REACTION_STATION_NUMBER = 6;
+
+export function isInteractionKey(code, key) {
+  return code === 'KeyE' || String(key ?? '').toLowerCase() === 'e';
+}
 
 export function resolveStationInteraction(stationNumber, distance) {
   if (!Number.isInteger(stationNumber) || stationNumber < 1 ||
@@ -9,5 +14,5 @@ export function resolveStationInteraction(stationNumber, distance) {
     return null;
   }
 
-  return stationNumber === 1 ? 'open-reaction-001' : 'inspect-station';
+  return stationNumber === REACTION_STATION_NUMBER ? 'open-reaction-001' : 'inspect-station';
 }
