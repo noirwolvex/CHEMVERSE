@@ -41,6 +41,8 @@ jobs:
         run: node --test tests/reaction-visuals.test.mjs
       - name: Check mixing station JavaScript syntax
         run: node --input-type=module --check < src/mixing-station.js
+      - name: Check live reaction particle renderer syntax
+        run: node --input-type=module --check < src/reaction-fx.mjs
       - name: Test sequential reaction-stage timing
         run: node --test tests/reaction-stages.test.mjs
       - name: Test mechanism timeline checkpoint navigation
