@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101d27">
+  <meta name="description" content="CHEMVERSE Reaction Mixing Lab — a six-reagent interactive chemistry teaching sandbox.">
+  <title>CHEMVERSE | Reaction Mixing Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./mixing.css">
+</head>
+<body>
+  <div class="mix-app">
+    <header class="mix-topbar">
+      <a class="brand" href="./" aria-label="Back to CHEMVERSE laboratory">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>CHEMVERSE</strong><small>SCIENCE / EXPLORE / DISCOVER</small></span>
+      </a>
+      <div class="topbar-center"><span class="live-dot"></span> REACTION MIXING LAB <b>05</b></div>
+      <div class="topbar-actions">
+        <span class="environment-tag">VIRTUAL EXPERIMENT</span>
+        <a class="back-link" href="./">← BACK TO LAB</a>
+      </div>
+    </header>
+
+    <main class="mix-main">
+      <section class="mix-intro">
+        <div>
+          <span class="eyebrow">EXPERIMENT STATION / 05</span>
+          <h1>Mix. Observe.<br><em>Understand.</em></h1>
+          <p>Choose two reagent bottles, combine them in the virtual vessel, and inspect the result.</p>
+        </div>
+        <div class="experiment-chip"><span>01</span><div><b>PAIR MIXING</b><small>6 REAGENTS / 2 SAMPLES</small></div></div>
+      </section>
+
+      <section class="mix-layout" aria-label="Interactive reagent mixing experiment">
+        <section class="reagent-panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">REAGENT LIBRARY</span><h2>Choose your bottles</h2></div>
+            <span class="panel-count">06 <i>/ AVAILABLE</i></span>
+          </div>
+          <div class="reagent-grid" id="reagent-grid">
+            <button class="reagent-card" type="button" data-reagent="vinegar" aria-pressed="false">
+              <span class="reagent-number">01</span>
+              <span class="bottle-art bottle-gold"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>DILUTED VINEGAR</b><small>ACETIC ACID · CH₃COOH</small><em>WEAK ACID</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+            <button class="reagent-card" type="button" data-reagent="bicarbonate" aria-pressed="false">
+              <span class="reagent-number">02</span>
+              <span class="bottle-art bottle-blue"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>SODIUM BICARBONATE</b><small>NaHCO₃ · AQUEOUS</small><em>MILD BASE</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+            <button class="reagent-card" type="button" data-reagent="citric-acid" aria-pressed="false">
+              <span class="reagent-number">03</span>
+              <span class="bottle-art bottle-rose"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>CITRIC ACID</b><small>C₆H₈O₇ · AQUEOUS</small><em>WEAK ACID</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+            <button class="reagent-card" type="button" data-reagent="indicator" aria-pressed="false">
+              <span class="reagent-number">04</span>
+              <span class="bottle-art bottle-purple"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>RED-CABBAGE INDICATOR</b><small>ANTHOCYANINS · pH</small><em>COLOUR INDICATOR</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+            <button class="reagent-card" type="button" data-reagent="salt" aria-pressed="false">
+              <span class="reagent-number">05</span>
+              <span class="bottle-art bottle-clear"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>SALT SOLUTION</b><small>SODIUM CHLORIDE · NaCl</small><em>NEAR NEUTRAL</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+            <button class="reagent-card" type="button" data-reagent="sugar" aria-pressed="false">
+              <span class="reagent-number">06</span>
+              <span class="bottle-art bottle-mint"><i class="bottle-cap"></i><i class="bottle-liquid"></i></span>
+              <span class="reagent-copy"><b>SUGAR SOLUTION</b><small>SUCROSE · C₁₂H₂₂O₁₁</small><em>NEUTRAL SOLUTE</em></span>
+              <span class="reagent-check">+</span>
+            </button>
+          </div>
+          <p class="panel-footnote"><span>✳</span> Select any two bottles. Select one again to remove it.</p>
+        </section>
+
+        <section class="reactor-panel">
+          <div class="panel-heading reactor-heading">
+            <div><span class="eyebrow">REACTION CHAMBER</span><h2>Mixing vessel</h2></div>
+            <span class="live-indicator"><i></i> LIVE VIEW</span>
+          </div>
+          <div class="reactor-stage" id="reactor-stage" data-effect="idle">
+            <div class="stage-grid"></div>
+            <div class="stage-orbit orbit-one"></div><div class="stage-orbit orbit-two"></div>
+            <div class="stage-readout readout-left">CV / 05<br><b>VESSEL A</b></div>
+            <div class="stage-readout readout-right">SIMULATION<br><b>QUALITATIVE</b></div>
+            <div class="mix-vessel" aria-label="Virtual glass mixing vessel">
+              <div class="vessel-neck"></div>
+              <div class="vessel-body">
+                <div class="vessel-liquid" id="vessel-liquid"></div>
+                <div class="bubble-layer" id="bubble-layer"></div>
+                <div class="foam-cap"></div>
+                <div class="vessel-glint"></div>
+              </div>
+              <div class="vessel-base"></div>
+            </div>
+            <div class="stage-status" id="stage-status">AWAITING TWO REAGENTS</div>
+            <div class="stage-flash"></div>
+          </div>
+          <div class="reactor-caption"><span>VISUAL REACTION DISPLAY</span><span id="visual-label">NO MIXTURE</span></div>
+        </section>
+
+        <aside class="analysis-panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">MIXING RECORD</span><h2>Your selection</h2></div>
+            <span class="selection-count"><b id="selected-count">00</b><i>/ 02</i></span>
+          </div>
+          <div class="selection-list" id="selection-list">
+            <p class="empty-selection">Choose two bottles from the reagent library.</p>
+          </div>
+          <button class="mix-button" id="mix-button" type="button" disabled><span>MIX REAGENTS</span><b>↗</b></button>
+          <button class="reset-button" id="reset-button" type="button">RESET VESSEL <span>↺</span></button>
+          <section class="outcome-card" id="outcome-card" aria-live="polite" aria-atomic="true">
+            <span class="eyebrow">OBSERVATION</span>
+            <span class="outcome-type" id="outcome-type">STANDBY</span>
+            <h3 id="outcome-title">Ready for an experiment</h3>
+            <p id="outcome-description">Select two reagents to start. The result will appear here with a reaction summary.</p>
+            <div class="equation-wrap"><span>MODEL / EQUATION</span><code id="outcome-equation">—</code></div>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="mix-footer">
+        <span><i></i> CHEMVERSE / REACTION MIXING LAB</span>
+        <p>SIMULATED EDUCATIONAL OUTCOMES · NOT A REAL-WORLD MIXING GUIDE</p>
+        <a href="./simulation.html">OPEN REACTION 001 ↗</a>
+      </footer>
+    </main>
+  </div>
+  <script type="module" src="./src/mixing-station.js"></script>
+</body>
+</html>
