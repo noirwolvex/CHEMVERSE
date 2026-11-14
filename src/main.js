@@ -3,6 +3,7 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   STATION_INTERACTION_DISTANCE,
+  isInteractionKey,
   resolveStationInteraction
 } from './station-interaction.mjs';
 
@@ -477,8 +478,9 @@ function init() {
   document.getElementById('enter-lab').addEventListener('click', () => controls.lock());
   document.getElementById('close-panel').addEventListener('click', () => selectStation(null));
   renderer.domElement.addEventListener('click', onCanvasClick);
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
+  // Capture physical key codes before any UI handler, regardless of keyboard language.
+  document.addEventListener('keydown', onKeyDown, true);
+  document.addEventListener('keyup', onKeyUp, true);
   window.addEventListener('blur', () => {
     movementKeys.clear();
     playerVelocity.set(0, 0, 0);
@@ -548,7 +550,7 @@ function onKeyDown(event) {
     event.preventDefault();
     movementKeys.add(key);
   }
-  if (key === 'e' && !event.repeat && controls && controls.isLocked) {
+  if (isInteractionKey(event.code, event.key) && !event.repeat && controls && controls.isLocked) {
     event.preventDefault();
     activateStationAtCrosshair();
   }
