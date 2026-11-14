@@ -64,3 +64,21 @@ test('unknown visual effect identifiers are rejected', () => {
   assert.equal(getReactionVisualProfile('explosion'), null);
   assert.equal(getReactionVisualProfile('unknown'), null);
 });
+
+
+test('every visual profile includes tuned real-time particle dynamics', () => {
+  for (const effect of ['foam-burst', 'precipitate', 'colour-shift', 'mixing-vortex']) {
+    const profile = getReactionVisualProfile(effect);
+    assert.ok(profile.fx, effect);
+    assert.ok(profile.fx.currentCount >= 50, effect);
+    assert.ok(profile.fx.vortexSpeed > 1, effect);
+    assert.ok(profile.phaseDurationMs >= 3500, effect);
+  }
+  assert.ok(getReactionVisualProfile('foam-burst').fx.bubbleRate >= 30);
+  assert.ok(getReactionVisualProfile('foam-burst').fx.foamRate >= 20);
+  assert.ok(getReactionVisualProfile('foam-burst').fx.maxBubbles >= 70);
+  assert.equal(getReactionVisualProfile('precipitate').fx.bubbleRate, 0);
+  assert.ok(getReactionVisualProfile('precipitate').fx.sedimentCount >= 70);
+  assert.ok(getReactionVisualProfile('colour-shift').fx.pigmentCount >= 20);
+  assert.equal(getReactionVisualProfile('mixing-vortex').fx.bubbleRate, 0);
+});
