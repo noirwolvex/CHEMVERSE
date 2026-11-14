@@ -33,6 +33,8 @@ jobs:
         run: bash scripts/test-native.sh
       - name: Check simulator JavaScript syntax
         run: node --input-type=module --check < src/simulation.js
+      - name: Test laboratory station interaction routing
+        run: node --test tests/station-interaction.test.mjs
       - name: Test sequential reaction-stage timing
         run: node --test tests/reaction-stages.test.mjs
       - name: Test mechanism timeline checkpoint navigation
