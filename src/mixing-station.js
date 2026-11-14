@@ -84,6 +84,21 @@ function mixSelectedReagents() {
   renderOutcome(outcome);
 }
 
+function clearPreviousOutcome() {
+  if (!lastOutcomeKey) return;
+  lastOutcomeKey = null;
+  stage.dataset.effect = 'idle';
+  stage.style.setProperty('--liquid-color', '#82cfc0');
+  liquid.style.height = '10%';
+  bubbleLayer.replaceChildren();
+  stageStatus.textContent = 'AWAITING TWO REAGENTS';
+  visualLabel.textContent = 'MIXTURE CHANGED';
+  outcomeType.textContent = 'READY TO MIX';
+  outcomeTitle.textContent = 'Selection updated';
+  outcomeDescription.textContent = 'Your bottle selection changed. Mix the new pair to calculate its qualitative outcome.';
+  outcomeEquation.textContent = '—';
+}
+
 function resetVessel() {
   selectedReagents.clear();
   lastOutcomeKey = null;
@@ -104,11 +119,13 @@ for (const button of bottleButtons) {
   button.addEventListener('click', () => {
     const id = button.dataset.reagent;
     if (!id) return;
+    const previousSize = selectedReagents.size;
     if (selectedReagents.has(id)) {
       selectedReagents.delete(id);
     } else if (selectedReagents.size < 2) {
       selectedReagents.add(id);
     }
+    if (selectedReagents.size !== previousSize || lastOutcomeKey) clearPreviousOutcome();
     renderSelection();
   });
 }
