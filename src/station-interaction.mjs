@@ -3,7 +3,7 @@ export const LAB_STATION_COUNT = 6;
 export const REACTION_STATION_NUMBER = 6;
 
 export function isInteractionKey(code, key) {
-  return code === 'KeyE' || String(key ?? '').toLowerCase() === 'e';
+  return code ? code === 'KeyE' : String(key ?? '').toLowerCase() === 'e';
 }
 
 export function resolveStationInteraction(stationNumber, distance) {
