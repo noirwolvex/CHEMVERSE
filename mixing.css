@@ -337,3 +337,71 @@ button, a { font: inherit; }
   .reactor-stage[data-phase="reaction"] .reaction-splash-particle,
   .colour-swirl.is-active { animation-duration:.01ms !important; animation-iteration-count:1 !important; }
 }
+
+
+/* Every valid reagent pair gets strong visible fluid motion. */
+.fluid-vortex {
+  position:absolute; z-index:2; inset:20% 4% 4%; border-radius:46% 46% 48% 48%;
+  opacity:0; pointer-events:none; mix-blend-mode:screen; filter:blur(1.2px);
+  background:
+    conic-gradient(from 18deg at 50% 58%,transparent 0 7%,rgba(255,255,255,.3) 10%,var(--liquid-color) 19%,transparent 31%,rgba(255,255,255,.26) 43%,var(--liquid-color) 57%,transparent 72%,rgba(255,255,255,.22) 83%,transparent 100%),
+    radial-gradient(ellipse at 50% 58%,rgba(255,255,255,.16),transparent 67%);
+  transform:scale(.58) rotate(-55deg);
+}
+.fluid-vortex.is-active { animation:fluid-vortex-churn 2.7s cubic-bezier(.2,.72,.2,1) both; }
+@keyframes fluid-vortex-churn {
+  0% { opacity:0; transform:scale(.52) rotate(-100deg); }
+  18% { opacity:.9; transform:scale(.92) rotate(-22deg); }
+  52% { opacity:.84; transform:scale(1.12) rotate(145deg); }
+  82% { opacity:.72; transform:scale(1.04) rotate(275deg); }
+  100% { opacity:.34; transform:scale(1.08) rotate(350deg); }
+}
+.mixing-current-layer {
+  position:absolute; z-index:3; inset:7% 2% 2%; overflow:hidden;
+  border-radius:8px 8px 46px 46px; pointer-events:none;
+}
+.mixing-current {
+  position:absolute; width:46px; height:17px; border:2px solid transparent;
+  border-top-color:var(--current-colour,#c4fff1); border-bottom-color:rgba(255,255,255,.55);
+  border-radius:50%; opacity:0; filter:drop-shadow(0 0 5px var(--current-colour,#c4fff1));
+  animation:mixing-current-sweep var(--current-duration,1.6s) ease-in-out forwards;
+  animation-delay:var(--current-delay,0s);
+}
+@keyframes mixing-current-sweep {
+  0% { opacity:0; transform:translate(-50%,-50%) rotate(var(--current-angle)) scale(.22); }
+  22% { opacity:.92; }
+  68% { opacity:.82; transform:translate(-50%,-50%) rotate(calc(var(--current-angle) + 190deg)) scale(1.22); }
+  100% { opacity:0; transform:translate(-50%,-50%) rotate(calc(var(--current-angle) + 330deg)) scale(.55); }
+}
+.reactor-stage[data-phase="reaction"][data-effect="mixing-vortex"] .mix-vessel,
+.reactor-stage[data-phase="reaction"][data-effect="colour-shift"] .mix-vessel {
+  animation:vigorous-vessel-shake .48s ease-in-out 4;
+}
+.reactor-stage[data-phase="reaction"][data-effect="mixing-vortex"] .vessel-liquid,
+.reactor-stage[data-phase="reaction"][data-effect="colour-shift"] .vessel-liquid {
+  animation:liquid-turbulence .32s ease-in-out infinite alternate;
+}
+.reactor-stage[data-phase="reaction"][data-effect="mixing-vortex"] .stage-flash,
+.reactor-stage[data-phase="reaction"][data-effect="colour-shift"] .stage-flash {
+  animation:stage-flash .48s ease-out 1;
+}
+.reactor-stage[data-phase="reaction"][data-effect="colour-shift"] .colour-swirl.is-active,
+.reactor-stage[data-phase="reaction"][data-effect="mixing-vortex"] .colour-swirl.is-active {
+  animation-duration:2.7s;
+}
+.reactor-stage[data-phase="reaction"][data-effect="precipitate"] .mix-vessel {
+  animation:vigorous-vessel-shake .58s ease-in-out 3;
+}
+.reactor-stage[data-phase="reaction"][data-effect="precipitate"] .vessel-liquid {
+  animation:liquid-turbulence .4s ease-in-out 2 alternate;
+}
+.reactor-stage[data-phase="reaction"][data-effect="precipitate"] .stage-flash {
+  animation:stage-flash .55s ease-out 1;
+}
+@media (prefers-reduced-motion:reduce) {
+  .fluid-vortex.is-active,
+  .mixing-current,
+  .reactor-stage[data-phase="reaction"] .mix-vessel {
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+  }
+}
