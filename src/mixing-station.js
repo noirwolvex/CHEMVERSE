@@ -1,5 +1,6 @@
 import { REAGENTS, evaluateMixture } from './reagent-mixer.mjs';
 import { getReactionVisualProfile } from './reaction-visuals.mjs';
+import { ReactionFxRenderer } from './reaction-fx.mjs';
 
 const bottleButtons = [...document.querySelectorAll('[data-reagent]')];
 const selectedCount = document.getElementById('selected-count');
@@ -15,6 +16,11 @@ const reactionParticleLayer = document.getElementById('reaction-particle-layer')
 const colourSwirl = document.getElementById('colour-swirl');
 const fluidVortex = document.getElementById('fluid-vortex');
 const mixingCurrentLayer = document.getElementById('mixing-current-layer');
+const reactionFx = new ReactionFxRenderer({
+  canvas: document.getElementById('reaction-fx-canvas'),
+  stage,
+  vessel: stage.querySelector('.vessel-body')
+});
 const stageStatus = document.getElementById('stage-status');
 const visualLabel = document.getElementById('visual-label');
 const outcomeType = document.getElementById('outcome-type');
@@ -164,6 +170,7 @@ function clearReactionLayers() {
   mixingCurrentLayer.replaceChildren();
   colourSwirl.classList.remove('is-active');
   fluidVortex.classList.remove('is-active');
+  reactionFx.stop();
 }
 
 function renderOutcome(outcome) {
@@ -182,6 +189,7 @@ function renderOutcome(outcome) {
   if (profile.currentCount) renderMixingCurrents(profile.currentCount, outcome.color);
   if (profile.colourSwirl) colourSwirl.classList.add('is-active');
   if (profile.fluidVortex) fluidVortex.classList.add('is-active');
+  reactionFx.activate(outcome.effect, outcome.color, profile.phaseDurationMs);
 
   const stageLabels = {
     'foam-burst': ['VIGOROUS CO₂ RELEASE', 'BUBBLES / FOAM ERUPTION'],
@@ -291,4 +299,5 @@ for (const button of bottleButtons) {
 
 mixButton.addEventListener('click', mixSelectedReagents);
 resetButton.addEventListener('click', resetVessel);
+window.addEventListener('pagehide', () => reactionFx.destroy(), { once: true });
 renderSelection();
