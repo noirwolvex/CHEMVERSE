@@ -1,5 +1,6 @@
 export const STATION_INTERACTION_DISTANCE = 7.5;
 export const LAB_STATION_COUNT = 6;
+export const MIXING_STATION_NUMBER = 5;
 export const REACTION_STATION_NUMBER = 6;
 
 export function isInteractionKey(code, key) {
@@ -14,5 +15,7 @@ export function resolveStationInteraction(stationNumber, distance) {
     return null;
   }
 
-  return stationNumber === REACTION_STATION_NUMBER ? 'open-reaction-001' : 'inspect-station';
+  if (stationNumber === MIXING_STATION_NUMBER) return 'open-mixing-station';
+  if (stationNumber === REACTION_STATION_NUMBER) return 'open-reaction-001';
+  return 'inspect-station';
 }
