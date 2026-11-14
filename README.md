@@ -10,7 +10,7 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 - The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
 - Storage cabinetry, shelves, safety point, windows and overhead lighting.
-- Aim at a workbench from within 7.5 world units and press E, or click while the pointer is locked, to inspect it. Station 06 is assigned to **REACTION 001 — Molecular Reaction Simulation**: aim at its plaque/work surface until the on-screen prompt appears, then press the physical E key to open `simulation.html`. The E key is detected independently of the active keyboard language. Stations 01–05 keep their existing inspection behavior.
+- Aim at a workbench from within 7.5 world units and press E, or click while the pointer is locked, to inspect it. Station 05 opens the **Reaction Mixing Lab**: select two of six educational reagent bottles, then run the mixture to see fizzing, indicator colour changes, or a no-visible-reaction result. Station 06 is assigned to **REACTION 001 — Molecular Reaction Simulation** and opens `simulation.html`. The E key is detected independently of the active keyboard language. Stations 01–04 keep their existing inspection behavior.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - **W / A / S / D** or arrow keys: move.
 - **Mouse**: look around.
 - **Shift**: sprint.
-- **E**: interact with the workbench at the centre reticle; station 06 opens REACTION 001.
+- **E**: interact with the workbench at the centre reticle; station 05 opens the Reaction Mixing Lab and station 06 opens REACTION 001.
 - **Left click** while playing: inspect the workbench at the centre reticle.
 - **Esc**: release the mouse and pause; click Resume to return.
 
@@ -36,6 +36,10 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - **index.html** — application shell, first-person HUD and import map.
 - **styles.css** — responsive interface styling.
 - **src/main.js** — Three.js room, furniture, equipment, first-person movement, player collision and interaction logic.
+
+## Reaction Mixing Lab — station 05
+
+The sixth-bottle rack is a visual teaching sandbox with six mild aqueous examples: diluted vinegar (acetic acid), sodium bicarbonate, citric acid, red-cabbage indicator, salt solution, and sugar solution. Select exactly two bottles and mix them in the virtual vessel. Supported demonstrations include carbon-dioxide fizzing for acid–bicarbonate pairs, indicator colour changes, and mixtures with no visible chemical reaction. A contained foam-burst animation is a visual effect only; it is not an explosive reaction. The outcomes are qualitative, pre-programmed teaching demonstrations, not concentration-dependent predictions or instructions to combine real chemicals. The page is `mixing.html`, with reaction classification and validation in `src/reagent-mixer.mjs` and `tests/reagent-mixer.test.mjs`.
 
 ## Molecular simulator — first experiment
 
