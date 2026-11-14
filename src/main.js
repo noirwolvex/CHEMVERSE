@@ -11,6 +11,8 @@ const root = document.getElementById('scene-root');
 const loadingScreen = document.getElementById('loading-screen');
 const stationPanel = document.getElementById('station-panel');
 const stationInteractionHint = document.getElementById('station-interaction-hint');
+const stationInteractionTitle = document.getElementById('station-interaction-title');
+const stationInteractionDescription = document.getElementById('station-interaction-description');
 
 const LAB = {
   width: 24,
@@ -506,9 +508,18 @@ function getStationTargetAtCrosshair() {
 
 function updateStationInteractionHint() {
   const target = controls && controls.isLocked ? getStationTargetAtCrosshair() : null;
-  const canOpenReaction = target && target.action === 'open-reaction-001';
-  stationInteractionHint.classList.toggle('is-visible', Boolean(canOpenReaction));
-  stationInteractionHint.setAttribute('aria-hidden', String(!canOpenReaction));
+  const prompt = target?.action === 'open-mixing-station'
+    ? ['OPEN MIXING LAB', 'STATION 05 / SIX-REAGENT MIXER']
+    : target?.action === 'open-reaction-001'
+      ? ['OPEN REACTION 001', 'STATION 06 / MOLECULAR REACTION SIMULATION']
+      : null;
+  const isVisible = Boolean(prompt);
+  if (prompt) {
+    stationInteractionTitle.textContent = prompt[0];
+    stationInteractionDescription.textContent = prompt[1];
+  }
+  stationInteractionHint.classList.toggle('is-visible', isVisible);
+  stationInteractionHint.setAttribute('aria-hidden', String(!isVisible));
 }
 
 function inspectStationAtCrosshair() {
@@ -528,10 +539,15 @@ function activateStationAtCrosshair() {
     return false;
   }
 
-  if (target.action === 'open-reaction-001') {
+  const stationDestinations = {
+    'open-mixing-station': '../mixing.html',
+    'open-reaction-001': '../simulation.html'
+  };
+  const destination = stationDestinations[target.action];
+  if (destination) {
     movementKeys.clear();
     playerVelocity.set(0, 0, 0);
-    window.location.assign(new URL('../simulation.html', import.meta.url).href);
+    window.location.assign(new URL(destination, import.meta.url).href);
     return true;
   }
 
