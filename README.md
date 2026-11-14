@@ -10,7 +10,7 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 - The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
 - Storage cabinetry, shelves, safety point, windows and overhead lighting.
-- Aim at a workbench from within 5.5 world units and press E, or click while the pointer is locked, to inspect it. Station 01 is assigned to **REACTION 001 — Molecular Reaction Simulation**: aim at its plaque/work surface until the on-screen prompt appears, then press E to open `simulation.html`. Stations 02–06 keep their existing inspection behavior.
+- Aim at a workbench from within 7.5 world units and press E, or click while the pointer is locked, to inspect it. Station 06 is assigned to **REACTION 001 — Molecular Reaction Simulation**: aim at its plaque/work surface until the on-screen prompt appears, then press the physical E key to open `simulation.html`. The E key is detected independently of the active keyboard language. Stations 01–05 keep their existing inspection behavior.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - **W / A / S / D** or arrow keys: move.
 - **Mouse**: look around.
 - **Shift**: sprint.
-- **E**: inspect the workbench at the centre reticle.
+- **E**: interact with the workbench at the centre reticle; station 06 opens REACTION 001.
 - **Left click** while playing: inspect the workbench at the centre reticle.
 - **Esc**: release the mouse and pause; click Resume to return.
 
