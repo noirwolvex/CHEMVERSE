@@ -93,9 +93,9 @@ const REACTION_DETAILS = Object.freeze({
   },
   'acid-base-neutralization': {
     phases: { hcl: 'aq', naoh: 'aq', nacl: 'aq', h2o: 'l' },
-    ionicEquation: 'H⁺(aq) + OH⁻(aq) → H₂O(l)',
+    ionicEquation: 'H₃O⁺(aq) + OH⁻(aq) → 2H₂O(l)',
     ionicNote: 'Na⁺ وCl⁻ أيونان متفرجان. لا يحسب النموذج pH أو منحنى المعايرة.',
-    mechanism: 'في المحلول المائي يتفاعل الهيدرونيوم مع الهيدروكسيد لتكوين الماء؛ المعادلة المختصرة تستخدم H⁺ اصطلاحياً.',
+    mechanism: 'في المحلول المائي يتفاعل H₃O⁺ مع OH⁻؛ ينتقل بروتون من الأكسجين الحامل للهيدروجين إلى أكسجين الهيدروكسيد، فتتكون جزيئات ماء. الأيونان Na⁺ وCl⁻ متفرجان. الحركة المعروضة مسار ذري بإحداثيات انتقالية تعليمية وليست ديناميكا جزيئية محسوبة.',
   },
   'methane-combustion': {
     phases: { ch4: 'g', o2: 'g', co2: 'g', h2o: 'g' },
