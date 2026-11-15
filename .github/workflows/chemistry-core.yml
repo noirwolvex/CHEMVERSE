@@ -266,8 +266,8 @@ jobs:
             if (Math.abs(transition[8] - 0.5) > 1e-9) {
               throw new Error('Lab 04 atom-engine bond transition interpolation failed');
             }
-            const productPointer = le.cv_lab04_atom_engine_sample(1);
-            const productSample = new Float64Array(le.memory.buffer, productPointer, 9);
+            const lab04ProductPointer = le.cv_lab04_atom_engine_sample(1);
+            const productSample = new Float64Array(le.memory.buffer, lab04ProductPointer, 9);
             if (Math.abs(productSample[8]) > 1e-9) {
               throw new Error('Lab 04 atom-engine final broken-bond state failed');
             }
