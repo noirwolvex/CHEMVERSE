@@ -15,3 +15,11 @@
 .mechanism-card>p{margin:5px 0 0;color:#9bb0b9;font-size:8px;line-height:1.8}
 .ionic-equation-panel .eyebrow{font-size:7px}
 @media(max-width:820px){.ionic-heading{align-items:flex-start;flex-direction:column;gap:5px}.ionic-equation-display{font-size:14px}.phase-state{font-size:.5em}}
+
+
+/* Atom-mapped engine status and source references. */
+#atom-engine-status{color:#9edfd2;font:600 7px "Space Grotesk";letter-spacing:.05em;white-space:nowrap}
+.mechanism-sources{margin:9px 0 0!important;padding-top:8px;border-top:1px solid rgba(174,215,210,.1);font-size:7px!important;color:#799795!important}
+.mechanism-sources a{color:#93cfc1;text-decoration:none}
+.mechanism-sources a:hover{text-decoration:underline;color:#c0efe4}
+@media(max-width:820px){#atom-engine-status{white-space:normal;text-align:left}}
