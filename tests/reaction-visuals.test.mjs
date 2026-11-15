@@ -5,30 +5,38 @@ import { REAGENTS, evaluateMixture } from '../src/reagent-mixer.mjs';
 
 test('gas-producing reactions use vigorous bubbles, foam and splash', () => {
   const profile = getReactionVisualProfile('foam-burst');
-  assert.ok(profile.bubbleCount >= 65);
-  assert.ok(profile.splashCount >= 40);
+  assert.ok(profile.bubbleCount >= 30);
+  assert.ok(profile.splashCount >= 25);
   assert.ok(profile.currentCount >= 20);
   assert.equal(profile.colourSwirl, false);
   assert.equal(profile.visibleMotion, true);
-  assert.ok(profile.phaseDurationMs >= 2800);
+  assert.ok(profile.phaseDurationMs >= 3500);
+  assert.ok(profile.fx.bubbleRate >= 30);
+  assert.ok(profile.fx.maxBubbles >= 70);
+  assert.ok(profile.fx.foamRate >= 20);
+  assert.ok(profile.fx.sprayCount >= 40);
 });
 
 test('precipitation uses a dense settling cloud and visible liquid currents', () => {
   const profile = getReactionVisualProfile('precipitate');
-  assert.ok(profile.precipitateCount >= 100);
+  assert.ok(profile.precipitateCount >= 80);
   assert.ok(profile.currentCount >= 35);
   assert.equal(profile.bubbleCount, 0);
   assert.equal(profile.fluidVortex, true);
   assert.equal(profile.liquidHeight, '50%');
+  assert.ok(profile.fx.sedimentCount >= 70);
+  assert.equal(profile.fx.bubbleRate, 0);
 });
 
 test('indicator reactions show a strong coloured bloom without inventing gas', () => {
   const profile = getReactionVisualProfile('colour-shift');
   assert.equal(profile.colourSwirl, true);
   assert.equal(profile.fluidVortex, true);
-  assert.ok(profile.splashCount >= 28);
+  assert.ok(profile.splashCount >= 20);
   assert.equal(profile.bubbleCount, 0);
-  assert.ok(profile.phaseDurationMs >= 2500);
+  assert.ok(profile.phaseDurationMs >= 3000);
+  assert.ok(profile.fx.pigmentCount >= 20);
+  assert.equal(profile.fx.bubbleRate, 0);
 });
 
 test('mixtures without a visible chemical reaction still show physical fluid mixing', () => {
@@ -38,7 +46,9 @@ test('mixtures without a visible chemical reaction still show physical fluid mix
   assert.ok(profile.currentCount >= 45);
   assert.ok(profile.splashCount >= 16);
   assert.equal(profile.bubbleCount, 0);
-  assert.ok(profile.phaseDurationMs >= 2500);
+  assert.ok(profile.phaseDurationMs >= 3000);
+  assert.ok(profile.fx.currentCount >= 80);
+  assert.equal(profile.fx.bubbleRate, 0);
 });
 
 test('all 28 unique pairs in the eight-bottle rack receive a visible effect profile', () => {
