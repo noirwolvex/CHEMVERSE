@@ -43,8 +43,12 @@ jobs:
         run: node --input-type=module --check < src/simulation.js
       - name: Check compounds and reactions lab JavaScript syntax
         run: node --input-type=module --check < src/compound-reaction-lab.js
+      - name: Check Lab 04 atom engine module syntax
+        run: node --input-type=module --check < src/lab04-atom-engine.mjs
       - name: Test compounds, equations, atom conservation and stoichiometry
         run: node --test tests/compound-reactions.test.mjs
+      - name: Test Lab 04 atom mapping and proton-transfer keyframes
+        run: node --test tests/lab04-atom-engine.test.mjs
       - name: Check microscope UI JavaScript syntax
         run: node --input-type=module --check < src/microscope-lab.js
       - name: Check interactive microscope instrument syntax
@@ -225,7 +229,49 @@ jobs:
                 products[14 * 4 + 12] !== 1) {
               throw new Error('Carbonic-acid decomposition bond mapping failed');
             }
-            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, and timeline-event validation passed');
+            const lab04Engine = await WebAssembly.instantiate(fs.readFileSync('wasm/lab04_atom_engine.wasm'), {});
+            const le = lab04Engine.instance.exports;
+            const lab04Names = ['memory', 'cv_lab04_atom_engine_configure',
+              'cv_lab04_atom_engine_atom_input', 'cv_lab04_atom_engine_bond_input',
+              'cv_lab04_atom_engine_atom_count', 'cv_lab04_atom_engine_bond_count',
+              'cv_lab04_atom_engine_sample', 'cv_lab04_atom_engine_validate',
+              'cv_lab04_atom_engine_last_error', 'cv_lab04_atom_engine_version'];
+            for (const name of lab04Names) {
+              if (!(name in le)) throw new Error('Missing Lab 04 atom-engine export: ' + name);
+            }
+            if (le.cv_lab04_atom_engine_version() !== 100) {
+              throw new Error('Unexpected Lab 04 atom-engine version');
+            }
+            if (le.cv_lab04_atom_engine_configure(2, 1) !== 1) {
+              throw new Error('Lab 04 atom-engine configure failed');
+            }
+            const atomInput = new Float64Array(le.memory.buffer,
+              le.cv_lab04_atom_engine_atom_input(), 2 * 11);
+            const atomRecords = [
+              [8, 1001, 0, 0, 0, 1, 0, 0, 2, 0, 0],
+              [1, 1002, 1, 0, 0, 1, 1, 0, 2, 0, 0]
+            ];
+            atomRecords.flat().forEach((value, index) => { atomInput[index] = value; });
+            const bondInput = new Float64Array(le.memory.buffer,
+              le.cv_lab04_atom_engine_bond_input(), 6);
+            [0, 1, 0, 1, 0.5, 0].forEach((value, index) => { bondInput[index] = value; });
+            if (le.cv_lab04_atom_engine_validate() !== 1) {
+              throw new Error('Lab 04 atom map or bond graph validation failed');
+            }
+            const transitionPointer = le.cv_lab04_atom_engine_sample(0.5);
+            if (!transitionPointer || le.cv_lab04_atom_engine_last_error() !== 0) {
+              throw new Error('Lab 04 atom-engine sampling failed');
+            }
+            const transition = new Float64Array(le.memory.buffer, transitionPointer, 9);
+            if (Math.abs(transition[8] - 0.5) > 1e-9) {
+              throw new Error('Lab 04 atom-engine bond transition interpolation failed');
+            }
+            const productPointer = le.cv_lab04_atom_engine_sample(1);
+            const productSample = new Float64Array(le.memory.buffer, productPointer, 9);
+            if (Math.abs(productSample[8]) > 1e-9) {
+              throw new Error('Lab 04 atom-engine final broken-bond state failed');
+            }
+            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, Lab 04 atom engine, and timeline-event validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -235,7 +281,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/lab04_atom_engine.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -252,5 +298,6 @@ jobs:
             wasm/experimental_fit.wasm
             wasm/concentration_fit.wasm
             wasm/reaction_mechanism.wasm
+            wasm/lab04_atom_engine.wasm
           if-no-files-found: error
           retention-days: 14
