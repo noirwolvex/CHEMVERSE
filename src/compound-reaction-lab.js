@@ -223,7 +223,7 @@ function updateReactionDisplay(){
  txt('balance-counts',balance.elements.map(el=>el+': '+(balance.left[el]||0)+' = '+(balance.right[el]||0)).join(' · ')+' / CONSERVED');
  byId('balance-status').innerHTML=balance.balanced?'<i></i> المعادلة موزونة':'<i></i> تحتاج مراجعة';
  txt('reaction-title-ar',activeReaction.titleAr);txt('reaction-summary',activeReaction.summary);txt('reaction-observation',activeReaction.observation);txt('reaction-conditions',activeReaction.conditions);
- txt('reaction-mechanism',activeReaction.mechanism||'المعادلة الكلية لا تحدد آلية أولية لهذا التفاعل.');
+ txt('reaction-mechanism',activeReaction.mechanism||'المعادلة الكلية لا تحدد آلية أولية لهذا التفاعل.');const mechanismSources=byId('mechanism-sources');if(mechanismSources)mechanismSources.hidden=activeReaction.id!=='acid-base-neutralization';
  txt('ionic-equation',activeReaction.ionicEquation||'— لا توجد معادلة أيونية صافية لهذا التفاعل —');
  txt('ionic-note',activeReaction.ionicNote||'يُعرض التفاعل بصيغته الجزيئية الكلية.');
  txt('reaction-index',activeReaction.number+' / '+String(REACTIONS.length).padStart(2,'0'));
