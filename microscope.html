@@ -3,7 +3,10 @@
 <meta name="description" content="CHEMVERSE Microscopy Lab — explore optical, SEM, TEM, AFM and STM sample visualisations.">
 <title>CHEMVERSE | Microscopy Lab 03</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="./microscope.css"></head><body>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="./microscope.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script></head><body>
 <div class="scope-app"><header class="scope-topbar">
 <a class="brand" href="./" aria-label="Return to CHEMVERSE laboratory"><span class="brand-mark"><span></span><span></span><span></span></span><span class="brand-copy"><strong>CHEMVERSE</strong><small>MICROSCOPY / MATERIALS / DISCOVERY</small></span></a>
 <div class="scope-topbar-center"><i></i> MICROSCOPE STATION <b>03</b></div><a class="back-link" href="./">← BACK TO LAB</a></header>
@@ -31,5 +34,29 @@
 <div class="info-block"><span>SPECIMEN PREPARATION</span><p id="specimen-preparation"></p></div>
 <div class="method-info"><span id="method-name">LIGHT MICROSCOPE</span><strong id="method-resolution"></strong><p id="method-principle"></p></div>
 <div class="limit-note"><b>METHOD LIMIT</b><p id="method-limitation"></p></div></aside></section>
+
+<section class="hands-on-lab" aria-label="Hands-on optical microscope">
+ <div class="hands-on-heading"><div><span class="eyebrow">HANDS-ON OPTICS / PLAYER INTERACTION</span><h2>Prepare. Mount. <em>Look closer.</em></h2><p>Handle the slide, mount the specimen, bring the eyepiece to eye level and turn the objective turret.</p></div><span class="hands-on-chip">OPTICAL WORKFLOW <b>01</b></span></div>
+ <div class="hands-on-grid">
+  <section class="instrument-panel"><div class="instrument-panel-heading"><div><span class="eyebrow">3D INSTRUMENT MODEL</span><h3>Compound light microscope</h3></div><span class="instrument-state"><i></i><b id="instrument-status">BENCH VIEW / OPTICAL MICROSCOPE</b></span></div>
+   <div class="instrument-stage"><canvas id="instrument-canvas" aria-label="Interactive three-dimensional compound microscope. Drag to rotate the model."></canvas><div class="instrument-hud"><span>CHEMVERSE / OPTICAL UNIT</span><b id="objective-readout">10× OBJECTIVE / 100× TOTAL</b></div><div class="instrument-hint">DRAG TO ROTATE <i>·</i> SCROLL TO ZOOM</div></div>
+   <div class="instrument-actions"><button class="instrument-primary" id="raise-microscope" type="button">RAISE TO EYE LEVEL</button><button class="instrument-secondary" id="look-through-eyepiece" type="button" disabled>LOOK THROUGH EYEPIECE</button></div>
+   <p class="instrument-note">The 3D model shows the stage, condenser, revolving nosepiece, objectives and focus wheels. Use the controls below to move the corresponding parts.</p>
+  </section>
+  <section class="preparation-panel"><div class="instrument-panel-heading"><div><span class="eyebrow">MANUAL SLIDE PREPARATION</span><h3>Prepare your specimen</h3></div><span class="prep-status" id="slide-status">SLIDE EMPTY</span></div>
+   <div class="slide-workspace"><div class="slide-graphic" aria-hidden="true"><span class="slide-glass"></span><i></i><b></b></div><div class="slide-copy"><strong id="tray-sample-name">Sodium chloride crystals</strong><small id="tray-sample-type">CRYSTALS / NaCl</small><p>Selected from the specimen tray. Complete each preparation action in order.</p></div></div>
+   <ol class="prep-step-list" id="prep-steps" aria-label="Slide preparation steps"></ol>
+   <div class="prep-progress"><div><span id="prep-progress-label">0 / 5 ACTIONS</span><b id="prep-progress-percent">0%</b></div><span class="prep-progress-track"><i id="prep-progress-bar"></i></span></div>
+   <button class="prep-reset" id="reset-slide" type="button">RESET / START AGAIN</button>
+  </section>
+ </div>
+ <section class="instrument-settings" aria-label="Microscope mechanical controls">
+  <div class="objective-control"><span class="eyebrow">REVOLVING NOSEPIECE / OBJECTIVE</span><div class="objective-buttons"><button type="button" data-objective="4" aria-pressed="false">4× <small>SCANNING</small></button><button type="button" data-objective="10" class="is-active" aria-pressed="true">10× <small>LOW POWER</small></button><button type="button" data-objective="40" aria-pressed="false">40× <small>HIGH POWER</small></button></div></div>
+  <label class="mechanical-control" for="coarse-focus"><span class="eyebrow">COARSE FOCUS / STAGE HEIGHT</span><strong>MOVE STAGE</strong><input id="coarse-focus" type="range" min="0" max="100" value="50"><small>LOWER <i>·</i> RAISE</small></label>
+  <label class="mechanical-control" for="instrument-fine-focus"><span class="eyebrow">FINE FOCUS / OBJECTIVE</span><strong>SHARPEN IMAGE</strong><input id="instrument-fine-focus" type="range" min="0" max="100" value="85"><small>SOFT <i>·</i> SHARP</small></label>
+  <label class="mechanical-control" for="instrument-lamp"><span class="eyebrow">CONDENSER / ILLUMINATION</span><strong>LIGHT INTENSITY</strong><input id="instrument-lamp" type="range" min="0" max="100" value="78"><small>LOW <i>·</i> HIGH</small></label>
+ </section>
+</section>
+
 <footer class="scope-footer"><span><i></i> CHEMVERSE / MICROSCOPY LAB 03</span><p>SIMULATED SCIENTIFIC VISUALISATIONS · NOT CAPTURED MICROGRAPHS</p><a href="./simulation.html">OPEN MOLECULAR SIMULATOR ↗</a></footer></main></div>
 <script type="module" src="./src/microscope-lab.js"></script></body></html>

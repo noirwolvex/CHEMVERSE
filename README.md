@@ -173,3 +173,10 @@ The molecular view now exposes three presentation checkpoints (reactants, the pr
 The C++ mechanism ABI publishes two event records. Each record provides its progress checkpoint and the indexed bond changes with before/after bond orders. Native tests verify that these event records match the corresponding sampled C++ keyframes; the browser validates the metadata before rendering the event inspector. Ionic associations are explicitly marked as such, and the acetate structure uses the same localized resonance drawing documented above.
 
 The event timeline is an inspection of the scripted atom-map and keyframe bookkeeping. Its checkpoint positions are presentation coordinates, not measured reaction times. The event list does not establish an experimentally verified elementary mechanism, rate-limiting step, transition state, or molecular trajectory.
+
+
+## Hands-on optical microscope workflow
+
+Station 03 includes manual slide preparation: clean the slide, add mounting medium only for wet-mount specimens, pick and transfer the sample, lower a coverslip, and mount the slide on the stage. The dry crystal and powder examples do not receive an unnecessary liquid-medium step. The optical instrument includes a rotatable 3D model, eye-level viewing transition, revolving 4× / 10× / 40× objectives, movable stage, fine focus and adjustable illumination. The eyepiece view is unlocked only after the slide is mounted. SEM, TEM, AFM and STM remain separate educational imaging methods with their own sample-preparation requirements; the optical slide sequence does not claim to prepare samples for those instruments.
+
+The instrument and slide handling are interactive visual training aids. The specimen fields remain procedural educational illustrations, not captured micrographs or measured experimental results. Optical magnification does not overcome the conventional optical resolving limit (approximately 0.2 µm under ideal conditions).

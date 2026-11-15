@@ -11,6 +11,8 @@ on:
       - 'src/**'
       - 'simulation.html'
       - 'simulation.css'
+      - 'microscope.html'
+      - 'microscope.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
   pull_request:
@@ -21,6 +23,8 @@ on:
       - 'src/**'
       - 'simulation.html'
       - 'simulation.css'
+      - 'microscope.html'
+      - 'microscope.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
 
@@ -35,6 +39,10 @@ jobs:
         run: node --input-type=module --check < src/simulation.js
       - name: Check microscope UI JavaScript syntax
         run: node --input-type=module --check < src/microscope-lab.js
+      - name: Check interactive microscope instrument syntax
+        run: node --input-type=module --check < src/microscope-instrument.js
+      - name: Test optical slide preparation workflow
+        run: node --test tests/microscope-workflow.test.mjs
       - name: Test laboratory station interaction routing
         run: node --test tests/station-interaction.test.mjs
       - name: Test microscope specimen catalogue and technique compatibility

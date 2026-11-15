@@ -1,7 +1,10 @@
 import {MICROSCOPE_MODES,MICROSCOPE_ZOOM_PRESETS,getMicroscopeMode,getMicroscopeSample,getMicroscopeSamples,getMicroscopeZoomPreset} from './microscope-samples.mjs';
+import {createMicroscopeInstrument} from './microscope-instrument.js';
+import {createSlidePreparationState,completeSlidePreparationStep,getSlidePreparationPlan,getSlidePreparationProgress} from './microscope-workflow.mjs';
 const canvas=document.getElementById('microscope-canvas'),viewport=document.getElementById('scope-viewport'),ctx=canvas.getContext('2d');
 const buttons=[...document.querySelectorAll('[data-mode]')],list=document.getElementById('sample-list'),zoom=document.getElementById('zoom-control'),focus=document.getElementById('focus-control'),gain=document.getElementById('light-control');
 let mode='light',sample=getMicroscopeSample('nacl-crystals');
+let slideState=createSlidePreparationState(sample.id),instrument=null;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),between=(r,a,b)=>a+r()*(b-a);
 function randomFor(seed){let s=2166136261;for(const ch of seed){s^=ch.charCodeAt(0);s=Math.imul(s,16777619)}return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
 function color(hex){const n=parseInt(hex.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255]}
@@ -29,8 +32,42 @@ function draw(){if(!ctx||!sample)return;const w=canvas.clientWidth||900,h=canvas
  if(lightMode){const radius=Math.min(w-margin*2,h-margin*2)*.48,v=ctx.createRadialGradient(cx,cy,radius*.62,cx,cy,radius*1.02);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.82)');ctx.fillStyle=v;ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(222,248,239,.7)';ctx.lineWidth=2;ctx.stroke()}else{ctx.strokeStyle='rgba(199,231,222,.28)';rounded(ctx,margin,margin,w-margin*2,h-margin*2,8);ctx.stroke()}
  ctx.fillStyle=lightMode?'rgba(20,44,43,.76)':'rgba(237,247,243,.72)';ctx.font='700 10px "Space Grotesk"';ctx.textAlign='left';ctx.fillText(mode.toUpperCase()+' / '+sample.category,16,25);ctx.font='600 8px "Space Grotesk"';ctx.fillText('CHEMVERSE · SIMULATED SPECIMEN',16,41);if(mode==='afm'||mode==='stm'){ctx.fillStyle='rgba(245,235,196,.88)';ctx.fillText(mode==='afm'?'SURFACE HEIGHT / FALSE COLOUR':'TUNNELLING-CURRENT MAP',16,57)}scaleBar(ctx,w,h,preset)}
 function updateDetails(){const m=getMicroscopeMode(mode),p=getMicroscopeZoomPreset(mode,Number(zoom.value));document.getElementById('mode-status').textContent=mode==='light'?'OPTICAL / BRIGHTFIELD':mode==='sem'?'SCANNING ELECTRON IMAGE':mode==='tem'?'TRANSMISSION ELECTRON IMAGE':mode==='afm'?'ATOMIC FORCE / HEIGHT MAP':'SCANNING TUNNELLING / CURRENT MAP';document.getElementById('viewport-mode').textContent=m.name.toUpperCase();document.getElementById('method-name').textContent=m.name.toUpperCase();document.getElementById('method-resolution').textContent=m.resolution;document.getElementById('method-principle').textContent=m.principle;document.getElementById('method-limitation').textContent=m.limitation;document.getElementById('viewer-title').textContent=sample.name;document.getElementById('viewport-sample').textContent=sample.formula+' · '+sample.category;document.getElementById('specimen-category').textContent=sample.category;document.getElementById('specimen-name').textContent=sample.name;document.getElementById('specimen-formula').textContent=sample.formula;document.getElementById('specimen-observation').textContent=sample.observation;document.getElementById('specimen-preparation').textContent=sample.preparation;document.getElementById('zoom-value').textContent=p?.label||'—';document.getElementById('focus-value').textContent=focus.value+'%';document.getElementById('light-value').textContent=gain.value+'%';document.getElementById('viewport-scale').textContent=p?.scale||sample.scaleBars[mode]||'—'}
-function renderSamples(){const items=getMicroscopeSamples(mode);list.replaceChildren();document.getElementById('sample-count').textContent=String(items.length).padStart(2,'0')+' SAMPLES';items.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='sample-button'+(s.id===sample.id?' is-active':'');b.setAttribute('aria-pressed',String(s.id===sample.id));const n=document.createElement('span');n.className='sample-index';n.textContent=String(i+1).padStart(2,'0');const copy=document.createElement('span'),title=document.createElement('b'),formula=document.createElement('small');title.textContent=s.name;formula.textContent=s.formula;copy.append(title,formula);b.append(n,copy);b.addEventListener('click',()=>{sample=s;renderSamples();updateDetails();draw()});list.append(b)})}
-function setMode(id){if(!getMicroscopeMode(id))return;mode=id;buttons.forEach(b=>{const on=b.dataset.mode===id;b.classList.toggle('is-active',on);b.setAttribute('aria-pressed',String(on))});const available=getMicroscopeSamples(id);if(!available.some(s=>s.id===sample.id))sample=available[0];zoom.min='1';zoom.max=String(MICROSCOPE_ZOOM_PRESETS[id].length);zoom.value=String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));renderSamples();updateDetails();draw()}
+
+function renderPreparation(){
+ const plan=getSlidePreparationPlan(sample.id),progress=getSlidePreparationProgress(slideState),container=document.getElementById('prep-steps');
+ if(!container)return;
+ container.replaceChildren();
+ plan.forEach((step,index)=>{
+  const complete=index<progress.completed,active=index===progress.completed,button=document.createElement('button');
+  button.type='button';button.className='prep-step'+(complete?' is-complete':'')+(active?' is-next':'');button.disabled=!active||mode!=='light';
+  const number=document.createElement('span');number.className='prep-step-index';number.textContent=complete?'✓':String(index+1).padStart(2,'0');
+  const copy=document.createElement('span');copy.className='prep-step-copy';
+  const title=document.createElement('b');title.textContent=step.title;const detail=document.createElement('small');detail.textContent=step.detail;copy.append(title,detail);
+  const action=document.createElement('span');action.className='prep-step-action';action.textContent=complete?'DONE':active?(mode==='light'?step.action:'OPTICAL ONLY'):'LOCKED';
+  button.append(number,copy,action);
+  button.addEventListener('click',()=>{const result=completeSlidePreparationStep(slideState,step.id);if(!result.accepted)return;slideState=result.state;renderPreparation();instrument?.setPreparationState(slideState)});
+  container.append(button);
+ });
+ const progressLabel=document.getElementById('prep-progress-label'),percentLabel=document.getElementById('prep-progress-percent'),bar=document.getElementById('prep-progress-bar'),status=document.getElementById('slide-status'),graphic=document.querySelector('.slide-graphic');
+ progressLabel.textContent=progress.completed+' / '+progress.total+' ACTIONS';percentLabel.textContent=progress.percent+'%';bar.style.width=progress.percent+'%';
+ status.textContent=progress.mounted?'SLIDE MOUNTED':progress.completed?'PREPARATION IN PROGRESS':'SLIDE EMPTY';status.classList.toggle('is-ready',progress.mounted);
+ graphic.classList.toggle('is-loaded',slideState.completed.includes('transfer-specimen'));graphic.classList.toggle('is-covered',slideState.completed.includes('apply-coverslip'));
+ document.getElementById('tray-sample-name').textContent=sample.name;document.getElementById('tray-sample-type').textContent=sample.category+' / '+sample.formula;
+ const eye=document.getElementById('look-through-eyepiece');if(eye)eye.disabled=!progress.mounted||mode!=='light';
+}
+
+function renderSamples(){const items=getMicroscopeSamples(mode);list.replaceChildren();document.getElementById('sample-count').textContent=String(items.length).padStart(2,'0')+' SAMPLES';items.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='sample-button'+(s.id===sample.id?' is-active':'');b.setAttribute('aria-pressed',String(s.id===sample.id));const n=document.createElement('span');n.className='sample-index';n.textContent=String(i+1).padStart(2,'0');const copy=document.createElement('span'),title=document.createElement('b'),formula=document.createElement('small');title.textContent=s.name;formula.textContent=s.formula;copy.append(title,formula);b.append(n,copy);b.addEventListener('click',()=>{sample=s;slideState=createSlidePreparationState(sample.id);instrument?.setSample(sample.id);renderSamples();updateDetails();renderPreparation();instrument?.setPreparationState(slideState);draw()});list.append(b)})}
+function setMode(id){if(!getMicroscopeMode(id))return;mode=id;buttons.forEach(b=>{const on=b.dataset.mode===id;b.classList.toggle('is-active',on);b.setAttribute('aria-pressed',String(on))});const available=getMicroscopeSamples(id);if(!available.some(s=>s.id===sample.id))sample=available[0];zoom.min='1';zoom.max=String(MICROSCOPE_ZOOM_PRESETS[id].length);zoom.value=String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));renderSamples();updateDetails();instrument?.setMode(mode);renderPreparation();draw()}
 buttons.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));[zoom,focus,gain].forEach(input=>input.addEventListener('input',()=>{updateDetails();draw()}));
 if(typeof ResizeObserver==='function'){const ro=new ResizeObserver(draw);ro.observe(viewport);window.addEventListener('pagehide',()=>ro.disconnect(),{once:true})}else window.addEventListener('resize',draw,{passive:true});
-renderSamples();updateDetails();draw();
+instrument=createMicroscopeInstrument({
+ canvas:document.getElementById('instrument-canvas'),
+ onObjectiveChange(value){zoom.value=String(value===4?1:value===10?2:3);updateDetails();draw()},
+ onFineFocusChange(value){focus.value=String(value);updateDetails();draw()},
+ onLampChange(value){gain.value=String(Math.round(35+(value/100)*105));updateDetails();draw()},
+ onEyepieceViewChange(active){viewport.classList.toggle('is-eyepiece',active)}
+});
+document.getElementById('reset-slide')?.addEventListener('click',()=>{slideState=createSlidePreparationState(sample.id);renderPreparation();instrument?.setPreparationState(slideState)});
+focus.addEventListener('input',()=>instrument?.setFineFocus(Number(focus.value)));
+gain.addEventListener('input',()=>instrument?.setLamp(Math.round(((Number(gain.value)-35)/105)*100)));
+instrument.setSample(sample.id);instrument.setMode(mode);renderSamples();updateDetails();renderPreparation();instrument.setPreparationState(slideState);draw();
