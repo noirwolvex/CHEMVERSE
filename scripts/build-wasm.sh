@@ -29,6 +29,17 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_fit_last_error -Wl,--export=cv_fit_engine_version \
   -Wl,--strip-all "$ROOT/cpp/experimental_fit.cpp" -o "$ROOT/wasm/experimental_fit.wasm"
 
+# Lab 04 atom-mapped reaction-coordinate engine; stable atom IDs and dynamic bond orders.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_lab04_atom_engine_configure \
+  -Wl,--export=cv_lab04_atom_engine_atom_input -Wl,--export=cv_lab04_atom_engine_bond_input \
+  -Wl,--export=cv_lab04_atom_engine_atom_count -Wl,--export=cv_lab04_atom_engine_bond_count \
+  -Wl,--export=cv_lab04_atom_engine_sample -Wl,--export=cv_lab04_atom_engine_validate \
+  -Wl,--export=cv_lab04_atom_engine_last_error -Wl,--export=cv_lab04_atom_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/lab04_atom_engine.cpp" -o "$ROOT/wasm/lab04_atom_engine.wasm"
+
 # Concentration-time initial-slope module; isolated memory and ABI.
 "$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
   -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
@@ -54,7 +65,7 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_mechanism_engine_version \
   -Wl,--strip-all "$ROOT/cpp/reaction_mechanism.cpp" -o "$ROOT/wasm/reaction_mechanism.wasm"
 
-printf 'Built %s, %s, %s, %s, and %s\\n' \
+printf 'Built %s, %s, %s, %s, %s, and %s\\n' \
   "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
   "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm" \
-  "$ROOT/wasm/reaction_mechanism.wasm"
+  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/lab04_atom_engine.wasm"
