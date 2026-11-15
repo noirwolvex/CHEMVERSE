@@ -31,7 +31,7 @@ export const NEUTRALIZATION_BONDS=Object.freeze([
 export function createNeutralizationInput(){
  return {
   atoms:NEUTRALIZATION_ATOMS.map(atom=>({
-   atomicNumber:ELEMENT_ATOMIC_NUMBERS[atom.element],id:atom.id,
+   atomicNumber:ELEMENT_ATOMIC_NUMBERS[atom.element],element:atom.element,id:atom.id,
    start:[...atom.start],transition:[...atom.transition],end:[...atom.end]
   })),
   bonds:NEUTRALIZATION_BONDS.map(bond=>({...bond}))
