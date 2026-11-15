@@ -107,6 +107,7 @@ function updateAtomEngineFrame(value){
   if(length<1e-5){meshes.forEach(mesh=>mesh.visible=false);return}
   const direction=delta.clone().normalize(),reference=Math.abs(direction.y)<.86?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
   const perpendicular=new THREE.Vector3().crossVectors(direction,reference).normalize();
+  const activeStrands=Math.max(1,Math.min(3,Math.ceil(order)));
   meshes.forEach((mesh,strand)=>{
    const strength=definition.kind===1?order:clamp(order-strand,0,1);
    if(strength<=.005){mesh.visible=false;return}
@@ -115,7 +116,7 @@ function updateAtomEngineFrame(value){
    if(definition.kind===1){
     const t=(strand+.5)/meshes.length;mesh.position.copy(start).lerp(end,t);mesh.scale.set(1,length/meshes.length*.48,1);
    }else{
-    const strandOffset=(strand-1)*.105;mesh.position.copy(midpoint).addScaledVector(perpendicular,strandOffset);mesh.scale.set(1,length,1);
+    const strandOffset=(strand-(activeStrands-1)/2)*.105;mesh.position.copy(midpoint).addScaledVector(perpendicular,strandOffset);mesh.scale.set(1,length,1);
    }
    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);
   });
