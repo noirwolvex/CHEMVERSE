@@ -84,6 +84,19 @@ Extend the validated reaction catalogue, add experimentally sourced kinetics and
 
 Run the native test suite from the repository root with **bash scripts/test-native.sh** (Git Bash or WSL), or compile the source and test file with a local C++17 compiler. Build WebAssembly with **bash scripts/build-wasm.sh** and Clang's wasm32 target. The committed .wasm file is included for static browser use.
 
+## Lab 04 atom-mapped reaction-coordinate engine
+
+Station 04 now loads a separate C++17 / WebAssembly engine for the aqueous strong-acid / strong-base neutralization example:
+
+- **cpp/lab04_atom_engine.h / cpp/lab04_atom_engine.cpp** — bounded C ABI for stable atom IDs, per-atom start/transition/final coordinates, and per-bond start/transition/final bond orders.
+- **src/lab04-atom-engine.mjs** — explicit atom map for H₃O⁺ + OH⁻ → 2H₂O. It retains Na⁺ and Cl⁻ as spectator ions and transfers the same mapped hydrogen from one oxygen to the other.
+- **wasm/lab04_atom_engine.wasm** — browser module loaded by Station 04; each animation frame samples C++ atom coordinates and bond orders for the Three.js renderer.
+- **tests/lab04_atom_engine_test.cpp** and **tests/lab04-atom-engine.test.mjs** — native and JavaScript checks for atom identity, elemental inventory, finite keyframes, and O–H bond changes.
+
+The engine is intentionally described as an **atom-mapped, keyframed reaction-coordinate visualization**. Coordinates are explanatory keyframes and intermediate bond orders are interpolated for display. This is not molecular dynamics, a quantum-chemical calculation, a force-field simulation, or a measured kinetic trajectory. The strong-acid/strong-base aqueous equation and the definition of a reaction mechanism are linked in the Station 04 interface to OpenStax and the IUPAC Gold Book.
+
+Build/test commands remain **bash scripts/test-native.sh** and **bash scripts/build-wasm.sh**.
+
 ## Reaction kinetics engine — v1
 
 The C++ kinetics module is separate from the existing stoichiometry calculator:
