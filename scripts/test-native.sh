@@ -24,9 +24,14 @@ CONCENTRATION_OUT="$OUT_DIR/chemverse-concentration-fit-test"
   "$ROOT/cpp/concentration_fit.cpp" "$ROOT/tests/concentration_fit_test.cpp" -o "$CONCENTRATION_OUT"
 "$CONCENTRATION_OUT"
 
+LAB04_ATOM_OUT="$OUT_DIR/chemverse-lab04-atom-engine-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/lab04_atom_engine.cpp" "$ROOT/tests/lab04_atom_engine_test.cpp" -o "$LAB04_ATOM_OUT"
+"$LAB04_ATOM_OUT"
+
 MECHANISM_OUT="$OUT_DIR/chemverse-reaction-mechanism-test"
 "$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
   "$ROOT/cpp/reaction_mechanism.cpp" "$ROOT/tests/reaction_mechanism_test.cpp" -o "$MECHANISM_OUT"
 "$MECHANISM_OUT"
 
-rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT"
+rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$LAB04_ATOM_OUT"
