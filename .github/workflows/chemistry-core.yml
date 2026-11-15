@@ -11,8 +11,12 @@ on:
       - 'src/**'
       - 'simulation.html'
       - 'simulation.css'
+      - 'compounds.html'
+      - 'compounds.css'
       - 'microscope.html'
       - 'microscope.css'
+      - 'compounds.html'
+      - 'compounds.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
   pull_request:
@@ -23,8 +27,12 @@ on:
       - 'src/**'
       - 'simulation.html'
       - 'simulation.css'
+      - 'compounds.html'
+      - 'compounds.css'
       - 'microscope.html'
       - 'microscope.css'
+      - 'compounds.html'
+      - 'compounds.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
 
@@ -37,6 +45,10 @@ jobs:
         run: bash scripts/test-native.sh
       - name: Check simulator JavaScript syntax
         run: node --input-type=module --check < src/simulation.js
+      - name: Check compounds and reactions lab JavaScript syntax
+        run: node --input-type=module --check < src/compound-reaction-lab.js
+      - name: Test compounds, equations, atom conservation and stoichiometry
+        run: node --test tests/compound-reactions.test.mjs
       - name: Check microscope UI JavaScript syntax
         run: node --input-type=module --check < src/microscope-lab.js
       - name: Check interactive microscope instrument syntax

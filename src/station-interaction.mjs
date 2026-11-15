@@ -1,6 +1,7 @@
 export const STATION_INTERACTION_DISTANCE = 7.5;
 export const LAB_STATION_COUNT = 6;
 export const MICROSCOPE_STATION_NUMBER = 3;
+export const COMPOUND_REACTION_STATION_NUMBER = 4;
 export const MIXING_STATION_NUMBER = 5;
 export const REACTION_STATION_NUMBER = 6;
 
@@ -17,6 +18,7 @@ export function resolveStationInteraction(stationNumber, distance) {
   }
 
   if (stationNumber === MICROSCOPE_STATION_NUMBER) return 'open-microscope-lab';
+  if (stationNumber === COMPOUND_REACTION_STATION_NUMBER) return 'open-compound-reaction-lab';
   if (stationNumber === MIXING_STATION_NUMBER) return 'open-mixing-station';
   if (stationNumber === REACTION_STATION_NUMBER) return 'open-reaction-001';
   return 'inspect-station';

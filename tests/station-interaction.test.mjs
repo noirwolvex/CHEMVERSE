@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   STATION_INTERACTION_DISTANCE,
   MICROSCOPE_STATION_NUMBER,
+  COMPOUND_REACTION_STATION_NUMBER,
   MIXING_STATION_NUMBER,
   REACTION_STATION_NUMBER,
   isInteractionKey,
@@ -33,8 +34,16 @@ test('station 06 opens REACTION 001 only inside interaction range', () => {
   assert.equal(resolveStationInteraction(6, STATION_INTERACTION_DISTANCE + 0.01), null);
 });
 
-test('stations 01, 02 and 04 keep their existing inspection action', () => {
-  for (const station of [1, 2, 4]) assert.equal(resolveStationInteraction(station, 2), 'inspect-station');
+test('station 04 opens the compounds and reactions lab only inside interaction range', () => {
+  assert.equal(COMPOUND_REACTION_STATION_NUMBER, 4);
+  assert.equal(resolveStationInteraction(4, 0), 'open-compound-reaction-lab');
+  assert.equal(resolveStationInteraction(4, 4), 'open-compound-reaction-lab');
+  assert.equal(resolveStationInteraction(4, STATION_INTERACTION_DISTANCE), 'open-compound-reaction-lab');
+  assert.equal(resolveStationInteraction(4, STATION_INTERACTION_DISTANCE + 0.01), null);
+});
+
+test('stations 01 and 02 keep their existing inspection action', () => {
+  for (const station of [1, 2]) assert.equal(resolveStationInteraction(station, 2), 'inspect-station');
 });
 
 test('the E interaction uses the physical key code on non-English keyboard layouts', () => {
