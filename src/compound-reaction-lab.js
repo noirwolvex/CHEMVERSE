@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
 import {loadLab04AtomEngine,configureNeutralizationEngine,NEUTRALIZATION_ATOMS,NEUTRALIZATION_BONDS} from './lab04-atom-engine.mjs';
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
-let activeReaction=getReactionById('acid-base-neutralization'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,raf=0,playing=false,progress=0,lastTime=0,atomEngine=null,atomEnginePromise=null,atomEngineState=null,atomEngineRoot=null,atomEngineVisuals=null;
+let activeReaction=getReactionById('acid-base-neutralization'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='hcl',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,raf=0,playing=false,progress=0,lastTime=0,atomEngine=null,atomEnginePromise=null,atomEngineState=null,atomEngineRoot=null,atomEngineVisuals=null;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
 const phaseArabic={gas:'غاز',liquid:'سائل',solid:'صلب',aqueous:'محلول مائي'};
@@ -255,7 +255,7 @@ function selectReaction(id){
  const next=getReactionById(id);if(!next)return;activeReaction=next;selectedSpecies=null;selectedMaterial=next.reactants[0].species;activeCategory='all';initialAmounts=Object.fromEntries(next.reactants.map(item=>[item.species,'0.100']));
  playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();updateAmounts();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');updateTimeline(0)}
- void activateAtomResolvedView(id);
+ void activateAtomResolvedView(id).then(()=>updateTimeline(progress));
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
 }
 function init(){
