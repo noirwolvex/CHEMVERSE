@@ -15,8 +15,6 @@ on:
       - 'compounds.css'
       - 'microscope.html'
       - 'microscope.css'
-      - 'compounds.html'
-      - 'compounds.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
   pull_request:
@@ -31,8 +29,6 @@ on:
       - 'compounds.css'
       - 'microscope.html'
       - 'microscope.css'
-      - 'compounds.html'
-      - 'compounds.css'
       - 'wasm/**'
       - '.github/workflows/chemistry-core.yml'
 
