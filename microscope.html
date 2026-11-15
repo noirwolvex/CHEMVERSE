@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101a25">
+<meta name="description" content="CHEMVERSE Microscopy Lab — explore optical, SEM, TEM, AFM and STM sample visualisations.">
+<title>CHEMVERSE | Microscopy Lab 03</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="./microscope.css"></head><body>
+<div class="scope-app"><header class="scope-topbar">
+<a class="brand" href="./" aria-label="Return to CHEMVERSE laboratory"><span class="brand-mark"><span></span><span></span><span></span></span><span class="brand-copy"><strong>CHEMVERSE</strong><small>MICROSCOPY / MATERIALS / DISCOVERY</small></span></a>
+<div class="scope-topbar-center"><i></i> MICROSCOPE STATION <b>03</b></div><a class="back-link" href="./">← BACK TO LAB</a></header>
+<main class="scope-main"><section class="scope-intro"><div><span class="eyebrow">EXPERIMENT STATION / 03</span><h1>Look closer.<br><em>Discover structure.</em></h1><p>Choose a specimen and an imaging technique. Move from visible-light crystals to electron microscopy and atomic-scale surface maps.</p></div><div class="scope-chip"><b>05</b><span><strong>IMAGING METHODS</strong><small>LIGHT · SEM · TEM · AFM · STM</small></span></div></section>
+<section class="scope-layout" aria-label="Interactive microscope laboratory"><aside class="library-panel"><div class="panel-heading"><div><span class="eyebrow">IMAGING METHOD</span><h2>Choose microscope</h2></div></div>
+<div class="method-list">
+<button class="method-button is-active" type="button" data-mode="light" aria-pressed="true"><span class="method-symbol">◉</span><span><b>OPTICAL</b><small>Visible light</small></span><i>01</i></button>
+<button class="method-button" type="button" data-mode="sem" aria-pressed="false"><span class="method-symbol">▧</span><span><b>SEM</b><small>Surface electrons</small></span><i>02</i></button>
+<button class="method-button" type="button" data-mode="tem" aria-pressed="false"><span class="method-symbol">▤</span><span><b>TEM</b><small>Transmitted electrons</small></span><i>03</i></button>
+<button class="method-button" type="button" data-mode="afm" aria-pressed="false"><span class="method-symbol">⌁</span><span><b>AFM</b><small>Surface topography</small></span><i>04</i></button>
+<button class="method-button" type="button" data-mode="stm" aria-pressed="false"><span class="method-symbol">⌗</span><span><b>STM</b><small>Tunnelling current</small></span><i>05</i></button></div>
+<div class="library-heading"><span class="eyebrow">SPECIMEN LIBRARY</span><span id="sample-count">08 SAMPLES</span></div><div class="sample-list" id="sample-list"></div></aside>
+<section class="viewer-panel"><div class="viewer-heading"><div><span class="eyebrow">LIVE SPECIMEN VIEW</span><h2 id="viewer-title">Sodium chloride crystals</h2></div><span class="viewer-state"><i></i><b id="mode-status">OPTICAL / BRIGHTFIELD</b></span></div>
+<div class="scope-viewport" id="scope-viewport"><canvas id="microscope-canvas" width="1200" height="760" aria-label="Illustrative microscope specimen view"></canvas>
+<div class="viewport-topline"><span id="viewport-mode">LIGHT MICROSCOPE</span><span>STATION 03 / SPECIMEN FEED</span></div><div class="viewport-bottomline"><span id="viewport-sample">NaCl · CRYSTALS</span><span id="viewport-scale">50 µm</span></div></div>
+<div class="viewer-controls">
+<div class="control-block"><div class="control-label"><label for="zoom-control">OBJECTIVE / SCAN</label><strong id="zoom-value">100×</strong></div><input id="zoom-control" type="range" min="1" max="4" step="1" value="2"><div class="range-ends"><span>WIDE FIELD</span><span>FINE DETAIL</span></div></div>
+<div class="control-block"><div class="control-label"><label for="focus-control">FOCUS</label><strong id="focus-value">85%</strong></div><input id="focus-control" type="range" min="0" max="100" value="85"><div class="range-ends"><span>SOFT</span><span>SHARP</span></div></div>
+<div class="control-block"><div class="control-label"><label for="light-control">ILLUMINATION / GAIN</label><strong id="light-value">100%</strong></div><input id="light-control" type="range" min="35" max="140" value="100"><div class="range-ends"><span>LOW</span><span>HIGH</span></div></div></div>
+<div class="viewer-footnote"><i></i><span>Scale bars and technique limits are shown for context. Zoom does not create detail beyond a method's resolving power.</span></div></section>
+<aside class="analysis-panel"><div class="panel-heading"><div><span class="eyebrow">SPECIMEN NOTES</span><h2>What you are seeing</h2></div></div>
+<div class="specimen-tag" id="specimen-category">CRYSTALS</div><h3 id="specimen-name">Sodium chloride crystals</h3>
+<div class="formula-row"><span>FORMULA / MATERIAL</span><b id="specimen-formula">NaCl</b></div>
+<div class="info-block"><span>OBSERVATION GUIDE</span><p id="specimen-observation"></p></div>
+<div class="info-block"><span>SPECIMEN PREPARATION</span><p id="specimen-preparation"></p></div>
+<div class="method-info"><span id="method-name">LIGHT MICROSCOPE</span><strong id="method-resolution"></strong><p id="method-principle"></p></div>
+<div class="limit-note"><b>METHOD LIMIT</b><p id="method-limitation"></p></div></aside></section>
+<footer class="scope-footer"><span><i></i> CHEMVERSE / MICROSCOPY LAB 03</span><p>SIMULATED SCIENTIFIC VISUALISATIONS · NOT CAPTURED MICROGRAPHS</p><a href="./simulation.html">OPEN MOLECULAR SIMULATOR ↗</a></footer></main></div>
+<script type="module" src="./src/microscope-lab.js"></script></body></html>

@@ -10,7 +10,7 @@ CHEMVERSE is a browser-based 3D chemistry laboratory. The environment is a recta
 - The player slides along obstacles, with the blocked movement axis losing velocity instead of pushing the camera through geometry.
 - Beakers, flasks, test tubes, reagent bottles, microscopes and burners.
 - Storage cabinetry, shelves, safety point, windows and overhead lighting.
-- Aim at a workbench from within 7.5 world units and press E, or click while the pointer is locked, to inspect it. Station 05 opens the **Reaction Mixing Lab**: select two of six educational reagent bottles, then run the mixture to see fizzing, indicator colour changes, or a no-visible-reaction result. Station 06 is assigned to **REACTION 001 — Molecular Reaction Simulation** and opens `simulation.html`. The E key is detected independently of the active keyboard language. Stations 01–04 keep their existing inspection behavior.
+- Aim at a workbench from within 7.5 world units and press E, or click while the pointer is locked, to inspect it. Station 03 opens the **Microscopy & Materials Lab** (`microscope.html`) from its physical microscope. Station 05 opens the **Reaction Mixing Lab** and station 06 opens **REACTION 001 — Molecular Reaction Simulation**. The E key is detected independently of the active keyboard language. Stations 01, 02 and 04 keep their existing inspection behavior.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 - **W / A / S / D** or arrow keys: move.
 - **Mouse**: look around.
 - **Shift**: sprint.
-- **E**: interact with the workbench at the centre reticle; station 05 opens the Reaction Mixing Lab and station 06 opens REACTION 001.
+- **E**: interact with the workbench at the centre reticle; station 03 opens the Microscope Lab, station 05 opens the Reaction Mixing Lab and station 06 opens REACTION 001.
 - **Left click** while playing: inspect the workbench at the centre reticle.
 - **Esc**: release the mouse and pause; click Resume to return.
 
@@ -40,6 +40,20 @@ A desktop browser with WebGL and Pointer Lock support is recommended. An interne
 ## Reaction Mixing Lab — station 05
 
 The eight-bottle rack is a qualitative teaching sandbox: diluted vinegar, sodium bicarbonate, citric acid, red-cabbage indicator, salt solution, sugar solution, sodium carbonate, and calcium chloride. Select two bottles. The simulator animates each virtual bottle pouring into the vessel, then illustrates vigorous CO₂ bubbling, a rising foam plume, spray droplets and a brief light pulse for gas-producing acid–carbonate pairs. Indicator solutions show a swirling colour transition, while calcium carbonate appears as a cloudy white precipitate whose particles settle. The foam burst is a contained visualisation of gas release, not a detonation. All 28 unique two-bottle combinations now use a real-time Canvas particle renderer with rising gas bubbles, moving foam cells, ballistic liquid droplets, rotating flow filaments, suspended pigment clouds and settling precipitate. Acid–carbonate pairs show the strongest CO₂ foam release; precipitating mixtures form a cloudy particle field; indicator pairs show swirling colour blooms; and mixtures without a visible chemical reaction use a physical liquid vortex without invented gas. The vortex and droplets in non-reactive mixtures depict physical fluid movement only; they do not imply gas formation or a new chemical product. These effects are illustrative particle dynamics, not computational fluid dynamics or a measured reaction prediction. Each outcome includes a representative balanced equation, a scientific explanation, and an observation guide. The visual effects are not measured physical predictions. The model does not calculate poured volumes, concentrations, exact pH, reaction rate, gas volume, or product yield, and it is not a real-world mixing guide. The page is `mixing.html`; chemistry classification and tests are in `src/reagent-mixer.mjs` and `tests/reagent-mixer.test.mjs`.
+
+
+## Microscopy & Materials Lab — station 03
+
+- The physical microscope is placed on workbench 03. Aim at station 03 from within interaction range and press **E** to open `microscope.html`.
+- Choose among a visible-light microscope, SEM, TEM, AFM and STM. The specimen list changes to show only samples compatible with the selected imaging technique.
+- Optical examples include NaCl cubes, sucrose crystals, blue copper sulfate crystals, iodine microcrystals, barium sulfate precipitate, oil-in-water droplets, cellulose fibres and insoluble powder grains.
+- Advanced examples include gold, silver and titanium dioxide nanoparticles, carbon nanotube networks, graphene/graphitic surfaces, porous catalyst surfaces and a graphite atomic-lattice signal map.
+- Adjust the objective/scan preset, focus and illumination/gain. The viewer includes a scale bar and technique-specific observation notes.
+- The optical-mode note describes the approximately 0.2 µm best-case diffraction limit; practical performance varies with wavelength, numerical aperture, contrast and specimen preparation. Zooming does not overcome this limit.
+- SEM is a grayscale surface-imaging method; TEM uses electrons transmitted through a suitably thin specimen; AFM maps probe-based surface topography; STM maps tunnelling current and requires a suitable conductive surface.
+- The microscopy fields are procedurally rendered scientific illustrations, not captured micrographs, atom photographs, measured particle-size distributions or validated experimental data. AFM/STM atomic-scale patterns represent instrument signals rather than ordinary photographs.
+
+The specimen catalogue and method compatibility are in `src/microscope-samples.mjs`; the interactive canvas viewer is in `src/microscope-lab.js`; compatibility tests are in `tests/microscope-samples.test.mjs`.
 
 ## Molecular simulator — first experiment
 

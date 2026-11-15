@@ -2,11 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   STATION_INTERACTION_DISTANCE,
+  MICROSCOPE_STATION_NUMBER,
   MIXING_STATION_NUMBER,
   REACTION_STATION_NUMBER,
   isInteractionKey,
   resolveStationInteraction
 } from '../src/station-interaction.mjs';
+
+test('station 03 opens the microscope lab only inside interaction range', () => {
+  assert.equal(MICROSCOPE_STATION_NUMBER, 3);
+  assert.equal(resolveStationInteraction(3, 0), 'open-microscope-lab');
+  assert.equal(resolveStationInteraction(3, 4), 'open-microscope-lab');
+  assert.equal(resolveStationInteraction(3, STATION_INTERACTION_DISTANCE), 'open-microscope-lab');
+  assert.equal(resolveStationInteraction(3, STATION_INTERACTION_DISTANCE + 0.01), null);
+});
 
 test('station 05 opens the reagent mixing lab only inside interaction range', () => {
   assert.equal(MIXING_STATION_NUMBER, 5);
@@ -24,10 +33,8 @@ test('station 06 opens REACTION 001 only inside interaction range', () => {
   assert.equal(resolveStationInteraction(6, STATION_INTERACTION_DISTANCE + 0.01), null);
 });
 
-test('stations 01–04 keep their existing inspection action', () => {
-  for (let station = 1; station <= 4; station += 1) {
-    assert.equal(resolveStationInteraction(station, 2), 'inspect-station');
-  }
+test('stations 01, 02 and 04 keep their existing inspection action', () => {
+  for (const station of [1, 2, 4]) assert.equal(resolveStationInteraction(station, 2), 'inspect-station');
 });
 
 test('the E interaction uses the physical key code on non-English keyboard layouts', () => {

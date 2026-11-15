@@ -33,8 +33,12 @@ jobs:
         run: bash scripts/test-native.sh
       - name: Check simulator JavaScript syntax
         run: node --input-type=module --check < src/simulation.js
+      - name: Check microscope UI JavaScript syntax
+        run: node --input-type=module --check < src/microscope-lab.js
       - name: Test laboratory station interaction routing
         run: node --test tests/station-interaction.test.mjs
+      - name: Test microscope specimen catalogue and technique compatibility
+        run: node --test tests/microscope-samples.test.mjs
       - name: Test safe reagent mixing outcomes
         run: node --test tests/reagent-mixer.test.mjs
       - name: Test reaction presentation profiles

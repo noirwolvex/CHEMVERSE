@@ -25,7 +25,7 @@ const LAB = {
 const stationInfo = [
   { title: 'Solutions & Mixing', description: 'Prepare solutions, measure liquids and explore how substances combine.' },
   { title: 'Molecular Discovery', description: 'Explore molecular models, chemical structures and the building blocks of matter.' },
-  { title: 'Measurement & Analysis', description: 'Use laboratory instruments to observe, measure and compare results.' },
+  { title: 'Microscopy & Materials', description: 'Prepare a specimen, choose an imaging technique and inspect crystals, precipitates, fibres, nanoparticles and atomic-scale surface maps.' },
   { title: 'Reaction Studies', description: 'Observe controlled reactions and record the changes that take place.' },
   { title: 'Materials & Compounds', description: 'Investigate samples, compounds and the properties of different materials.' },
   { title: 'Practical Experiments', description: 'A flexible station for guided experiments and independent discovery.' }
@@ -265,7 +265,7 @@ function addStation(number, x, z) {
   addFlask(group, -1.72, -0.63, [mats.liquidBlue, mats.liquidRose, mats.liquidAmber][(number - 1) % 3], 0.9);
   addBeaker(group, 1.64, -0.68, [mats.liquidMint, mats.liquidAmber, mats.liquidBlue][(number - 1) % 3], 0.95);
   addBottle(group, 2.15, 0.38, mats.liquidRose, 0.82);
-  if (number % 2 === 0) addMicroscope(group, -2.12, 0.43);
+  if (number === 3 || number % 2 === 0) addMicroscope(group, -2.12, 0.43);
   else addBurner(group, -2.12, 0.43);
 
   // Keep a direct reference to the workbench surface for reliable hover and selection feedback.
@@ -508,11 +508,13 @@ function getStationTargetAtCrosshair() {
 
 function updateStationInteractionHint() {
   const target = controls && controls.isLocked ? getStationTargetAtCrosshair() : null;
-  const prompt = target?.action === 'open-mixing-station'
-    ? ['OPEN MIXING LAB', 'STATION 05 / SIX-REAGENT MIXER']
-    : target?.action === 'open-reaction-001'
-      ? ['OPEN REACTION 001', 'STATION 06 / MOLECULAR REACTION SIMULATION']
-      : null;
+  const prompt = target?.action === 'open-microscope-lab'
+    ? ['OPEN MICROSCOPE LAB', 'STATION 03 / OPTICAL · SEM · TEM · AFM · STM']
+    : target?.action === 'open-mixing-station'
+      ? ['OPEN MIXING LAB', 'STATION 05 / EIGHT-REAGENT MIXER']
+      : target?.action === 'open-reaction-001'
+        ? ['OPEN REACTION 001', 'STATION 06 / MOLECULAR REACTION SIMULATION']
+        : null;
   const isVisible = Boolean(prompt);
   if (prompt) {
     stationInteractionTitle.textContent = prompt[0];
@@ -540,6 +542,7 @@ function activateStationAtCrosshair() {
   }
 
   const stationDestinations = {
+    'open-microscope-lab': '../microscope.html',
     'open-mixing-station': '../mixing.html',
     'open-reaction-001': '../simulation.html'
   };
