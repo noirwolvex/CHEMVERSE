@@ -3,7 +3,6 @@
 namespace {
 constexpr double kCoordinateLimit = 100.0;
 constexpr double kOrderLimit = 3.0;
-constexpr double kEpsilon = 1.0e-9;
 
 double g_atom_input[CV_LAB04_ATOM_MAX_ATOMS * CV_LAB04_ATOM_INPUT_FIELDS]{};
 double g_bond_input[CV_LAB04_ATOM_MAX_BONDS * CV_LAB04_BOND_INPUT_FIELDS]{};
