@@ -157,7 +157,7 @@ function selectReaction(id){
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
 }
 function init(){
- renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
+ txt('reaction-total',REACTIONS.length);renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
