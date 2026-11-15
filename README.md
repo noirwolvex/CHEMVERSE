@@ -58,14 +58,14 @@ The specimen catalogue and method compatibility are in `src/microscope-samples.m
 ## Molecular simulator — first experiment
 
 - Open **Molecular Simulator** from the laboratory header or visit **simulation.html**.
-- The first educational model demonstrates the balanced reaction: CH3COOH + NaHCO3 → CH3COONa + H2O + CO2.
+- Station 04 contains 19 balanced educational reactions across six reaction classes, with reactant/product physical states and net ionic equations where applicable.
 - The 3D ball-and-stick view shows the reactants, the proton-transfer intermediate (acetate + carbonic acid), and the products (sodium acetate, water and carbon dioxide).
 - Orbit the model with the mouse, zoom with the wheel, play/pause, reset, scrub the timeline, move to the previous/next mechanism checkpoint, inspect the C++ event bond-change records, change playback speed and adjust the illustrative temperature setting. Pressing **Start** automatically opens the molecular view in fullscreen; use the fullscreen control or **Esc** to return.
-- The atom inventory is balanced: C3 H5 Na1 O5 on both sides.
+- The element inventory is checked on both sides of every catalogue equation; molecule models include single, double, triple, resonance-style and dashed ionic associations where represented.
 - A C++ / WebAssembly core computes reaction extent, the limiting reagent, remaining reactants, product millimoles and an atom-conservation check from the selected initial millimole amounts.
 - The default inputs are 10 mmol acetic acid and 8 mmol sodium bicarbonate; at full conversion the bicarbonate is limiting, 2 mmol acetic acid remains and 8 mmol of each product is calculated.
 - With supplied k, experimental orders, solution volume, and a documented parameter source, the concentration curve and quantitative readouts follow the integrated C++ kinetic model. The three molecular presentation stages always advance by elapsed presentation time (one third of the selected duration per stage), regardless of the conversion reached by the kinetic model. This separation is intentional: the displayed proton-transfer and product-formation scenes illustrate a reaction pathway and are not independently calculated elementary steps. Kinetic curves and quantitative readouts continue to report the actual modeled conversion. Without valid kinetic inputs, quantitative kinetic values remain unavailable. Temperature changes k only when an activation energy and reference temperature are supplied for the Arrhenius correction; otherwise it affects only schematic vibration.
-- Atom sizes, bond lengths, molecular arrangement and transition timing remain schematic. This is not molecular dynamics or quantum chemistry.
+- Station 04 uses ball-and-stick representations with atom sizes, coordinates and bond patterns intended for teaching. Its cross-fade between reactant and product assemblies is a schematic sequence, not atom-mapped molecular dynamics, quantum chemistry, or an experimentally measured reaction trajectory.
 
 ## Next development stage
 
