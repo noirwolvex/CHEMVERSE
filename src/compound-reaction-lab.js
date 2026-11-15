@@ -66,7 +66,8 @@ function disposeAtomEngineView(){
 }
 function buildAtomEngineView(){
  if(!scene||!atomEngineState)return;
- disposeAtomEngineView();
+ if(atomEngineRoot){scene.remove(atomEngineRoot);disposeGroup(atomEngineRoot);atomEngineRoot=null}
+ atomEngineVisuals=null;
  atomEngineRoot=new THREE.Group();scene.add(atomEngineRoot);
  const atomGeometry=new THREE.SphereGeometry(1,36,26),atomMeshes=[];
  for(const atom of NEUTRALIZATION_ATOMS){
