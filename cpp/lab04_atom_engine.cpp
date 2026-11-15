@@ -18,10 +18,10 @@ bool finiteNumber(double value) {
 }
 
 bool isIntegerInRange(double value, int minimum, int maximum) {
-  if (!finiteNumber(value)) return false;
+  if (!finiteNumber(value) || value < static_cast<double>(minimum) ||
+      value > static_cast<double>(maximum)) return false;
   const int rounded = static_cast<int>(value);
-  return value == static_cast<double>(rounded) &&
-         rounded >= minimum && rounded <= maximum;
+  return value == static_cast<double>(rounded);
 }
 
 double clamp01(double value) {
