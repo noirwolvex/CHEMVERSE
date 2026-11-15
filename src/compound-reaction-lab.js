@@ -266,6 +266,6 @@ function init(){
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
  byId('reset-reaction').addEventListener('click',()=>{playing=false;lastTime=0;updateTimeline(0);byId('play-reaction').textContent='▶ ابدأ المحاكاة'});
  byId('reset-camera').addEventListener('click',()=>{camera?.position.set(0,atomEngineState?3.1:5.2,atomEngineState?9.4:14);orbit?.target.set(0,atomEngineState?0:.9,0);orbit?.update()});
- void activateAtomResolvedView(activeReaction.id)
+ void activateAtomResolvedView(activeReaction.id).then(()=>updateTimeline(progress))
 }
 init();
