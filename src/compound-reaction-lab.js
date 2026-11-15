@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
+import {loadLab04AtomEngine,configureNeutralizationEngine,NEUTRALIZATION_ATOMS,NEUTRALIZATION_BONDS} from './lab04-atom-engine.mjs';
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
-let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,raf=0,playing=false,progress=0,lastTime=0;
+let activeReaction=getReactionById('acid-base-neutralization'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,raf=0,playing=false,progress=0,lastTime=0,atomEngine=null,atomEnginePromise=null,atomEngineState=null,atomEngineRoot=null,atomEngineVisuals=null;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
 const phaseArabic={gas:'غاز',liquid:'سائل',solid:'صلب',aqueous:'محلول مائي'};
@@ -59,7 +60,105 @@ function buildSide(root,entries,side){
 }
 function setOpacity(root,opacity){root.traverse(obj=>{if(obj.isMesh&&obj.material){obj.material.opacity=opacity;obj.material.transparent=true;obj.material.depthWrite=opacity>.98}})}
 function setSideTransform(root,side,amount){root.children.forEach((m,i)=>{const base=m.userData.startPosition;if(!base)return;m.position.x=base.x+(side==='reactants'?1:-1)*amount*.26;m.position.y=base.y+Math.sin(amount*Math.PI+i)*.12;m.rotation.y=(i%2?-.16:.13)+amount*.25*(side==='reactants'?1:-1);m.scale.setScalar(.78*(side==='reactants'?1-.13*amount:.86+.14*amount))})}
-function updateTimeline(value){progress=clamp(value,0,1);const vanish=smooth((progress-.26)/.43),appear=smooth((progress-.43)/.38);if(reactantRoot){setOpacity(reactantRoot,1-vanish);setSideTransform(reactantRoot,'reactants',progress)}if(productRoot){setOpacity(productRoot,appear);setSideTransform(productRoot,'products',progress)}const phase=progress<.26?'REACTANTS':progress<.76?'SCHEMATIC TRANSITION':'PRODUCTS';txt('view-phase',phase);txt('stage-label',progress<.26?'المواد المتفاعلة':progress<.76?'انتقال بصري تخطيطي':'النواتج');txt('scene-caption',progress<.26?'نماذج المواد المتفاعلة مع حالات المادة':progress<.76?'انتقال تخطيطي بين جانبي المعادلة؛ ليس مساراً ذرياً زمنياً':'نماذج النواتج بعد اكتمال العرض التخطيطي');txt('progress-label',Math.round(progress*100)+'%');byId('timeline-progress').style.width=(progress*100)+'%'}
+function disposeAtomEngineView(){
+ if(atomEngineRoot){scene?.remove(atomEngineRoot);disposeGroup(atomEngineRoot);atomEngineRoot=null}
+ atomEngineState=null;atomEngineVisuals=null;
+}
+function buildAtomEngineView(){
+ if(!scene||!atomEngineState)return;
+ disposeAtomEngineView();
+ atomEngineRoot=new THREE.Group();scene.add(atomEngineRoot);
+ const atomGeometry=new THREE.SphereGeometry(1,36,26),atomMeshes=[];
+ for(const atom of NEUTRALIZATION_ATOMS){
+  const colour=atomColors[atom.element]||'#d2e0dc';
+  const material=new THREE.MeshStandardMaterial({color:colour,roughness:.3,metalness:.18,emissive:colour,emissiveIntensity:.04});
+  const mesh=new THREE.Mesh(atomGeometry,material);mesh.scale.setScalar(atomRadii[atom.element]||.34);mesh.castShadow=true;mesh.receiveShadow=true;
+  mesh.userData.atomId=atom.id;mesh.userData.element=atom.element;atomEngineRoot.add(mesh);atomMeshes.push(mesh);
+ }
+ const bondVisuals=NEUTRALIZATION_BONDS.map(bond=>{
+  const group=new THREE.Group();atomEngineRoot.add(group);const meshes=[],segmentCount=bond.kind===1?7:3;
+  for(let index=0;index<segmentCount;index++){
+   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.043,.043,1,12),new THREE.MeshStandardMaterial({
+    color:bond.kind===1?0x93b4c0:0xd7e5e1,roughness:.42,metalness:.18,transparent:true,opacity:0,depthWrite:false
+   }));
+   mesh.visible=false;group.add(mesh);meshes.push(mesh);
+  }
+  return {definition:bond,meshes}
+ });
+ atomEngineVisuals={atomMeshes,bondVisuals};
+ camera?.position.set(0,3.1,9.4);orbit?.target.set(0,0,0);orbit?.update();
+}
+function updateAtomEngineFrame(value){
+ if(!atomEngine||!atomEngineState||!atomEngineVisuals)return false;
+ const pointer=atomEngine.cv_lab04_atom_engine_sample(value);
+ if(!pointer)return false;
+ const {atomCount,bondCount}=atomEngineState;
+ const sample=new Float64Array(atomEngine.memory.buffer,pointer,atomCount*4+bondCount);
+ const {atomMeshes,bondVisuals}=atomEngineVisuals;
+ for(let index=0;index<atomCount;index++){
+  const offset=index*4,mesh=atomMeshes[index];
+  mesh.position.set(sample[offset],sample[offset+1],sample[offset+2]);mesh.visible=sample[offset+3]>.01;
+ }
+ const bondOffset=atomCount*4;
+ bondVisuals.forEach((visual,index)=>{
+  const {definition,meshes}=visual,start=atomMeshes[definition.a].position,end=atomMeshes[definition.b].position;
+  const delta=new THREE.Vector3().subVectors(end,start),length=delta.length(),order=clamp(sample[bondOffset+index],0,3);
+  if(length<1e-5){meshes.forEach(mesh=>mesh.visible=false);return}
+  const direction=delta.clone().normalize(),reference=Math.abs(direction.y)<.86?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
+  const perpendicular=new THREE.Vector3().crossVectors(direction,reference).normalize();
+  meshes.forEach((mesh,strand)=>{
+   const strength=definition.kind===1?order:clamp(order-strand,0,1);
+   if(strength<=.005){mesh.visible=false;return}
+   mesh.visible=true;mesh.material.opacity=strength;
+   const midpoint=start.clone().add(end).multiplyScalar(.5);
+   if(definition.kind===1){
+    const t=(strand+.5)/meshes.length;mesh.position.copy(start).lerp(end,t);mesh.scale.set(1,length/meshes.length*.48,1);
+   }else{
+    const strandOffset=(strand-1)*.105;mesh.position.copy(midpoint).addScaledVector(perpendicular,strandOffset);mesh.scale.set(1,length,1);
+   }
+   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);
+  });
+ });
+ return true;
+}
+async function activateAtomResolvedView(reactionId){
+ if(reactionId!=='acid-base-neutralization'){
+  disposeAtomEngineView();if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;
+  txt('atom-engine-status','عرض جزيئي تخطيطي');return;
+ }
+ try{
+  if(!atomEnginePromise)atomEnginePromise=loadLab04AtomEngine();
+  const loaded=await atomEnginePromise;if(reactionId!==activeReaction.id)return;
+  atomEngine=loaded;atomEngineState=configureNeutralizationEngine(atomEngine);
+  if(reactantRoot)reactantRoot.visible=false;if(productRoot)productRoot.visible=false;
+  buildAtomEngineView();updateAtomEngineFrame(progress);
+  txt('atom-engine-status','C++ / WASM · ATOM MAPPED · ACTIVE');
+  txt('view-phase','ATOM-MAPPED REACTION');
+  txt('scene-caption','تعيين ثابت لكل ذرة؛ انتقال البروتون وتغير الروابط مع حفظ عدد الذرات');
+ }catch(error){
+  atomEnginePromise=null;atomEngine=null;disposeAtomEngineView();
+  txt('atom-engine-status','تعذر تحميل محرك الذرات');
+  txt('ionic-note','تعذر تحميل محرك الذرات: '+error.message+' — سيبقى العرض الجزيئي التخطيطي متاحاً.');
+  if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;
+ }
+}
+function updateTimeline(value){
+ progress=clamp(value,0,1);
+ if(atomEngineState&&atomEngineVisuals){
+  updateAtomEngineFrame(progress);
+  txt('view-phase',progress<.5?'PROTON TRANSFER / APPROACH':'WATER BOND FORMED');
+  txt('stage-label',progress<.5?'انتقال البروتون':'تكوّن رابطة الماء');
+  txt('scene-caption',progress<.5?'يتحرك البروتون بين موقعي الأكسجين؛ رابطة O–H القديمة تضعف والجديدة تتكوّن':'أصبحت الذرة نفسها مرتبطة بالأكسجين الجديد؛ الأيونات المتفرجة لم تتغير');
+ }else{
+  const vanish=smooth((progress-.26)/.43),appear=smooth((progress-.43)/.38);
+  if(reactantRoot){setOpacity(reactantRoot,1-vanish);setSideTransform(reactantRoot,'reactants',progress)}
+  if(productRoot){setOpacity(productRoot,appear);setSideTransform(productRoot,'products',progress)}
+  txt('view-phase',progress<.26?'REACTANTS':progress<.76?'SCHEMATIC TRANSITION':'PRODUCTS');
+  txt('stage-label',progress<.26?'المواد المتفاعلة':progress<.76?'انتقال بصري تخطيطي':'النواتج');
+  txt('scene-caption',progress<.26?'نماذج المواد المتفاعلة مع حالات المادة':progress<.76?'انتقال تخطيطي بين جانبي المعادلة؛ ليس مساراً ذرياً زمنياً':'نماذج النواتج بعد اكتمال العرض التخطيطي');
+ }
+ txt('progress-label',Math.round(progress*100)+'%');byId('timeline-progress').style.width=(progress*100)+'%'
+}
 function renderScene(){
  const canvas=byId('molecule-canvas');try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'})}catch(error){byId('webgl-fallback').hidden=false;canvas.hidden=true;return}
  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
@@ -155,15 +254,17 @@ function selectReaction(id){
  const next=getReactionById(id);if(!next)return;activeReaction=next;selectedSpecies=null;selectedMaterial=next.reactants[0].species;activeCategory='all';initialAmounts=Object.fromEntries(next.reactants.map(item=>[item.species,'0.100']));
  playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();updateAmounts();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');updateTimeline(0)}
+ void activateAtomResolvedView(id);
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
 }
 function init(){
- txt('reaction-total',REACTIONS.length);renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
+ txt('reaction-total',REACTIONS.length);renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts=Object.fromEntries(activeReaction.reactants.map(item=>[item.species,'0.100']));updateAmounts();updateSelectedMaterial();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
  byId('reset-reaction').addEventListener('click',()=>{playing=false;lastTime=0;updateTimeline(0);byId('play-reaction').textContent='▶ ابدأ المحاكاة'});
- byId('reset-camera').addEventListener('click',()=>{camera?.position.set(0,5.2,14);orbit?.target.set(0,.9,0);orbit?.update()})
+ byId('reset-camera').addEventListener('click',()=>{camera?.position.set(0,atomEngineState?3.1:5.2,atomEngineState?9.4:14);orbit?.target.set(0,atomEngineState?0:.9,0);orbit?.update()});
+ void activateAtomResolvedView(activeReaction.id)
 }
 init();
