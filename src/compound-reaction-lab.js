@@ -226,10 +226,107 @@ function updateStoichiometry(){
  const products=activeReaction.products.map(e=>materialById.get(e.species).formulaDisplay+' = '+formatAmount(result.produced[e.species])).join(' · ');
  txt('amount-note','النواتج النظرية: '+products+' | مقدار التفاعل: '+formatAmount(result.extent)+'. لا يشمل الحساب المردود أو الاتزان أو السرعة.')
 }
+
+function supportsCurrentKinetics(){
+ return activeReaction.reactants.length===2&&activeReaction.reactants.every(entry=>{
+  const item=materialById.get(entry.species);
+  return entry.coefficient===1&&item?.phase==='aqueous';
+ });
+}
+function kineticsInput(id){return byId(id)?.value.trim()??''}
+function clearKineticsResults(){
+ kineticsResults=null;txt('kinetics-summary','لا توجد محاكاة حركية بعد.');
+ const canvas=byId('kinetics-chart');if(canvas){const context=canvas.getContext('2d');context?.clearRect(0,0,canvas.width,canvas.height)}
+}
+function updateKineticsAvailability(){
+ const button=byId('kinetics-run');if(!button)return;
+ const supported=supportsCurrentKinetics();
+ const raw=[kineticsInput('kinetics-volume'),kineticsInput('kinetics-temperature'),
+  kineticsInput('kinetics-reference-temperature'),kineticsInput('kinetics-rate-constant'),
+  kineticsInput('kinetics-order-a'),kineticsInput('kinetics-order-b')];
+ const values=raw.map(Number);
+ const activationRaw=kineticsInput('kinetics-activation-energy');
+ const activationValid=activationRaw===''||(Number.isFinite(Number(activationRaw))&&Number(activationRaw)>=0);
+ const valid=raw.every(value=>value!=='')&&values.every(Number.isFinite)&&
+  values[0]>0&&values[1]>-273.15&&values[2]>-273.15&&values[3]>0&&
+  values[4]>=0&&values[4]<=4&&values[5]>=0&&values[5]<=4&&
+  values[4]+values[5]<=6&&activationValid;
+ button.disabled=!kineticsEngineReady||!supported||!valid;
+ if(!supported)txt('kinetics-status','المحرك الحالي يتطلب متفاعلين مائيين بمعامل ستوكيومتري 1:1؛ هذا الشرط غير متحقق للتفاعل المحدد.');
+ else if(!kineticsEngineReady)txt('kinetics-status','محرك الحركية C++ / WebAssembly غير متاح حالياً.');
+ else if(!valid)txt('kinetics-status','أدخل الحجم والحرارة وثابت السرعة والرتبتين. طاقة التنشيط اختيارية إذا لم يتوفر لها مصدر موثوق.');
+ else txt('kinetics-status','البيانات مكتملة. سيستخدم المحرك القيم المدخلة فقط ولن يستنتج ثوابت من المعادلة.');
+}
+function drawKineticsChart(rows,volumeMl){
+ const canvas=byId('kinetics-chart');if(!canvas||!rows?.length)return;
+ const width=Math.max(320,canvas.clientWidth||640),height=Math.max(150,canvas.clientHeight||170);
+ const ratio=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.round(width*ratio);canvas.height=Math.round(height*ratio);
+ const context=canvas.getContext('2d');if(!context)return;
+ context.setTransform(ratio,0,0,ratio,0,0);context.clearRect(0,0,width,height);
+ const left=43,right=12,top=12,bottom=28,plotW=width-left-right,plotH=height-top-bottom;
+ const concentrationA=rows.map(row=>row[3]/volumeMl),concentrationB=rows.map(row=>row[4]/volumeMl);
+ const maximum=Math.max(1e-9,...concentrationA,...concentrationB)*1.12;
+ context.font='10px "IBM Plex Sans Arabic",sans-serif';context.lineWidth=1;
+ for(let tick=0;tick<=4;tick++){
+  const y=top+plotH*tick/4;context.strokeStyle='rgba(150,180,188,.13)';
+  context.beginPath();context.moveTo(left,y);context.lineTo(width-right,y);context.stroke();
+  context.fillStyle='#8da3aa';context.textAlign='right';context.fillText((maximum*(1-tick/4)).toPrecision(2),left-7,y+3);
+ }
+ context.strokeStyle='rgba(170,200,205,.45)';context.beginPath();context.moveTo(left,top);context.lineTo(left,top+plotH);context.lineTo(width-right,top+plotH);context.stroke();
+ const drawSeries=(values,colour)=>{
+  context.beginPath();values.forEach((value,index)=>{
+   const x=left+plotW*index/(values.length-1),y=top+plotH*(1-value/maximum);
+   if(index===0)context.moveTo(x,y);else context.lineTo(x,y);
+  });context.strokeStyle=colour;context.lineWidth=2.1;context.stroke();
+ };
+ drawSeries(concentrationA,'#74cbb7');drawSeries(concentrationB,'#e0b36b');
+ context.fillStyle='#9fb2b9';context.textAlign='left';context.fillText('0 s',left, height-8);
+ context.textAlign='right';context.fillText(rows[rows.length-1][0].toFixed(1)+' s',width-right,height-8);
+ context.textAlign='center';context.fillStyle='#74cbb7';context.fillText('A',width*.43,top+10);
+ context.fillStyle='#e0b36b';context.fillText('B',width*.56,top+10);
+}
+async function runKinetics(){
+ if(!supportsCurrentKinetics()||!kineticsEngineReady)return;
+ const button=byId('kinetics-run');button.disabled=true;txt('kinetics-status','يجري تكامل معادلة السرعة باستخدام محرك C++...');
+ try{
+  const [a,b]=activeReaction.reactants;
+  const amountA=Number(initialAmounts[a.species]),amountB=Number(initialAmounts[b.species]);
+  const volumeMl=Number(kineticsInput('kinetics-volume'));
+  const temperatureC=Number(kineticsInput('kinetics-temperature'));
+  const referenceTemperatureC=Number(kineticsInput('kinetics-reference-temperature'));
+  const rateConstant=Number(kineticsInput('kinetics-rate-constant'));
+  const orderA=Number(kineticsInput('kinetics-order-a')),orderB=Number(kineticsInput('kinetics-order-b'));
+  const activationRaw=kineticsInput('kinetics-activation-energy');
+  const hasActivationEnergy=activationRaw!=='',activationEnergyKjMol=hasActivationEnergy?Number(activationRaw):0;
+  if(![amountA,amountB,volumeMl,temperatureC,referenceTemperatureC,rateConstant,orderA,orderB,activationEnergyKjMol].every(Number.isFinite)||amountA<=0||amountB<=0)throw new Error('تحقق من كميات المتفاعلات ومدخلات الحركية.');
+  const result=await simulateStation04Kinetics({
+   amountAMmol:amountA*1000,amountBMmol:amountB*1000,volumeMl,rateConstant,orderA,orderB,
+   temperatureC,referenceTemperatureC,activationEnergyKjMol,useArrhenius:hasActivationEnergy,
+   durationSeconds:20,maximumStepSeconds:.05,sampleCount:101
+  });
+  kineticsResults=result;drawKineticsChart(result.rows,volumeMl);
+  const first=result.rows[0],last=result.rows[result.rows.length-1];
+  const initialRate=first[5],finalRate=last[5];
+  const finalA=last[3]/volumeMl,finalB=last[4]/volumeMl;
+  const order=orderA+orderB,rateUnits=order===1?'s⁻¹':('M⁻'+(order-1).toFixed(2)+' s⁻¹');
+  txt('kinetics-summary',
+   'k الفعّال = '+result.effectiveRateConstant.toPrecision(5)+' '+rateUnits+
+   ' · السرعة الابتدائية = '+initialRate.toPrecision(4)+' M/s'+
+   ' · السرعة عند النهاية = '+finalRate.toPrecision(4)+' M/s'+
+   ' · [A] النهائية = '+finalA.toPrecision(4)+' M'+
+   ' · [B] النهائية = '+finalB.toPrecision(4)+' M'+
+   ' · التحول = '+(last[1]*100).toFixed(2)+'%');
+  txt('kinetics-status',hasActivationEnergy?
+   'نجح التكامل العددي. تم تعديل k بدرجة الحرارة وفق Arrhenius وباستخدام طاقة التنشيط التي أدخلتها.':
+   'نجح التكامل العددي. لم تُدخل طاقة تنشيط؛ لذلك بقي k ثابتاً عند القيمة المرجعية ولم تُنسب للحرارة زيادة سرعة مصطنعة.');
+ }catch(error){txt('kinetics-status',error instanceof Error?error.message:'تعذر تشغيل نموذج الحركية.')}
+ updateKineticsAvailability();
+}
 function updateAmounts(){
  const container=byId('reactant-amounts');container.replaceChildren();
- for(const entry of activeReaction.reactants){const item=materialById.get(entry.species),row=document.createElement('div');row.className='amount-row';const label=document.createElement('label');label.htmlFor='amount-'+item.id;label.textContent=item.nameAr+' / '+item.formulaDisplay;const input=document.createElement('input');input.type='number';input.id='amount-'+item.id;input.min='0';input.max='1000';input.step='0.001';input.value=initialAmounts[item.id]??'0.100';input.inputMode='decimal';input.addEventListener('input',()=>{initialAmounts[item.id]=input.value;updateStoichiometry()});row.append(label,input);container.append(row)}
- updateStoichiometry()
+ for(const entry of activeReaction.reactants){const item=materialById.get(entry.species),row=document.createElement('div');row.className='amount-row';const label=document.createElement('label');label.htmlFor='amount-'+item.id;label.textContent=item.nameAr+' / '+item.formulaDisplay;const input=document.createElement('input');input.type='number';input.id='amount-'+item.id;input.min='0';input.max='1000';input.step='0.001';input.value=initialAmounts[item.id]??'0.100';input.inputMode='decimal';input.addEventListener('input',()=>{initialAmounts[item.id]=input.value;updateStoichiometry();updateKineticsAvailability()});row.append(label,input);container.append(row)}
+ updateStoichiometry();updateKineticsAvailability()
 }
 function updateReactionDisplay(){
  const balance=getReactionAtomBalance(activeReaction),equation=byId('equation-display');equation.replaceChildren();
@@ -262,17 +359,28 @@ function updateSelectedMaterial(){
 function renderLegend(){const root=byId('atom-legend');root.replaceChildren();ELEMENTS.forEach(el=>{const item=document.createElement('span');item.className='atom-key';const dot=document.createElement('i');dot.style.background=el.color;const text=document.createElement('span');text.textContent=el.symbol+' / '+el.name;item.append(dot,text);root.append(item)})}
 function selectReaction(id){
  const next=getReactionById(id);if(!next)return;activeReaction=next;selectedSpecies=null;selectedMaterial=next.reactants[0].species;activeCategory='all';initialAmounts=Object.fromEntries(next.reactants.map(item=>[item.species,'0.100']));
- playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();updateAmounts();
+ playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();clearKineticsResults();
+ ['kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>{const input=byId(id);if(input)input.value=''});
+ updateAmounts();updateKineticsAvailability();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
 }
-function init(){
- renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
+async function init(){
+ renderScene();
+ const engines=await Promise.allSettled([loadStation04Engine(),loadKineticsEngine()]);
+ station04EngineReady=engines[0].status==='fulfilled';
+ kineticsEngineReady=engines[1].status==='fulfilled';
+ const engineStatus=byId('s04-engine-status');
+ if(engineStatus){engineStatus.textContent=station04EngineReady?'C++ PROCESS ENGINE / ONLINE':'C++ PROCESS ENGINE / OFFLINE';engineStatus.classList.toggle('is-offline',!station04EngineReady)}
+ renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
+ ['kinetics-volume','kinetics-temperature','kinetics-reference-temperature','kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>byId(id).addEventListener('input',updateKineticsAvailability));
+ byId('kinetics-run').addEventListener('click',runKinetics);
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
  byId('reset-reaction').addEventListener('click',()=>{playing=false;lastTime=0;updateTimeline(0);byId('play-reaction').textContent='▶ ابدأ المحاكاة'});byId('previous-stage').addEventListener('click',()=>seekReaction(stageStops.filter(stop=>stop<progress-1e-4).pop()??0));byId('next-stage').addEventListener('click',()=>seekReaction(stageStops.find(stop=>stop>progress+1e-4)??1));byId('reaction-scrubber').addEventListener('input',event=>seekReaction(Number(event.target.value)/1000));
- byId('reset-camera').addEventListener('click',()=>{camera?.position.set(0,5.2,14);orbit?.target.set(0,.9,0);orbit?.update()})
+ byId('reset-camera').addEventListener('click',()=>{camera?.position.set(0,5.2,14);orbit?.target.set(0,.9,0);orbit?.update()});
+ updateKineticsAvailability();
 }
-init();
+init().catch(error=>{const status=byId('s04-engine-status');if(status){status.textContent='ENGINE INIT ERROR';status.classList.add('is-offline')}txt('kinetics-status',error.message||'تعذر تهيئة المحركات.')});
