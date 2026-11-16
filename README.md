@@ -196,7 +196,7 @@ CH3COOH + NaHCO3 -> CH3COONa + H2O + CO2
 The station now includes a separate quantitative layer:
 
 - The theoretical stoichiometric extent and limiting reagent are calculated from the entered initial concentrations and fixed solution volume. Since mol/L × mL has the numerical value mmol, the inputs are converted consistently to millimoles.
-- The theoretical product masses use the molar masses of **anhydrous sodium acetate** (82.0338 g/mol), water (18.0153 g/mol), and carbon dioxide (44.0095 g/mol). Hydrated sodium acetate is not assumed.
+- The product masses use the molar masses of sodium acetate (82.0338 g/mol), water (18.0153 g/mol), and carbon dioxide (44.0095 g/mol). The sodium acetate value is an **anhydrous formula-unit equivalent**; it is not a claim that solid sodium acetate precipitates from the aqueous mixture. The water value is only the stoichiometrically formed amount, not the solvent already present.
 - The maximum CO2 gas volume is estimated with the ideal gas law, PV = nRT, using the selected gas pressure and simulator temperature. It assumes every mole of generated CO2 enters the gas phase and behaves ideally.
 - Current product amounts remain unavailable unless the C++/WebAssembly kinetic model has valid user-supplied kinetic parameters. The app does not fill missing kinetic data with invented values.
 - The beaker-and-bubble canvas is a qualitative observation aid. Bubble count and animation are not computational fluid dynamics, measured gas flow, or a predicted bubble-size distribution.
@@ -206,5 +206,5 @@ The ideal-gas estimate is not a substitute for a measured gas-volume result. The
 
 Reference data for the product molar masses and gas constant:
 
-- NIST Chemistry WebBook: [sodium acetate](https://webbook.nist.gov/cgi/cbook.cgi?ID=B6002039), [water](https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185), and [carbon dioxide](https://webbook.nist.gov/cgi/cbook.cgi?ID=C124-38-9).
+- NIST Chemistry WebBook: [sodium acetate](https://webbook.nist.gov/cgi/cbook.cgi?ID=B6002039), [water](https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185), and [carbon dioxide](https://webbook.nist.gov/cgi/cbook.cgi?ID=124-38-9).
 - NIST/CODATA 2022: [fundamental physical constants](https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf).
