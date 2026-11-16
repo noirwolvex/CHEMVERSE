@@ -397,7 +397,8 @@ function draw(){
  }else if(mode==='tem'){
   drawTEM(ctx,width,height,fieldWidthNm,rng);
  }else if(mode==='afm'){
-  drawAFM(ctx,width,height,fieldWidthNm,rng);
+  if(afmResult)drawAFMPhysicsImage(ctx,width,height,afmResult);
+  else drawAFM(ctx,width,height,fieldWidthNm,rng);
  }else{
   drawSTM(ctx,width,height,fieldWidthNm,rng);
  }
@@ -779,7 +780,7 @@ function renderSamples(){
   title.textContent=item.name;formula.textContent=item.formula;copy.append(title,formula);button.append(number,copy);
   button.addEventListener('click',()=>{
    sample=item;slideState=createSlidePreparationState(sample.id);instrument?.setSample(sample.id);
-   renderSamples();updateDetails();renderPreparation();instrument?.setPreparationState(slideState);draw();
+   clearPhysicsResults();renderSamples();updateDetails();renderPreparation();instrument?.setPreparationState(slideState);updatePhysicsPanelVisibility();draw();
   });
   list.append(button);
  });
@@ -798,6 +799,7 @@ function setObjectiveFromControl(value){
 }
 function setMode(id){
  if(!getMicroscopeMode(id))return;
+ clearPhysicsResults();
  mode=id;
  buttons.forEach(button=>{
   const active=button.dataset.mode===id;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',String(active));
@@ -809,7 +811,7 @@ function setMode(id){
  }
  zoom.min='1';zoom.max=String(MICROSCOPE_ZOOM_PRESETS[id].length);
  zoom.value=id==='light'?String(opticalIndexForObjective(objective)):String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));scanValue=Number(zoom.value);
- renderSamples();updateDetails();instrument?.setMode(mode);renderPreparation();draw();
+ renderSamples();updateDetails();instrument?.setMode(mode);renderPreparation();updatePhysicsPanelVisibility();draw();
 }
 buttons.forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.mode)));
 zoom.addEventListener('input',()=>{
@@ -817,6 +819,14 @@ zoom.addEventListener('input',()=>{
  scanValue=Number(zoom.value);updateDetails();draw();
 });
 [focus,gain].forEach(input=>input.addEventListener('input',()=>{updateDetails();draw()}));
+for(const id of ['electron-voltage','electron-thickness','electron-particles','electron-tilt','afm-amplitude','afm-setpoint','afm-spring','afm-force','afm-tip-radius']){
+ const input=document.getElementById(id);input?.addEventListener('input',()=>{updatePhysicsControlReadouts();clearPhysicsResults()});
+}
+document.getElementById('afm-signal-channel')?.addEventListener('change',()=>{draw();drawAFMProbeTrace(afmResult)});
+document.getElementById('run-electron-transport')?.addEventListener('click',executeElectronTransport);
+document.getElementById('run-afm-scan')?.addEventListener('click',executeAFMScan);
+document.getElementById('play-afm-tip-scan')?.addEventListener('click',playAFMTipTrace);
+document.getElementById('afm-interaction-mode')?.addEventListener('change',()=>clearPhysicsResults());
 if(typeof ResizeObserver==='function'){
  const observer=new ResizeObserver(draw);observer.observe(viewport);window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
 }else window.addEventListener('resize',draw,{passive:true});
@@ -835,4 +845,4 @@ focus.addEventListener('input',()=>instrument?.setFineFocus(Number(focus.value))
 gain.addEventListener('input',()=>instrument?.setLamp(Math.round(((Number(gain.value)-35)/105)*100)));
 instrument.setSample(sample.id);instrument.setMode(mode);
 instrument.setFineFocus(Number(focus.value));instrument.setLamp(Math.round(((Number(gain.value)-35)/105)*100));
-renderSamples();updateDetails();renderPreparation();instrument.setPreparationState(slideState);draw();
+renderSamples();updateDetails();renderPreparation();instrument.setPreparationState(slideState);updatePhysicsControlReadouts();updatePhysicsPanelVisibility();draw();
