@@ -2,9 +2,7 @@
 
 namespace {
 constexpr double PI = 3.14159265358979323846;
-constexpr double HALF_PI = 1.57079632679489661923;
 constexpr double TWO_PI = 6.28318530717958647692;
-constexpr double ELECTRON_REST_KEV = 510.99895;
 constexpr int ERR_INVALID = 1;
 constexpr int ERR_NUMERIC = 2;
 constexpr int ERR_STEP_LIMIT = 3;
