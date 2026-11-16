@@ -2,6 +2,10 @@ name: Chemistry engines
 
 permissions:
   contents: write
+
+concurrency:
+  group: chemistry-engines-${{ github.ref }}
+  cancel-in-progress: false
 on:
   push:
     paths:
@@ -338,6 +342,11 @@ jobs:
           NODE
       - name: Publish validated WebAssembly binaries to branch
         run: |
+          git fetch origin "${GITHUB_REF_NAME}"
+          if [ "$(git rev-parse "origin/${GITHUB_REF_NAME}")" != "${GITHUB_SHA}" ]; then
+            echo "Branch advanced during this run; the latest commit's workflow will publish its matching WebAssembly build."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/station04_engine.wasm wasm/crystal_engine.wasm
@@ -345,7 +354,9 @@ jobs:
             echo "Validated WebAssembly binaries are already up to date."
           else
             git commit -m "Update validated WebAssembly binaries"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "The branch advanced during publication; a newer run will publish the current binaries."
+            fi
           fi
       - name: Upload validated WebAssembly modules
         uses: actions/upload-artifact@v4
