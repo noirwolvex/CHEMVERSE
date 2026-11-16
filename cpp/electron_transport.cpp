@@ -11,10 +11,14 @@ constexpr int MAX_COLLISIONS = 2000;
 constexpr double MIN_ENERGY_KEV = 0.05;
 constexpr int TRACK_STRIDE = CV_ELECTRON_TRACK_HEADER_FIELDS +
   CV_ELECTRON_MAX_POINTS * CV_ELECTRON_POINT_FIELDS;
+constexpr int SECONDARY_TRACK_STRIDE = TRACK_STRIDE;
+constexpr double SECONDARY_MIN_ENERGY_KEV = 0.0005;
 
 double summary[CV_ELECTRON_SUMMARY_FIELDS]{};
 double histogram[CV_ELECTRON_HISTOGRAM_BINS]{};
 double tracks[CV_ELECTRON_MAX_TRACKS * TRACK_STRIDE]{};
+double secondary_tracks[CV_ELECTRON_MAX_SECONDARY_TRACKS * SECONDARY_TRACK_STRIDE]{};
+int secondary_track_count = 0;
 int last_error = 0;
 unsigned int rng_state = 1u;
 
@@ -159,6 +163,82 @@ void appendPoint(int track,double x,double y,double z,double energy,int event) {
   tracks[offset+4] = static_cast<double>(event);
   tracks[base] = static_cast<double>(count+1);
 }
+
+void appendSecondaryPoint(int track,double x,double y,double z,double energy,int event) {
+  if(track<0||track>=CV_ELECTRON_MAX_SECONDARY_TRACKS)return;
+  const int base=track*SECONDARY_TRACK_STRIDE;
+  const int count=static_cast<int>(secondary_tracks[base]);
+  if(count>=CV_ELECTRON_MAX_POINTS)return;
+  const int offset=base+CV_ELECTRON_TRACK_HEADER_FIELDS+
+    count*CV_ELECTRON_POINT_FIELDS;
+  secondary_tracks[offset]=x;
+  secondary_tracks[offset+1]=y;
+  secondary_tracks[offset+2]=z;
+  secondary_tracks[offset+3]=energy;
+  secondary_tracks[offset+4]=static_cast<double>(event);
+  secondary_tracks[base]=static_cast<double>(count+1);
+}
+void transportSecondary(Vec3 origin,double initial_energy_kev,double atomic_number,
+ double density_g_cm3,int track,double *escaped_energy_kev,double *deposited_energy_kev){
+  *escaped_energy_kev=0.0;
+  *deposited_energy_kev=0.0;
+  Vec3 position=origin;
+  const double cosine=-(0.12+0.88*random01());
+  const double sine=sqrtFast(maxv(0.0,1.0-cosine*cosine));
+  const double azimuth=TWO_PI*random01();
+  Vec3 direction{ sine*cosApprox(azimuth),sine*sinApprox(azimuth),cosine };
+  double energy=initial_energy_kev;
+  int outcome=2;
+  if(track>=0){
+    const int base=track*SECONDARY_TRACK_STRIDE;
+    secondary_tracks[base+1]=2.0;
+    secondary_tracks[base+2]=initial_energy_kev;
+    appendSecondaryPoint(track,position.x,position.y,position.z,energy,6);
+  }
+  for(int step=0;step<CV_ELECTRON_MAX_POINTS-1;++step){
+    if(energy<=SECONDARY_MIN_ENERGY_KEV)break;
+    const double scaledZ=maxv(0.25,atomic_number/6.0);
+    const double lambda=clamp(0.45+
+      5.5*sqrtFast(energy/0.03)/(density_g_cm3*sqrtFast(scaledZ)),0.15,12.0);
+    const double free_path=clamp(-lambda*logFast(maxv(1.0e-12,random01())),0.02,20.0);
+    const double to_surface=direction.z< -1.0e-9?
+      maxv(0.0,position.z/(-direction.z)):1.0e300;
+    const bool escaping=to_surface<=free_path;
+    const double travel=escaping?to_surface:free_path;
+    const double stopping=0.00018+0.065*energy;
+    const double loss=minv(energy,stopping*travel);
+    energy=maxv(0.0,energy-loss);
+    *deposited_energy_kev+=loss;
+    position=add(position,scale(direction,travel));
+    if(escaping&&energy>SECONDARY_MIN_ENERGY_KEV){
+      *escaped_energy_kev=energy;
+      outcome=1;
+      if(track>=0)appendSecondaryPoint(track,position.x,position.y,position.z,energy,8);
+      break;
+    }
+    if(energy<=SECONDARY_MIN_ENERGY_KEV){
+      *deposited_energy_kev+=energy;
+      energy=0.0;
+      outcome=2;
+      if(track>=0)appendSecondaryPoint(track,position.x,position.y,position.z,energy,9);
+      break;
+    }
+    Vec3 scattered=randomUnit();
+    if(scattered.z>0.0)scattered.z=-scattered.z;
+    direction=normalize(add(scale(direction,0.35),scale(scattered,0.65)));
+    if(direction.z> -0.04)direction.z=-0.04;
+    direction=normalize(direction);
+    if(track>=0)appendSecondaryPoint(track,position.x,position.y,position.z,energy,7);
+  }
+  if(*escaped_energy_kev<=0.0&&energy>0.0){
+    *deposited_energy_kev+=energy;
+    energy=0.0;
+    outcome=2;
+    if(track>=0)appendSecondaryPoint(track,position.x,position.y,position.z,energy,9);
+  }
+  if(track>=0)secondary_tracks[track*SECONDARY_TRACK_STRIDE+1]=static_cast<double>(outcome);
+}
+
 }
 
 extern "C" const double *cv_electron_simulate(
@@ -170,6 +250,8 @@ extern "C" const double *cv_electron_simulate(
   for(int i=0;i<CV_ELECTRON_SUMMARY_FIELDS;++i)summary[i]=0.0;
   for(int i=0;i<CV_ELECTRON_HISTOGRAM_BINS;++i)histogram[i]=0.0;
   for(int i=0;i<CV_ELECTRON_MAX_TRACKS*TRACK_STRIDE;++i)tracks[i]=0.0;
+  for(int i=0;i<CV_ELECTRON_MAX_SECONDARY_TRACKS*SECONDARY_TRACK_STRIDE;++i)secondary_tracks[i]=0.0;
+  secondary_track_count=0;
 
   const bool valid=primary_count>=1&&primary_count<=MAX_PRIMARY_COUNT&&
     finite(atomic_number)&&atomic_number>=1.0&&atomic_number<=92.0&&
@@ -186,8 +268,10 @@ extern "C" const double *cv_electron_simulate(
   const double tilt=beam_tilt_degrees*PI/180.0;
   const Vec3 initial_direction=normalize({sinApprox(tilt),0.0,cosApprox(tilt)});
   double deposited_total=0.0,backscatter_energy=0.0,transmitted_energy=0.0;
-  double secondary_energy_total=0.0,penetration_sum=0.0,event_sum=0.0;
+  double secondary_energy_total=0.0,secondary_deposited_total=0.0;
+  double secondary_emitted_total=0.0,penetration_sum=0.0,event_sum=0.0;
   int backscattered=0,transmitted=0,absorbed=0,secondary_count=0;
+  int secondary_escaped_count=0,secondary_absorbed_count=0;
   int global_events=0;
   const int tracks_to_record=recorded_track_count<primary_count?
     recorded_track_count:primary_count;
@@ -247,8 +331,19 @@ extern "C" const double *cv_electron_simulate(
         const double secondary_energy=minv(loss,0.005+0.025*random01());
         deposited_total=maxv(0.0,deposited_total-secondary_energy);
         primary_deposited=maxv(0.0,primary_deposited-secondary_energy);
-        secondary_energy_total+=secondary_energy;
+        secondary_emitted_total+=secondary_energy;
         secondary_count++;
+        const int secondary_track=secondary_track_count<CV_ELECTRON_MAX_SECONDARY_TRACKS?
+          secondary_track_count:-1;
+        double secondary_escaped_energy=0.0,secondary_deposited_energy=0.0;
+        transportSecondary(position,secondary_energy,atomic_number,density_g_cm3,
+          secondary_track,&secondary_escaped_energy,&secondary_deposited_energy);
+        if(secondary_track>=0)secondary_track_count++;
+        deposited_total+=secondary_deposited_energy;
+        secondary_deposited_total+=secondary_deposited_energy;
+        secondary_energy_total+=secondary_escaped_energy;
+        if(secondary_escaped_energy>0.0)secondary_escaped_count++;
+        else secondary_absorbed_count++;
         event=4;
       }
 
@@ -307,11 +402,19 @@ extern "C" const double *cv_electron_simulate(
   summary[13]=static_cast<double>(secondary_count)/static_cast<double>(primary_count);
   summary[14]=closure;
   summary[15]=static_cast<double>(global_events);
+  summary[16]=static_cast<double>(secondary_escaped_count);
+  summary[17]=static_cast<double>(secondary_absorbed_count);
+  summary[18]=static_cast<double>(secondary_track_count);
+  summary[19]=secondary_energy_total;
+  summary[20]=secondary_deposited_total;
+  summary[21]=secondary_emitted_total;
   return summary;
 }
 
 extern "C" const double *cv_electron_summary(void){return summary;}
 extern "C" const double *cv_electron_histogram(void){return histogram;}
 extern "C" const double *cv_electron_tracks(void){return tracks;}
+extern "C" const double *cv_electron_secondary_tracks(void){return secondary_tracks;}
+extern "C" int cv_electron_secondary_track_count(void){return secondary_track_count;}
 extern "C" int cv_electron_last_error(void){return last_error;}
-extern "C" int cv_electron_engine_version(void){return 100;}
+extern "C" int cv_electron_engine_version(void){return 110;}

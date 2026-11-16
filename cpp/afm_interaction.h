@@ -22,8 +22,9 @@ enum {
  *
  * Tapping uses a driven damped cantilever with DMT/Hertz contact and
  * non-contact van der Waals interaction. Contact mode uses a DMT/Hertz
- * force-setpoint solution. This is a single-asperity continuum model;
- * it does not solve atomistic tip chemistry or full 3-D elasticity.
+ * force-setpoint solution. The input height map is morphologically convolved
+ * with a spherical, conical or four-sided pyramidal tip envelope before scanning.
+ * This remains a single-asperity continuum model, not atomistic tip chemistry.
  */
 double *cv_afm_height_input(void);
 const double *cv_afm_scan(
@@ -42,7 +43,9 @@ const double *cv_afm_scan(
   int scan_mode,
   double contact_force_setpoint_nn,
   int cycles_per_pixel,
-  int steps_per_cycle);
+  int steps_per_cycle,
+  int tip_geometry,
+  double tip_half_angle_degrees);
 
 const double *cv_afm_summary(void);
 const double *cv_afm_output(void);

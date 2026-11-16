@@ -8,10 +8,11 @@ extern "C" {
 enum {
   CV_ELECTRON_HISTOGRAM_BINS = 32,
   CV_ELECTRON_MAX_TRACKS = 24,
+  CV_ELECTRON_MAX_SECONDARY_TRACKS = 24,
   CV_ELECTRON_MAX_POINTS = 48,
   CV_ELECTRON_POINT_FIELDS = 5,
   CV_ELECTRON_TRACK_HEADER_FIELDS = 3,
-  CV_ELECTRON_SUMMARY_FIELDS = 16
+  CV_ELECTRON_SUMMARY_FIELDS = 22
 };
 
 /*
@@ -19,8 +20,9 @@ enum {
  * Energies: keV; distances: nm; density: g/cm^3; tilt: degrees.
  * Atomic mass: g/mol. The engine uses screened-Rutherford angular
  * scattering and a Kanaya-Okayama range-based continuous energy-loss
- * approximation. Secondary-electron escape is an explicitly simplified
- * near-surface yield model, not a full dielectric-response cascade.
+ * approximation. Secondary electrons are tracked as independent, low-energy
+ * surface-emission histories with simplified inelastic stopping and escape;
+ * this is not a full dielectric-response or electron-cascade calculation.
  */
 const double *cv_electron_simulate(
   int primary_count,
@@ -37,6 +39,8 @@ const double *cv_electron_simulate(
 const double *cv_electron_summary(void);
 const double *cv_electron_histogram(void);
 const double *cv_electron_tracks(void);
+const double *cv_electron_secondary_tracks(void);
+int cv_electron_secondary_track_count(void);
 int cv_electron_last_error(void);
 int cv_electron_engine_version(void);
 

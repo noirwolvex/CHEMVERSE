@@ -7,9 +7,9 @@ namespace {
 bool near(double a,double b,double tolerance=1e-5){
  return std::fabs(a-b)<=tolerance*(1.0+std::fabs(b));
 }
-const double *scan(int mode,double force=2.0){
+const double *scan(int mode,double force=2.0,int tip_geometry=0,double tip_angle=30.0){
  return cv_afm_scan(16,800.0,8.0,0.72,2.0,300.0,80.0,
-  10.0,70.0,0.23,25.0,1.0e-19,mode,force,8,32);
+  10.0,70.0,0.23,25.0,1.0e-19,mode,force,8,32,tip_geometry,tip_angle);
 }
 }
 int main(){
@@ -83,11 +83,25 @@ int main(){
  assert(highAdhesion);
  assert(cv_afm_summary()[7]>lowAdhesionIndent);
 
+
+ /* Finite-radius spherical, conical and pyramidal tips broaden a narrow pillar. */
+ for(int i=0;i<16*16;++i)input[i]=0.0;
+ input[8*16+8]=20.0;
+ assert(scan(1,3.0,0,30.0));
+ const double sphereNeighbour=cv_afm_output()[(8*16+9)*CV_AFM_OUTPUT_FIELDS];
+ assert(sphereNeighbour>0.1&&sphereNeighbour<20.0);
+ assert(scan(1,3.0,1,30.0));
+ const double coneNeighbour=cv_afm_output()[(8*16+9)*CV_AFM_OUTPUT_FIELDS];
+ assert(coneNeighbour>sphereNeighbour);
+ assert(scan(1,3.0,2,30.0));
+ const double pyramidDiagonal=cv_afm_output()[(9*16+9)*CV_AFM_OUTPUT_FIELDS];
+ assert(pyramidDiagonal>0.1);
+
  /* Invalid grid and out-of-range materials are rejected. */
  assert(!cv_afm_scan(4,800.0,8.0,.72,2.0,300.0,80.0,
-  10.0,70.0,.23,25.0,1e-19,0,2.0,8,32));
+  10.0,70.0,.23,25.0,1e-19,0,2.0,8,32,0,30.0));
  assert(cv_afm_last_error()==1);
  assert(!cv_afm_scan(16,800.0,8.0,.72,2.0,300.0,80.0,
-  10.0,70.0,.9,25.0,1e-19,0,2.0,8,32));
+  10.0,70.0,.9,25.0,1e-19,0,2.0,8,32,0,30.0));
  std::puts("CHEMVERSE AFM tip-sample interaction solver: all tests passed");
 }

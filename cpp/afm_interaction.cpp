@@ -9,6 +9,7 @@ constexpr int ERR_STEP_LIMIT=3;
 constexpr int MAX_DYNAMIC_STEPS=120000000;
 double height_input[CV_AFM_MAX_CELLS]{};
 double output[CV_AFM_MAX_CELLS*CV_AFM_OUTPUT_FIELDS]{};
+double convolved_height[CV_AFM_MAX_CELLS]{};
 double summary[CV_AFM_SUMMARY_FIELDS]{};
 int last_error=0;
 
@@ -135,6 +136,47 @@ double runTapping(double sample_z,double stage_z,double amplitude,double spring,
  if(phase_out)*phase_out=last_phase;
  return .5*(maximum-minimum);
 }
+double cosApprox(double value){
+ while(value>PI)value-=TWO_PI;
+ while(value< -PI)value+=TWO_PI;
+ const double x2=value*value;
+ return 1.0-x2/2.0+x2*x2/24.0-x2*x2*x2/720.0;
+}
+void buildTipConvolution(int grid_size,double scan_width_nm,double tip_radius_nm,
+ int tip_geometry,double tip_half_angle_degrees){
+ const double pixel=scan_width_nm/static_cast<double>(grid_size-1);
+ const double support=tip_radius_nm*(tip_geometry==0?1.0:3.0);
+ const int reach=static_cast<int>(support/pixel)+1;
+ const double angle=tip_half_angle_degrees*PI/180.0;
+ const double tangent=maxv(0.01,sinApprox(angle)/cosApprox(angle));
+ for(int y=0;y<grid_size;++y)for(int x=0;x<grid_size;++x){
+  double maximum=-1.0e300;
+  for(int dy=-reach;dy<=reach;++dy)for(int dx=-reach;dx<=reach;++dx){
+   const int sx=x+dx,sy=y+dy;
+   if(sx<0||sx>=grid_size||sy<0||sy>=grid_size)continue;
+   const double offset_x=static_cast<double>(dx)*pixel;
+   const double offset_y=static_cast<double>(dy)*pixel;
+   const double radial=sqrtFast(offset_x*offset_x+offset_y*offset_y);
+   double tip_height=0.0;
+   if(tip_geometry==0){
+    if(radial>tip_radius_nm)continue;
+    tip_height=tip_radius_nm-sqrtFast(maxv(0.0,
+      tip_radius_nm*tip_radius_nm-radial*radial));
+   }else if(tip_geometry==1){
+    if(radial>support)continue;
+    tip_height=radial/tangent;
+   }else{
+    const double square_radius=maxv(absd(offset_x),absd(offset_y));
+    if(square_radius>support)continue;
+    tip_height=square_radius/tangent;
+   }
+   const double candidate=height_input[sy*grid_size+sx]+tip_height;
+   maximum=maxv(maximum,candidate);
+  }
+  convolved_height[y*grid_size+x]=maximum>-1.0e299?maximum:height_input[y*grid_size+x];
+ }
+}
+
 }
 
 extern "C" double *cv_afm_height_input(void){return height_input;}
@@ -145,7 +187,8 @@ extern "C" const double *cv_afm_scan(
  double resonance_frequency_khz,double quality_factor,double tip_radius_nm,
  double young_modulus_gpa,double poisson_ratio,double adhesion_energy_mj_m2,
  double hamaker_constant_j,int scan_mode,double contact_force_setpoint_nn,
- int cycles_per_pixel,int steps_per_cycle){
+ int cycles_per_pixel,int steps_per_cycle,int tip_geometry,
+ double tip_half_angle_degrees){
  last_error=0;
  for(int i=0;i<CV_AFM_SUMMARY_FIELDS;++i)summary[i]=0.0;
  for(int i=0;i<CV_AFM_MAX_CELLS*CV_AFM_OUTPUT_FIELDS;++i)output[i]=0.0;
@@ -163,12 +206,15 @@ extern "C" const double *cv_afm_scan(
   finite(hamaker_constant_j)&&hamaker_constant_j>=1.0e-22&&hamaker_constant_j<=1.0e-18&&
   (scan_mode==0||scan_mode==1)&&finite(contact_force_setpoint_nn)&&
   contact_force_setpoint_nn>=0.01&&contact_force_setpoint_nn<=100.0&&
-  cycles_per_pixel>=2&&cycles_per_pixel<=40&&steps_per_cycle>=16&&steps_per_cycle<=64;
+  cycles_per_pixel>=2&&cycles_per_pixel<=40&&steps_per_cycle>=16&&steps_per_cycle<=64&&
+  (tip_geometry==0||tip_geometry==1||tip_geometry==2)&&
+  finite(tip_half_angle_degrees)&&tip_half_angle_degrees>=10.0&&tip_half_angle_degrees<=80.0;
  if(!valid){last_error=ERR_INVALID;return 0;}
  if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*9>MAX_DYNAMIC_STEPS){
   last_error=ERR_STEP_LIMIT;return 0;
  }
  const int cells=grid_size*grid_size;
+ buildTipConvolution(grid_size,scan_width_nm,tip_radius_nm,tip_geometry,tip_half_angle_degrees);
  const double frequency_hz=resonance_frequency_khz*1000.0;
  const double target_amplitude=free_amplitude_nm*amplitude_setpoint_ratio;
  const double spring=spring_constant_n_m;
@@ -176,11 +222,11 @@ extern "C" const double *cv_afm_scan(
  double total_topography=0.0,total_error=0.0,max_indent=0.0;
  int feedback_total=0,contact_cells=0;
  double previous_stage_z=height_input[0]+free_amplitude_nm*1.05;
- double previous_surface=height_input[0];
+ double previous_surface=convolved_height[0];
  for(int y=0;y<grid_size;++y){
   for(int x=0;x<grid_size;++x){
    const int index=y*grid_size+x;
-   const double surface=height_input[index];
+   const double surface=convolved_height[index];
    double stage_z=previous_stage_z+(surface-previous_surface);
    double deflection=0.0,peak_force=0.0,indentation=0.0,phase=0.0;
    double measured_amplitude=0.0;
@@ -255,4 +301,4 @@ extern "C" const double *cv_afm_scan(
 extern "C" const double *cv_afm_summary(void){return summary;}
 extern "C" const double *cv_afm_output(void){return output;}
 extern "C" int cv_afm_last_error(void){return last_error;}
-extern "C" int cv_afm_engine_version(void){return 100;}
+extern "C" int cv_afm_engine_version(void){return 110;}

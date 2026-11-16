@@ -29,7 +29,16 @@ int main(){
  const double incident=summary[0]*20.0;
  const double accounted=summary[5]+summary[6]+summary[7]+summary[8];
  assert(near(incident,accounted,1e-8));
+ assert(near(summary[21],summary[19]+summary[20],1e-7));
 
+ assert(summary[16]+summary[17]==summary[4]);
+ assert(summary[18]<=CV_ELECTRON_MAX_SECONDARY_TRACKS);
+ assert(near(summary[19]+summary[20],summary[21],1e-7));
+ const double *secondaryTracks=cv_electron_secondary_tracks();
+ if(cv_electron_secondary_track_count()>0){
+  assert(secondaryTracks[0]>=2.0);
+  assert(secondaryTracks[CV_ELECTRON_TRACK_HEADER_FIELDS+4]==6.0);
+ }
  const double *track=cv_electron_tracks();
  assert(track[0]>=2.0);
  assert(near(track[2],20.0));
