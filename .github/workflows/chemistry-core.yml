@@ -71,6 +71,8 @@ jobs:
         run: node --test tests/experimental-data.test.mjs
       - name: Test concentration-time CSV validation
         run: node --test tests/concentration-data.test.mjs
+      - name: Test station 06 quantitative reaction estimates and report export
+        run: node --test tests/reaction-quantities.test.mjs
 
   wasm-build:
     runs-on: ubuntu-latest
