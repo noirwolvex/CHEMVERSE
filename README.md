@@ -185,3 +185,26 @@ The instrument and slide handling are interactive visual training aids. The spec
 ## Elements, compounds & reactions lab — station 04
 
 Station 04 opens `compounds.html`, a separate educational reaction explorer. It contains twelve balanced examples across synthesis, decomposition, displacement, precipitation, neutralisation, combustion and oxidation. The material library includes fourteen element references and molecular/ionic formula models. The simulator checks atom conservation from stored formulae, renders schematic ball-and-stick reactants and products in Three.js, and calculates ideal stoichiometric extent, limiting reactant, remaining reactants and theoretical products from user-entered initial moles. These amount calculations are based on balanced equations only; they do not predict reaction rate, equilibrium, actual yield, temperature change or molecular dynamics. The 3D rearrangement is an educational visualisation, not a measured trajectory or a quantum-chemical calculation.
+
+
+## Station 06 — reaction observation and quantitative yield
+
+Station 06 opens the molecular reaction simulator for the balanced 1:1 reaction:
+
+CH3COOH + NaHCO3 -> CH3COONa + H2O + CO2
+
+The station now includes a separate quantitative layer:
+
+- The theoretical stoichiometric extent and limiting reagent are calculated from the entered initial concentrations and fixed solution volume. Since mol/L × mL has the numerical value mmol, the inputs are converted consistently to millimoles.
+- The theoretical product masses use the molar masses of **anhydrous sodium acetate** (82.0338 g/mol), water (18.0153 g/mol), and carbon dioxide (44.0095 g/mol). Hydrated sodium acetate is not assumed.
+- The maximum CO2 gas volume is estimated with the ideal gas law, PV = nRT, using the selected gas pressure and simulator temperature. It assumes every mole of generated CO2 enters the gas phase and behaves ideally.
+- Current product amounts remain unavailable unless the C++/WebAssembly kinetic model has valid user-supplied kinetic parameters. The app does not fill missing kinetic data with invented values.
+- The beaker-and-bubble canvas is a qualitative observation aid. Bubble count and animation are not computational fluid dynamics, measured gas flow, or a predicted bubble-size distribution.
+- **Export experiment CSV** records the inputs, selected pressure and temperature, kinetic parameters and their user-entered source, theoretical products, available current estimates, and notes.
+
+The ideal-gas estimate is not a substitute for a measured gas-volume result. The current model does not include CO2 dissolution, gas–liquid mass transfer, carbonate equilibria, water-vapour pressure, non-ideal gas behaviour, or experimental losses. The kinetic and atom-mapped mechanism models retain the scope and limitations described above.
+
+Reference data for the product molar masses and gas constant:
+
+- NIST Chemistry WebBook: [sodium acetate](https://webbook.nist.gov/cgi/cbook.cgi?ID=B6002039), [water](https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185), and [carbon dioxide](https://webbook.nist.gov/cgi/cbook.cgi?ID=C124-38-9).
+- NIST/CODATA 2022: [fundamental physical constants](https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf).
