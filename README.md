@@ -227,3 +227,40 @@ The instrument and slide handling are interactive visual training aids. The spec
 ## Elements, compounds & reactions lab — station 04
 
 Station 04 opens `compounds.html`, a separate educational reaction explorer. It contains twelve balanced examples across synthesis, decomposition, displacement, precipitation, neutralisation, combustion and oxidation. The material library includes fourteen element references and molecular/ionic formula models. The simulator checks atom conservation from stored formulae, renders schematic ball-and-stick reactants and products in Three.js, and calculates ideal stoichiometric extent, limiting reactant, remaining reactants and theoretical products from user-entered initial moles. These amount calculations are based on balanced equations only; they do not predict reaction rate, equilibrium, actual yield, temperature change or molecular dynamics. The 3D rearrangement is an educational visualisation, not a measured trajectory or a quantum-chemical calculation.
+
+
+## Electron transport and AFM tip–sample physics — station 03
+
+Station 03 contains two independent C++17 engines compiled to WebAssembly. The microscope UI loads them only when the corresponding imaging technique is selected.
+
+### SEM / TEM electron transport
+
+- `cpp/electron_transport.h` / `cpp/electron_transport.cpp` implement deterministic-seed Monte Carlo histories for primary electrons entering a homogeneous specimen slab.
+- Inputs are the material's effective atomic number, atomic mass and density, accelerating voltage (keV), specimen thickness (nm), beam incidence angle (degrees), number of primary-electron histories, random seed, recorded track count and collision limit.
+- Each primary history advances through screened-Rutherford angular scattering and a continuous energy-loss approximation based on a Kanaya–Okayama range estimate. The model classifies primary electrons as backscattered, transmitted or absorbed and includes a simplified near-surface secondary-electron yield.
+- The result reports BSE and transmitted fractions, secondary-electron yield/count, deposited and escaped energy, mean penetration depth, collision statistics, a depth histogram and selected individual primary trajectories. The energy ledger is checked against the incident energy for every run.
+- SEM and TEM use different default beam energies and sample thicknesses, but the controls can be adjusted. The displayed trajectories are a deterministic sample of the Monte Carlo histories; they are not every simulated electron.
+
+The transport calculation is an educational, homogeneous-material Monte Carlo approximation. It does **not** yet solve a complete electron cascade, explicit dielectric-loss spectrum, phonon/plasmon generation, space-charge effects, crystal channeling, charging, detailed surface chemistry, or a calibrated secondary/backscatter detector response. The material table uses effective elemental/composition inputs rather than a full compound-mixture transport database. In particular, a particle trajectory and an energy-conservation check do not by themselves validate a real instrument's image contrast.
+
+### AFM cantilever and tip–sample interaction
+
+- `cpp/afm_interaction.h` / `cpp/afm_interaction.cpp` accept a sampled surface-height map (nm), scan width (nm), cantilever free amplitude (nm), amplitude setpoint, spring constant (N/m), resonance frequency (kHz), quality factor, tip radius (nm), effective sample Young's modulus (GPa), Poisson ratio, adhesion energy (mJ/m²), Hamaker constant (J), and contact-force setpoint (nN).
+- Tapping mode integrates a driven, damped single-cantilever equation of motion with a fourth-order Runge–Kutta scheme. A per-pixel amplitude-feedback controller adjusts the piezo height toward the selected amplitude ratio.
+- Contact mode computes an effective Hertz/DMT contact indentation and the piezo position needed to maintain the requested normal-force setpoint.
+- The tip–sample force model includes a long-range van der Waals attraction, short-range adhesion and a repulsive Hertzian contact term using the effective elastic modulus. The numerical solver caps the Hertz contribution at 120 nN to keep the educational integration bounded.
+- Each scan pixel records feedback topography, cantilever deflection, peak interaction force, oscillation amplitude, phase and feedback-iteration count. The interface can display the resulting topography, deflection, force or amplitude channel and animate a tip trace across the measured synthetic scan.
+
+The AFM surface generator creates repeatable synthetic height fields from the specimen category, dimensions and a seed. It does not claim to reconstruct an actual measured surface. The cantilever model is a continuum, single-asperity approximation: it does **not** calculate atomistic chemical bonding, full three-dimensional elastic deformation, viscoelasticity, capillary forces, tip wear, probe contamination, thermal drift, instrument noise or a complete multi-mode cantilever. Contact-mode force control is quasi-static; tapping mode is the dynamic oscillator/feedback model. The displayed material parameters are educational effective values and should be replaced with sample- and environment-specific measurements for quantitative research.
+
+### Source files and validation
+
+- `src/microscope-physics.mjs` loads the two WASM modules, supplies specimen-dependent effective material inputs, generates deterministic AFM height maps and decodes the fixed C ABI output layouts.
+- `wasm/electron_transport.wasm` and `wasm/afm_interaction.wasm` are the browser modules built by `scripts/build-wasm.sh`.
+- `tests/electron_transport_test.cpp` checks reproducibility, outcome accounting, energy closure, material-Z backscatter trends, thickness-dependent transmission and beam-energy penetration trends.
+- `tests/afm_interaction_test.cpp` checks finite output, step-height recovery, contact-force setpoint, elastic-stiffness and adhesion trends, amplitude-setpoint stability and bounded indentation.
+- `tests/microscope-physics.test.mjs` checks the JavaScript/WASM memory interface, specimen material presets, deterministic surface generation and the returned data channels.
+- GitHub Actions builds both WASM modules, runs native C++ and JavaScript tests, validates the WebAssembly exports and smoke-tests energy conservation and AFM force/topography recovery.
+
+Run `bash scripts/test-native.sh` for the native C++ suite and `bash scripts/build-wasm.sh` to build the browser modules with Clang's wasm32 target. The GitHub Actions workflow publishes the validated WASM binaries to the development branch.
+
