@@ -55,6 +55,10 @@ jobs:
         run: node --input-type=module --check < src/microscope-instrument.js
       - name: Check microscope optics model syntax
         run: node --input-type=module --check < src/microscope-optics.mjs
+      - name: Check microscope WASM physics wrapper syntax
+        run: node --input-type=module --check < src/microscope-physics.mjs
+      - name: Test microscope electron and AFM physics wrapper
+        run: node --test tests/microscope-physics.test.mjs
       - name: Test microscope objective calibration and imaging physics
         run: node --test tests/microscope-optics.test.mjs
       - name: Test optical slide preparation workflow
@@ -88,6 +92,49 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang
       - name: Build WebAssembly modules
         run: bash scripts/build-wasm.sh
+      - name: Validate electron transport and AFM WebAssembly solvers
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          (async () => {
+            const electronModule = await WebAssembly.instantiate(fs.readFileSync('wasm/electron_transport.wasm'), {});
+            const e = electronModule.instance.exports;
+            const electronNames = ['memory','cv_electron_simulate','cv_electron_summary',
+              'cv_electron_histogram','cv_electron_tracks','cv_electron_last_error','cv_electron_engine_version'];
+            for (const name of electronNames) if (!(name in e)) throw new Error('Missing electron export: ' + name);
+            if (e.cv_electron_engine_version() !== 100) throw new Error('Unexpected electron transport version');
+            const ep = e.cv_electron_simulate(320,29,63.546,8.96,20,500,0,12345,8,400);
+            if (!ep || e.cv_electron_last_error() !== 0) throw new Error('Monte Carlo electron transport failed');
+            const es = new Float64Array(e.memory.buffer,e.cv_electron_summary(),16);
+            if (es[0] !== 320 || es[1]+es[2]+es[3] !== 320 || es[14] > 1e-7 ||
+                es[11] < 0 || es[11] > 1 || es[12] < 0 || es[12] > 1) {
+              throw new Error('Electron outcome or energy-conservation validation failed');
+            }
+            const tracks = new Float64Array(e.memory.buffer,e.cv_electron_tracks(),24*243);
+            if (tracks[0] < 2 || Math.abs(tracks[2]-20) > 1e-9) {
+              throw new Error('Electron trajectory output layout failed');
+            }
+
+            const afmModule = await WebAssembly.instantiate(fs.readFileSync('wasm/afm_interaction.wasm'), {});
+            const a = afmModule.instance.exports;
+            const afmNames = ['memory','cv_afm_height_input','cv_afm_scan','cv_afm_summary',
+              'cv_afm_output','cv_afm_last_error','cv_afm_engine_version'];
+            for (const name of afmNames) if (!(name in a)) throw new Error('Missing AFM export: ' + name);
+            if (a.cv_afm_engine_version() !== 100) throw new Error('Unexpected AFM engine version');
+            const inputPointer = a.cv_afm_height_input();
+            const heights = new Float64Array(a.memory.buffer,inputPointer,16*16);
+            for (let y=0;y<16;y++) for (let x=0;x<16;x++) heights[y*16+x] = x<8?0:20;
+            const ap = a.cv_afm_scan(16,800,8,.72,2,300,80,10,70,.23,25,1e-19,1,3,8,32);
+            if (!ap || a.cv_afm_last_error() !== 0) throw new Error('AFM force-feedback scan failed');
+            const as = new Float64Array(a.memory.buffer,a.cv_afm_summary(),12);
+            const ao = new Float64Array(a.memory.buffer,a.cv_afm_output(),16*16*6);
+            if (as[0] !== 16 || Math.abs(as[1]-3)>1e-8 || as[7] <= 0 ||
+                Math.abs(ao[(8*16+12)*6]-20)>1e-7) {
+              throw new Error('AFM contact-force or recovered-height validation failed');
+            }
+            console.log('Electron Monte Carlo energy balance and AFM contact-force/height map validation passed');
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
       - name: Validate WebAssembly modules and kinetics curve
         run: |
           node <<'NODE'
@@ -333,7 +380,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/lab04_atom_engine.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/lab04_atom_engine.wasm wasm/electron_transport.wasm wasm/afm_interaction.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -351,5 +398,7 @@ jobs:
             wasm/concentration_fit.wasm
             wasm/reaction_mechanism.wasm
             wasm/lab04_atom_engine.wasm
+            wasm/electron_transport.wasm
+            wasm/afm_interaction.wasm
           if-no-files-found: error
           retention-days: 14
