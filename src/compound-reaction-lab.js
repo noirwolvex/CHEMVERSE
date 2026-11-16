@@ -340,7 +340,10 @@ function updateDynamicEffects(value){
   if(station04Profile[2]>0){
    const crystalNames={1:'شبكة بلورية أيونية',2:'ترسيب فلزي',3:'نمو بلوري للأكسيد'};
    messages.push((crystalNames[station04Profile[2]]||'تكوّن راسب')+' / '+Math.round(growth*100)+'%');
-   if(crystalStructure)messages.push('خلية '+crystalStructure.profile[1]+' / '+crystalStructure.sites.length+' موقعاً ذرياً');
+   if(crystalStructure){
+    const spaceGroup=crystalStructure.profile[1]===62?'Pnma (62)':'Fm-3m (225)';
+    messages.push(spaceGroup+' / '+crystalStructure.sites.length+' مواقع في الخلية / 3×3×3 خلايا مرئية');
+   }
   }
   if(station04Profile[3]>0)messages.push((station04Profile[4]===1?'فقاعات ':'تحرر غاز ')+Math.round(gasRelease*100)+'%');
   const preservedBonds=mappedBonds.filter(bond=>bond.unchanged).length;
@@ -358,7 +361,7 @@ function updateAtomMappedScene(value){
   const a=mappedAtoms[bond.a]?.mesh.position,b=mappedAtoms[bond.b]?.mesh.position;if(!a||!b)return;
   const direction=new THREE.Vector3().subVectors(b,a),length=direction.length();
   bond.mesh.position.copy(a).add(b).multiplyScalar(.5);bond.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());bond.mesh.scale.y=Math.max(.001,length);
-  const fade=bond.unchanged?1:(bond.side==='reactants'?1-breaking:forming);
+  const fade=bond.unchanged?(bond.side==='reactants'?1:0):(bond.side==='reactants'?1-breaking:forming);
   bond.mesh.material.opacity=fade;bond.mesh.visible=fade>.015;
  });
  updateDynamicEffects(value);
