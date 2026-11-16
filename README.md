@@ -101,7 +101,7 @@ Build/test commands remain **bash scripts/test-native.sh** and **bash scripts/bu
 
 - The atom-map uses 4 formula units: **4AgNO3(aq) + 4NaCl(aq) → 4AgCl(s) + 4NaNO3(aq)**. Its 28 mapped atoms conserve Ag4, Cl4, Na4, N4 and O12. Na+ and nitrate remain spectator species in the aqueous phase.
 - The visual model keeps nitrate N–O connectivity as a resonance-averaged order of 4/3. Four alternating Ag+/Cl− ions form an initial square face; the other mapped ions then join a finite alternating ionic cluster. It is a small teaching nucleus, not a complete crystal lattice. Solvent water is not explicitly drawn.
-- At 25 °C, the interface uses (K_{sp}(AgCl)=1.6\times10^{-10}\,M^2). It calculates (Q_{sp}=[Ag^+][Cl^-]) from entered moles and the final mixture volume, and allows the cluster keyframes only when (Q_{sp}>K_{sp}). This gate indicates the thermodynamic precipitation condition; it does not calculate the final equilibrium mass, nucleation barrier, ion activities, or crystal-growth kinetics.
+- At 25 °C, the interface uses `Ksp(AgCl) = 1.6 × 10⁻¹⁰ M²`. It calculates `Qsp = [Ag⁺][Cl⁻]` from entered moles and the final mixture volume, and allows the cluster keyframes only when `Qsp > Ksp`. Concentrations are used as the dilute-solution approximation to activities. This gate indicates the thermodynamic precipitation condition; it does not calculate the final equilibrium mass, nucleation barrier, activity coefficients, or crystal-growth kinetics.
 - Reference: OpenStax, *Chemistry*, section 15.1, “Precipitation and Dissolution”.
 
 ## Reaction kinetics engine — v1
