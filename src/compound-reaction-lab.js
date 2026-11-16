@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
-import {loadStation04Engine,loadKineticsEngine,sampleStation04ReactionNow,simulateStation04Kinetics} from './station04-engine.mjs';
+import {loadStation04Engine,loadKineticsEngine,loadCrystalEngine,sampleStation04ReactionNow,sampleStation04RedoxNow,getCrystalStructureNow,simulateStation04Kinetics} from './station04-engine.mjs';
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomicNumbers=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.atomicNumber])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
-let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,interactionRoot=null,solidRoot=null,gasRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,electronParticles=[],protonParticles=[],solidParticles=[],gasParticles=[],station04Profile=null,station04Effects=null,station04EngineReady=false,kineticsEngineReady=false,kineticsResults=null,raf=0,playing=false,progress=0,lastTime=0;
+let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,interactionRoot=null,solidRoot=null,gasRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,electronParticles=[],electronPaths=[],electronShells=[],protonParticles=[],solidParticles=[],gasParticles=[],crystalBondMeshes=[],crystalLinkObject=null,crystalStructure=null,redoxPairs=[],station04Profile=null,station04Effects=null,station04EngineReady=false,crystalEngineReady=false,kineticsEngineReady=false,kineticsResults=null,raf=0,playing=false,progress=0,lastTime=0;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
 function buildMolecule(parent,species){
@@ -74,12 +74,17 @@ function buildAtomMappedScene(){
   mesh.scale.setScalar((atomRadii[atom.element]||.34)*.78);mesh.position.copy(atom.position);mesh.castShadow=true;atomRoot.add(mesh);
   mappedAtoms.push({mesh,element:atom.element,start:atom.position.clone(),end:right.atoms[targetIndex].position.clone()});
  });
+ const pairKey=([a,b])=>a<b?a+':'+b:b+':'+a;
+ const leftKeys=new Set(left.bonds.map(pairKey));
+ const mappedRightBonds=right.bonds.map(([a,b])=>[targetToSource[a],targetToSource[b]]);
+ const rightKeys=new Set(mappedRightBonds.map(pairKey));
  const addBonds=(pairs,side)=>pairs.forEach(([a,b])=>{
+  const key=pairKey([a,b]),unchanged=side==='reactants'?rightKeys.has(key):leftKeys.has(key);
   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1,10),new THREE.MeshStandardMaterial({color:0xb4c5c9,roughness:.34,metalness:.42,transparent:true,opacity:side==='reactants'?1:0}));
-  atomRoot.add(mesh);mappedBonds.push({mesh,a,b,side});
+  atomRoot.add(mesh);mappedBonds.push({mesh,a,b,side,unchanged});
  });
  addBonds(left.bonds,'reactants');
- addBonds(right.bonds.map(([a,b])=>[targetToSource[a],targetToSource[b]]),'products');
+ addBonds(mappedRightBonds,'products');
  atomMapReady=mappedAtoms.length===left.atoms.length;
  updateAtomMappedScene(progress);
  return atomMapReady;
@@ -90,56 +95,189 @@ function createParticle(parent,geometry,colour,opacity=1){
  const material=new THREE.MeshStandardMaterial({color:colour,emissive:colour,emissiveIntensity:.7,roughness:.28,metalness:.12,transparent:opacity<1,opacity,depthWrite:opacity>=1});
  const mesh=new THREE.Mesh(geometry,material);parent.add(mesh);return mesh;
 }
+
+function findMappedAtomsForElement(atomicNumber){
+ return mappedAtoms.map((atom,index)=>({atom,index}))
+  .filter(item=>atomicNumbers[item.atom.element]===atomicNumber)
+  .map(item=>item.index);
+}
 function findMappedAtom(atomicNumber,exclude=-1){
  return mappedAtoms.findIndex((atom,index)=>index!==exclude&&atomicNumbers[atom.element]===atomicNumber);
 }
+function chargeLabel(symbol,charge){
+ if(charge===0)return symbol+'⁰';
+ const magnitude=Math.abs(charge);
+ const superscript=magnitude===1?'¹':magnitude===2?'²':magnitude===3?'³':String(magnitude);
+ return symbol+superscript+(charge>0?'⁺':'⁻');
+}
+function buildCrystalLinks(structure){
+ crystalBondMeshes=[];crystalLinkObject=null;
+ if(!structure||!solidRoot)return;
+ const [kind,,a,b,c]=structure.profile;
+ const toWorld=site=>new THREE.Vector3(
+  site.fractional[0]*a,site.fractional[1]*b,site.fractional[2]*c
+ );
+ const physicalSites=solidParticles.map(item=>({
+  ...item,
+  position:toWorld(item.site).add(new THREE.Vector3(
+   item.cell[0]*a,item.cell[1]*b,item.cell[2]*c
+  ))
+ }));
+ if(kind===3){
+  const sulphurs=physicalSites.filter(item=>item.site.atomicNumber===16);
+  const oxygens=physicalSites.filter(item=>item.site.atomicNumber===8);
+  const points=[];
+  sulphurs.forEach(sulphur=>{
+   const nearest=oxygens.map(oxygen=>({
+    oxygen,
+    distance:sulphur.position.distanceTo(oxygen.position)
+   })).filter(item=>item.distance>1e-6&&item.distance<1.9)
+    .sort((left,right)=>left.distance-right.distance).slice(0,4);
+   nearest.forEach(({oxygen})=>{
+    const start=sulphur.mesh.position,end=oxygen.mesh.position;
+    points.push(start.x,start.y,start.z,end.x,end.y,end.z);
+   });
+  });
+  if(points.length){
+   const geometry=new THREE.BufferGeometry();
+   geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+   const lines=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({
+    color:0xe6c86f,transparent:true,opacity:.78
+   }));
+   solidRoot.add(lines);crystalLinkObject=lines;
+  }
+ }else if(kind===2){
+  const cations=physicalSites.filter(item=>item.site.role===1);
+  const anions=physicalSites.filter(item=>item.site.role===2);
+  const points=[],seen=new Set(),cutoff=Math.min(a,b,c)*.505;
+  cations.forEach(cation=>{
+   anions.map(anion=>({anion,distance:cation.position.distanceTo(anion.position)}))
+    .filter(item=>item.distance>1e-6&&item.distance<=cutoff)
+    .forEach(({anion})=>{
+     const key=[cation.mesh.id,anion.mesh.id].sort((x,y)=>x-y).join(':');
+     if(seen.has(key))return;seen.add(key);
+     const start=cation.mesh.position,end=anion.mesh.position;
+     points.push(start.x,start.y,start.z,end.x,end.y,end.z);
+    });
+  });
+  if(points.length){
+   const geometry=new THREE.BufferGeometry();
+   geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+   const lines=new THREE.LineSegments(geometry,new THREE.LineDashedMaterial({
+    color:0x9bb5c0,dashSize:.075,gapSize:.045,transparent:true,opacity:.52
+   }));
+   lines.computeLineDistances();solidRoot.add(lines);crystalLinkObject=lines;
+  }
+ }
+}
+function buildCrystalLattice(){
+ crystalParticles=[];crystalBondMeshes=[];crystalStructure=getCrystalStructureNow(reactionNumber());
+ if(!crystalStructure||!solidRoot)return false;
+ const profile=crystalStructure.profile,kind=profile[0],a=profile[2],b=profile[3],c=profile[4];
+ const cellCount=3,cellScale=3.45/Math.max(a*cellCount,b*cellCount,c*cellCount);
+ const cellOffset=new THREE.Vector3((a*cellCount*cellScale)/2,(b*cellCount*cellScale)/2,(c*cellCount*cellScale)/2);
+ const sphere=new THREE.SphereGeometry(1,16,12);
+ const colourByAtomicNumber={1:0xeaf0f4,6:0x59646d,8:0xe45c54,12:0x58b9ad,16:0xe1b342,17:0x76bd76,20:0x68a8d7,26:0xc38a52,29:0xd58a4a,30:0x8ca6ac,47:0xc8d1d9,56:0xa6b1bf};
+ const radiusByAtomicNumber={8:.10,12:.145,16:.105,17:.14,20:.155,29:.145,47:.15,56:.18};
+ const maxCell=(cellCount-1)*1.5;
+ for(let cx=0;cx<cellCount;cx++)for(let cy=0;cy<cellCount;cy++)for(let cz=0;cz<cellCount;cz++){
+  const layer=Math.abs(cx-1)+Math.abs(cy-1)+Math.abs(cz-1);
+  for(const site of crystalStructure.sites){
+   const atomicNumber=site.atomicNumber,colour=colourByAtomicNumber[atomicNumber]??0xb5c2c0;
+   const material=new THREE.MeshStandardMaterial({
+    color:colour,roughness:atomicNumber===29?.23:.34,
+    metalness:atomicNumber===29?.68:.16,emissive:colour,emissiveIntensity:.045
+   });
+   const mesh=new THREE.Mesh(sphere,material);
+   const position=new THREE.Vector3(
+    (cx+site.fractional[0])*a*cellScale-cellOffset.x+.35,
+    (cy+site.fractional[1])*b*cellScale-cellOffset.y+.62,
+    (cz+site.fractional[2])*c*cellScale-cellOffset.z
+   );
+   mesh.position.copy(position);
+   const radius=(radiusByAtomicNumber[atomicNumber]??.12)*(kind===3?1:.9);
+   mesh.scale.setScalar(radius);mesh.castShadow=true;solidRoot.add(mesh);
+   crystalParticles.push({
+    mesh,site,cell:[cx,cy,cz],layer,
+    baseRadius:radius,
+    physicalPosition:new THREE.Vector3(
+     (cx+site.fractional[0])*a,
+     (cy+site.fractional[1])*b,
+     (cz+site.fractional[2])*c
+    )
+   });
+  }
+ }
+ buildCrystalLinks(crystalStructure);
+ return crystalParticles.length>0;
+}
+function createDynamicGasParticles(){
+ if(station04Profile[3]<=0)return;
+ const gasColour=station04Profile[3]===1?0xa9d9ee:(station04Profile[3]===3?0xb9e7e9:0xd5e0e7);
+ for(let i=0;i<24;i++){
+  const particle=createParticle(gasRoot,new THREE.SphereGeometry(.105+(i%3)*.018,14,10),gasColour,.72);
+  particle.userData.phase=i/24;particle.userData.seed=i;gasParticles.push(particle);
+ }
+}
 function configureDynamicEffects(){
  [interactionRoot,solidRoot,gasRoot].forEach(root=>{if(root)disposeGroup(root)});
- electronParticles=[];protonParticles=[];solidParticles=[];gasParticles=[];
+ electronParticles=[];electronPaths=[];electronShells=[];protonParticles=[];solidParticles=[];gasParticles=[];crystalBondMeshes=[];
+ crystalStructure=null;crystalLinkObject=null;redoxPairs=sampleStation04RedoxNow(reactionNumber());
  const sample=sampleStation04ReactionNow(reactionNumber(),progress);
  station04Profile=sample?.profile??null;station04Effects=sample?.effects??null;
  if(!station04Profile||!interactionRoot||!solidRoot||!gasRoot)return;
- const electronCount=Math.min(6,Math.max(0,Math.round(station04Profile[0])));
+ const electronCount=Math.min(8,Math.max(0,Math.round(station04Profile[0])));
  const protonCount=Math.min(3,Math.max(0,Math.round(station04Profile[1])));
- for(let i=0;i<electronCount;i++){
-  electronParticles.push(createParticle(interactionRoot,new THREE.SphereGeometry(.095,16,12),0x8bcfff,1));
+ const redox=redoxPairs[0];
+ if(redox&&electronCount>0){
+  const donors=findMappedAtomsForElement(redox[0]),acceptors=findMappedAtomsForElement(redox[4]);
+  const donorCount=Math.min(donors.length,Math.round(redox[3]));
+  const acceptorCount=Math.min(acceptors.length,Math.round(redox[7]));
+  for(let i=0;i<electronCount;i++){
+   const donorIndex=donors[Math.min(donorCount-1,Math.floor(i*donorCount/electronCount))];
+   const acceptorIndex=acceptors[Math.min(acceptorCount-1,Math.floor(i*acceptorCount/electronCount))];
+   if(donorIndex===undefined||acceptorIndex===undefined)continue;
+   const particle=createParticle(interactionRoot,new THREE.SphereGeometry(.075,14,10),0x8bcfff,1);
+   electronParticles.push(particle);
+   electronPaths.push({particle,donorIndex,acceptorIndex,index:i});
+  }
+  const shellIndices=[...new Set([...donors.slice(0,donorCount),...acceptors.slice(0,acceptorCount)])];
+  shellIndices.forEach((atomIndex,index)=>{
+   const ring=new THREE.Mesh(new THREE.TorusGeometry(.31,.008,6,32),
+    new THREE.MeshBasicMaterial({color:index<donorCount?0xe6b76b:0x83d6ef,transparent:true,opacity:.36}));
+   interactionRoot.add(ring);electronShells.push({mesh:ring,atomIndex});
+  });
  }
  for(let i=0;i<protonCount;i++){
   protonParticles.push(createParticle(interactionRoot,new THREE.SphereGeometry(.13,18,14),0xffc879,1));
  }
- if(station04Profile[2]>0){
-  const colour=station04Profile[2]===2?0xc8844b:(reactionNumber()===5?0xe8e7dc:0xe5ebed);
-  for(let i=0;i<72;i++){
-   const geometry=station04Profile[2]===2?new THREE.SphereGeometry(.105,12,10):new THREE.OctahedronGeometry(.105,0);
-   const particle=createParticle(solidRoot,geometry,colour,.92);
-   const angle=i*2.3999632297,radius=.08+.032*Math.sqrt(i);
-   particle.userData.clusterPosition=new THREE.Vector3(Math.cos(angle)*radius,.10+(i%5)*.075,Math.sin(angle)*radius);
-   particle.scale.setScalar(.001);solidParticles.push(particle);
-  }
- }
- if(station04Profile[3]>0){
-  const gasColour=station04Profile[3]===1?0xa9d9ee:(station04Profile[3]===3?0xb9e7e9:0xd5e0e7);
-  for(let i=0;i<24;i++){
-   const particle=createParticle(gasRoot,new THREE.SphereGeometry(.105+(i%3)*.018,14,10),gasColour,.72);
-   particle.userData.phase=i/24;particle.userData.seed=i;gasParticles.push(particle);
-  }
- }
+ if(station04Profile[2]>0&&crystalEngineReady)buildCrystalLattice();
+ createDynamicGasParticles();
 }
+
 function updateDynamicEffects(value){
  if(!station04Profile||!station04Effects)return;
  const electronProgress=station04Effects[0],protonProgress=station04Effects[1];
- const electronStartIndex=findMappedAtom(station04Profile[5]);
- const electronEndIndex=findMappedAtom(station04Profile[6],electronStartIndex);
- if(electronStartIndex>=0&&electronEndIndex>=0){
-  const start=mappedAtoms[electronStartIndex].mesh.position,end=mappedAtoms[electronEndIndex].mesh.position;
-  electronParticles.forEach((particle,index)=>{
-   const phase=clamp(electronProgress*1.08-index*.035,0,1);
-   particle.position.lerpVectors(start,end,phase);
-   particle.position.y+=Math.sin(phase*Math.PI)*(.28+index*.045);
-   particle.position.x+=Math.sin(index*2.1)*.06;
-   particle.visible=electronProgress>.005;
-  });
- }
+ electronPaths.forEach(path=>{
+  const startAtom=mappedAtoms[path.donorIndex]?.mesh.position,endAtom=mappedAtoms[path.acceptorIndex]?.mesh.position;
+  if(!startAtom||!endAtom)return;
+  const phase=clamp(electronProgress*1.08-path.index*.012,0,1);
+  const direction=new THREE.Vector3().subVectors(endAtom,startAtom);
+  const normal=direction.clone().cross(new THREE.Vector3(0,0,1));
+  if(normal.lengthSq()<1e-6)normal.set(0,1,0);
+  normal.normalize();
+  const start=startAtom.clone().addScaledVector(normal,.24);
+  const end=endAtom.clone().addScaledVector(normal,.24);
+  path.particle.position.copy(start.lerp(end,phase));
+  path.particle.position.addScaledVector(normal,Math.sin(phase*Math.PI)*(.24+path.index*.025));
+  path.particle.visible=electronProgress>.005;
+ });
+ electronShells.forEach(shell=>{
+  const atom=mappedAtoms[shell.atomIndex];
+  if(!atom)return;
+  shell.mesh.position.copy(atom.mesh.position);
+  shell.mesh.material.opacity=.34*(1-electronProgress*.18);
+ });
  const hydrogenIndex=findMappedAtom(1),oxygenIndex=findMappedAtom(8,hydrogenIndex);
  if(hydrogenIndex>=0&&oxygenIndex>=0){
   const start=mappedAtoms[hydrogenIndex].mesh.position,end=mappedAtoms[oxygenIndex].mesh.position;
@@ -151,13 +289,21 @@ function updateDynamicEffects(value){
   });
  }
  const nucleation=station04Effects[4],growth=station04Effects[5];
- solidParticles.forEach((particle,index)=>{
-  const base=particle.userData.clusterPosition;
-  const scale=(.12+.88*growth)*(.35+.65*nucleation);
-  particle.position.set((station04Profile[2]===2?-2.15:.35)+base.x,base.y*scale,base.z);
-  particle.scale.setScalar(Math.max(.001,scale*(.45+(index%4)*.14)));
-  particle.visible=nucleation>.01;
+ const layerThreshold=.45+3.2*growth;
+ solidParticles.forEach(item=>{
+  const visible=nucleation>.01&&item.layer<=layerThreshold;
+  const scale=visible?item.baseRadius*(.58+.42*clamp(nucleation*1.1,0,1)):.001;
+  item.mesh.scale.setScalar(scale);item.mesh.visible=visible;
  });
+ if(crystalLinkObject){
+  crystalLinkObject.visible=nucleation>.01;
+  crystalLinkObject.material.opacity=crystalStructure?.profile?.[0]===3?.78:.46;
+ }
+ crystalBondMeshes.forEach(bond=>{
+  const visible=nucleation>.01&&bond.layer<=layerThreshold;
+  bond.mesh.visible=visible;bond.mesh.material.opacity=visible?.76:0;
+ });
+
  const gasNucleation=station04Effects[6],gasRelease=station04Effects[7];
  gasParticles.forEach(particle=>{
   const phase=(value*2.65+particle.userData.phase)%1;
@@ -173,13 +319,25 @@ function updateDynamicEffects(value){
  const readout=byId('reaction-effect-readout');
  if(readout){
   const messages=[];
-  if(station04Profile[0]>0)messages.push('e⁻ '+station04Profile[0]+' / '+Math.round(electronProgress*100)+'%');
-  if(station04Profile[1]>0)messages.push('H⁺ '+Math.round(protonProgress*100)+'%');
-  if(station04Profile[2]>0)messages.push((station04Profile[2]===2?'ترسيب فلزي ':'تكوّن راسب ')+Math.round(growth*100)+'%');
+  if(redoxPairs.length){
+   const pair=redoxPairs[0],donorSymbol=Object.keys(atomicNumbers).find(symbol=>atomicNumbers[symbol]===pair[0])||'X';
+   const acceptorSymbol=Object.keys(atomicNumbers).find(symbol=>atomicNumbers[symbol]===pair[4])||'X';
+   messages.push(chargeLabel(donorSymbol,pair[1])+' → '+chargeLabel(donorSymbol,pair[2])+' ×'+pair[3]);
+   messages.push(chargeLabel(acceptorSymbol,pair[5])+' → '+chargeLabel(acceptorSymbol,pair[6])+' ×'+pair[7]);
+   messages.push(pair[8]+'e⁻');
+   messages.push('نقل إلكترونات بين مواقع ذرية محددة');
+  }else if(station04Profile[0]>0)messages.push('e⁻ '+station04Profile[0]+' / '+Math.round(electronProgress*100)+'%');
+  if(station04Profile[1]>0)messages.push('انتقال بروتون / '+Math.round(protonProgress*100)+'%');
+  if(station04Profile[2]>0){
+   const crystalNames={1:'شبكة بلورية أيونية',2:'ترسيب فلزي',3:'نمو بلوري للأكسيد'};
+   messages.push((crystalNames[station04Profile[2]]||'تكوّن راسب')+' / '+Math.round(growth*100)+'%');
+   if(crystalStructure)messages.push('خلية '+crystalStructure.profile[1]+' / '+crystalStructure.sites.length+' موقعاً ذرياً');
+  }
   if(station04Profile[3]>0)messages.push((station04Profile[4]===1?'فقاعات ':'تحرر غاز ')+Math.round(gasRelease*100)+'%');
   readout.textContent=messages.length?messages.join('  ·  '):'تغيّر الروابط / حفظ الذرات';
  }
 }
+
 function updateAtomMappedScene(value){
  if(!atomMapReady)return;
  const p=smooth(value),breaking=station04Effects?.[2]??smooth((value-.20)/.38),forming=station04Effects?.[3]??smooth((value-.52)/.40);
@@ -188,7 +346,7 @@ function updateAtomMappedScene(value){
   const a=mappedAtoms[bond.a]?.mesh.position,b=mappedAtoms[bond.b]?.mesh.position;if(!a||!b)return;
   const direction=new THREE.Vector3().subVectors(b,a),length=direction.length();
   bond.mesh.position.copy(a).add(b).multiplyScalar(.5);bond.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());bond.mesh.scale.y=Math.max(.001,length);
-  const fade=bond.side==='reactants'?1-breaking:forming;
+  const fade=bond.unchanged?1:(bond.side==='reactants'?1-breaking:forming);
   bond.mesh.material.opacity=fade;bond.mesh.visible=fade>.015;
  });
  updateDynamicEffects(value);
