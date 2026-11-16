@@ -43,6 +43,8 @@ jobs:
         run: node --input-type=module --check < src/simulation.js
       - name: Check compounds and reactions lab JavaScript syntax
         run: node --input-type=module --check < src/compound-reaction-lab.js
+      - name: Check Station 04 C++ WebAssembly bridge syntax
+        run: node --input-type=module --check < src/station04-engine.mjs
       - name: Test compounds, equations, atom conservation and stoichiometry
         run: node --test tests/compound-reactions.test.mjs
       - name: Check microscope UI JavaScript syntax
