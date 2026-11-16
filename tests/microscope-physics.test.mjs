@@ -28,7 +28,7 @@ function makeElectronEngine(){
    histogram[2]=10;
    tracks[0]=2;tracks[1]=1;tracks[2]=energy;
    tracks[3]=0;tracks[4]=0;tracks[5]=0;tracks[6]=energy;tracks[7]=0;
-   tracks[8]=2;tracks[9]=0;tracks[10]=1;tracks[11]=thickness*.25;tracks[12]=energy*.8;tracks[13]=2;
+   tracks[8]=2;tracks[9]=0;tracks[10]=thickness*.25;tracks[11]=energy*.8;tracks[12]=2;
    return summaryPointer;
   }
  };
@@ -101,6 +101,7 @@ test('electron wrapper decodes Monte Carlo summary, histogram and tracks from WA
  assert.equal(result.trajectories.length,1);
  assert.equal(result.trajectories[0].points.length,2);
  assert.equal(result.trajectories[0].points[1].depthNm,125);
+ assert.equal(result.trajectories[0].points[1].energyKeV,16);
  assert.equal(result.histogram[2],10);
 });
 test('electron wrapper rejects unsupported imaging modes',()=>{
