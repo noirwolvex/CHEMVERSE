@@ -273,7 +273,9 @@ extern "C" int cv_afm_scan_advance(int max_pixels){
  if(!scan_active){last_error=ERR_INVALID;return -1;}
  last_error=0;
  const int total=scan_parameters.grid_size*scan_parameters.grid_size;
- const int stop=scan_progress+max_pixels<total?scan_progress+max_pixels:total;
+ const int remaining=total-scan_progress;
+ const int step=max_pixels<remaining?max_pixels:remaining;
+ const int stop=scan_progress+step;
  const double frequency_hz=scan_parameters.resonance_frequency_khz*1000.0;
  const double target_amplitude=scan_parameters.free_amplitude_nm*
    scan_parameters.amplitude_setpoint_ratio;
