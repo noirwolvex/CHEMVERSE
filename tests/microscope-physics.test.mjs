@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {getMicroscopeSample} from '../src/microscope-samples.mjs';
 import {
  getElectronMaterial,getElectronRunDefaults,generateAFMSurface,
- runElectronTransport,runAFMInteraction,MICROSCOPE_PHYSICS_LAYOUT
+ runElectronTransport,startAFMInteraction,advanceAFMInteraction,runAFMInteraction,MICROSCOPE_PHYSICS_LAYOUT
 } from '../src/microscope-physics.mjs';
 
 function makeElectronEngine(){
@@ -45,25 +45,37 @@ function makeAfmEngine(){
  const inputPointer=0,summaryPointer=8000,outputPointer=8200;
  const summary=new Float64Array(memory.buffer,summaryPointer,12);
  const output=new Float64Array(memory.buffer,outputPointer,96*96*6);
+ let gridSize=0,cursor=0,mode=0,amplitude=8,setpoint=.72;
+ const begin=(grid,width,freeAmplitude,ratio,spring,freq,q,radius,young,poisson,adhesion,hamaker,scanMode,force,cycles,steps,tipGeometry,tipAngle)=>{
+  gridSize=grid;cursor=0;mode=scanMode;amplitude=freeAmplitude;setpoint=ratio;
+  output.fill(0);summary.fill(0);summary[0]=grid;
+  return outputPointer;
+ };
+ const advance=maxPixels=>{
+  const total=gridSize*gridSize,start=cursor;
+  cursor=Math.min(total,cursor+Math.max(1,Math.round(maxPixels)));
+  const input=new Float64Array(memory.buffer,inputPointer,total);
+  for(let i=start;i<cursor;i++){
+   const p=i*6;output[p]=input[i];output[p+1]=.2;output[p+2]=2;
+   output[p+3]=amplitude*setpoint;output[p+4]=12;output[p+5]=4;
+  }
+  summary[0]=gridSize;summary[1]=2;summary[2]=4;summary[3]=.2;
+  summary[4]=1;summary[5]=amplitude*setpoint;summary[6]=setpoint;
+  summary[7]=.15;summary[8]=4;summary[9]=.01;summary[10]=.8;summary[11]=mode;
+  return cursor;
+ };
  return {
   memory,
-  cv_afm_engine_version:()=>110,
+  cv_afm_engine_version:()=>120,
   cv_afm_last_error:()=>0,
   cv_afm_height_input:()=>inputPointer,
   cv_afm_summary:()=>summaryPointer,
   cv_afm_output:()=>outputPointer,
-  cv_afm_scan(grid,width,amplitude,setpoint,spring,freq,q,radius,young,poisson,adhesion,hamaker,mode,force,cycles,steps,tipGeometry,tipAngle){
-   const count=grid*grid,input=new Float64Array(memory.buffer,inputPointer,count);
-   output.fill(0);summary.fill(0);
-   summary[0]=grid;summary[1]=2;summary[2]=4;summary[3]=.2;
-   summary[4]=1;summary[5]=amplitude*setpoint;summary[6]=setpoint;
-   summary[7]=.15;summary[8]=4;summary[9]=.01;summary[10]=.8;summary[11]=mode;
-   for(let i=0;i<count;i++){
-    const p=i*6;output[p]=input[i];output[p+1]=.2;output[p+2]=2;
-    output[p+3]=amplitude*setpoint;output[p+4]=12;output[p+5]=4;
-   }
-   return outputPointer;
-  }
+  cv_afm_scan_begin:begin,
+  cv_afm_scan_advance:advance,
+  cv_afm_scan_progress:()=>cursor,
+  cv_afm_scan_complete:()=>cursor===gridSize*gridSize?1:0,
+  cv_afm_scan(...args){begin(...args);advance(gridSize*gridSize);return outputPointer}
  };
 }
 
@@ -138,6 +150,23 @@ test('AFM wrapper writes a physical height map and returns force, deflection and
  assert.equal(result.material.poisson,.32);
  assert.equal(result.material.adhesion,28);
 });
+test('AFM wrapper reveals computed rows incrementally and completes the raster session',()=>{
+ const session=startAFMInteraction({afm:makeAfmEngine()},{
+  sample:getMicroscopeSample('cellulose-fibres'),scanWidthNm:2000,gridSize:8,
+  mode:'tapping',tipGeometry:'cone',seed:26
+ });
+ assert.equal(session.result.scannedPixels,0);
+ assert.equal(session.result.scanComplete,false);
+ const first=advanceAFMInteraction(session,13);
+ assert.equal(first.scannedPixels,13);
+ assert.equal(first.scanComplete,false);
+ assert.equal(first.peakForceNn[12],2);
+ assert.equal(first.peakForceNn[13],0);
+ const complete=advanceAFMInteraction(session,100);
+ assert.equal(complete.scannedPixels,64);
+ assert.equal(complete.scanComplete,true);
+ assert.equal(complete.topographyNm.length,64);
+});
 test('AFM wrapper rejects an invalid operation mode',()=>{
  assert.throws(()=>runAFMInteraction({afm:makeAfmEngine()},{
   sample:getMicroscopeSample('cellulose-fibres'),mode:'sem'
@@ -148,5 +177,6 @@ test('physics memory layouts remain fixed for C++ and JavaScript ABI compatibili
  assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.maxSecondaryTracks,24);
  assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.trackStride,243);
  assert.equal(MICROSCOPE_PHYSICS_LAYOUT.afm.outputFields,6);
+ assert.equal(MICROSCOPE_PHYSICS_LAYOUT.afm.incrementalScan,true);
  assert.deepEqual(MICROSCOPE_PHYSICS_LAYOUT.afm.tipGeometries,['sphere','cone','pyramid']);
 });
