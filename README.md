@@ -97,6 +97,28 @@ The engine is intentionally described as an **atom-mapped, keyframed reaction-co
 
 Build/test commands remain **bash scripts/test-native.sh** and **bash scripts/build-wasm.sh**.
 
+## Microscope Lab 03 — electron transport and AFM interaction engines
+
+The microscope page includes two separate C++17 engines compiled to WebAssembly. The workbench loads them when SEM/TEM or AFM mode is selected.
+
+### SEM / TEM electron transport
+
+- `cpp/electron_transport.cpp` uses a seeded Monte Carlo history for each primary electron. It samples screened-Rutherford-like elastic angular scattering, a continuous energy-loss approximation based on the Kanaya–Okayama projected range, and a simplified near-surface secondary-electron escape event.
+- The run reports backscattered, transmitted and absorbed primary counts; secondary yield; depth-binned deposited energy; selected trajectory histories; and an energy-closure residual. Tests cover reproducibility, material trends, thickness/energy trends and energy conservation.
+- Default examples are 15 keV / 500 nm for SEM and 200 keV / 80 nm for TEM. Controls let the user change energy, thickness, primary count and beam tilt. Material values in `src/microscope-physics.mjs` are homogeneous effective inputs for teaching comparisons.
+- This is not a full electron-cascade or detector simulation. It does not solve detailed dielectric response, plasmon/phonon transport, electron-wave coherence, charging, column optics or detector geometry. Secondary electrons are counted and assigned energy; a full secondary cascade is not tracked. Displayed trajectories are selected primary histories, not captured micrographs.
+
+### AFM tip–sample interaction
+
+- `cpp/afm_interaction.cpp` integrates a driven, damped single-cantilever oscillator in tapping mode. A per-pixel amplitude-feedback loop adjusts the piezo position; the solver returns topography, cantilever deflection, peak interaction force, oscillation amplitude and phase.
+- The interaction model combines a softened non-contact van der Waals attraction with DMT/Hertz contact repulsion and adhesion. Contact mode solves an approximate Hertz/DMT indentation for a requested force setpoint.
+- The browser builds a deterministic height field from the selected specimen dimensions and scan width, uploads it to WASM, and displays recovered topography or signal channels. The separate tip-trace view animates the cantilever over the solved sample profile.
+- This is a single-asperity continuum teaching model, not atomistic AFM. It assumes effective homogeneous Young's modulus, Poisson ratio, Hamaker constant and tip radius. It omits full 3-D viscoelasticity, multiple cantilever modes, lateral friction, thermal noise, feedback electronics, tip wear, chemical bonding and sample damage.
+
+### Rebuild and verify
+
+Run `bash scripts/test-native.sh` for the native C++ suite and `bash scripts/build-wasm.sh` to build all WebAssembly modules. GitHub Actions validates electron energy balance and AFM force/topography outputs, then publishes `wasm/electron_transport.wasm` and `wasm/afm_interaction.wasm` to the development branch. The microscope browser loader expects both files under `./wasm/`.
+
 ## AgCl precipitation — Lab 04 atom-resolved stage
 
 - The atom-map uses 4 formula units: **4AgNO3(aq) + 4NaCl(aq) → 4AgCl(s) + 4NaNO3(aq)**. Its 28 mapped atoms conserve Ag4, Cl4, Na4, N4 and O12. Na+ and nitrate remain spectator species in the aqueous phase.
