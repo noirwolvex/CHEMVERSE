@@ -262,7 +262,7 @@ function updateKineticsAvailability(){
  button.disabled=!kineticsEngineReady||!supported||!valid;
  if(!supported)txt('kinetics-status','المحرك الحالي يتطلب متفاعلين مائيين بمعامل ستوكيومتري 1:1؛ هذا الشرط غير متحقق للتفاعل المحدد.');
  else if(!kineticsEngineReady)txt('kinetics-status','محرك الحركية C++ / WebAssembly غير متاح حالياً.');
- else if(!valid)txt('kinetics-status','أدخل الحجم والحرارة وثابت السرعة والرتبتين. طاقة التنشيط اختيارية إذا لم يتوفر لها مصدر موثوق.');
+ else if(!valid)txt('kinetics-status','أدخل الحجم والحرارة وثابت السرعة والرتبتين ومرجع البيانات. طاقة التنشيط اختيارية، لكن لا تدخلها إلا من مصدر موثوق.');
  else txt('kinetics-status','البيانات مكتملة. سيستخدم المحرك القيم المدخلة فقط ولن يستنتج ثوابت من المعادلة.');
 }
 function drawKineticsChart(rows,volumeMl){
