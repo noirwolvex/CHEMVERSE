@@ -37,3 +37,7 @@
 .reaction-effect-readout{position:absolute;z-index:4;top:12px;left:12px;max-width:min(78%,440px);padding:7px 10px;border:1px solid rgba(118,194,183,.22);border-radius:8px;background:rgba(5,15,22,.76);color:#bde9dc;font-size:10px;line-height:1.6;direction:rtl;pointer-events:none;backdrop-filter:blur(8px)}
 
 .kinetics-source-field{grid-column:1/-1}.kinetics-summary{overflow-wrap:anywhere}
+
+/* Station 04: explicit bond multiplicity and animated geometric bond length */
+.bond-order-readout{position:absolute;z-index:4;top:72px;left:12px;max-width:min(86%,520px);padding:7px 10px;border:1px solid rgba(139,190,220,.22);border-radius:8px;background:rgba(5,15,22,.78);color:#d0e6f2;font-size:9px;line-height:1.65;direction:rtl;pointer-events:none;backdrop-filter:blur(8px);font-variant-numeric:tabular-nums}
+@media(max-width:520px){.bond-order-readout{top:70px;max-width:calc(100% - 24px);font-size:8px;padding:6px 8px}}
