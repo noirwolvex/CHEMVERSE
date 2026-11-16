@@ -29,4 +29,9 @@ MECHANISM_OUT="$OUT_DIR/chemverse-reaction-mechanism-test"
   "$ROOT/cpp/reaction_mechanism.cpp" "$ROOT/tests/reaction_mechanism_test.cpp" -o "$MECHANISM_OUT"
 "$MECHANISM_OUT"
 
-rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT"
+STATION04_OUT="$OUT_DIR/chemverse-station04-engine-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/station04_engine.cpp" "$ROOT/tests/station04_engine_test.cpp" -o "$STATION04_OUT"
+"$STATION04_OUT"
+
+rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$STATION04_OUT"
