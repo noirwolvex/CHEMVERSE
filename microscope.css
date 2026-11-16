@@ -98,3 +98,11 @@
  .afm-map-heading{align-items:flex-start;flex-direction:column}
  .afm-material-properties{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Live AFM raster-scan status and incremental probe feedback. */
+.afm-scan-progress{display:grid;grid-template-columns:auto minmax(90px,1fr) auto;align-items:center;gap:12px;margin:10px 2px 5px;padding:9px 11px;border:1px solid rgba(139,206,194,.14);border-radius:5px;background:rgba(5,18,26,.46)}
+.afm-scan-progress>span{color:#78a49b;font:700 7px "Space Grotesk";letter-spacing:.11em}
+.afm-scan-progress progress{width:100%;height:6px;accent-color:#83d7c2}
+.afm-scan-progress>b{color:#c2e8dc;font:600 8px "Space Grotesk";text-align:right;white-space:nowrap}
+@media(max-width:680px){.afm-scan-progress{grid-template-columns:1fr auto;gap:7px}.afm-scan-progress>span{grid-column:1/-1}}
