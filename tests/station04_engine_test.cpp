@@ -25,21 +25,33 @@ int main() {
   }
 
   const double *mg = cv_s04_profile(2);
-  assert(mg[0] == 4 && mg[5] == 12 && mg[6] == 8);
+  assert(mg[0] == 4 && mg[2] == CV_S04_SOLID_CRYSTAL_PRODUCT && mg[5] == 12 && mg[6] == 8);
+  assert(cv_s04_redox_pair_count(2) == 1);
+  const double *mgPair = cv_s04_redox_pair(2, 0);
+  assert(mgPair[0] == 12 && mgPair[2] == 2 && mgPair[3] == 2);
+  assert(mgPair[4] == 8 && mgPair[6] == -2 && mgPair[7] == 2 && mgPair[8] == 4);
   const double *iron = cv_s04_profile(4);
   assert(iron[0] == 2 && iron[2] == CV_S04_SOLID_METAL_DEPOSITION);
+  const double *ironPair = cv_s04_redox_pair(4, 0);
+  assert(ironPair[0] == 26 && ironPair[2] == 2 && ironPair[4] == 29 && ironPair[5] == 2 && ironPair[6] == 0 && ironPair[8] == 2);
   assert(iron[5] == 26 && iron[6] == 29);
 
+  assert(cv_s04_redox_pair_count(1) == 0);
+  assert(cv_s04_redox_pair(4, 1) == nullptr);
   const double *acid = cv_s04_profile(6);
   assert(acid[0] == 0 && acid[1] == 1);
   const double *zinc = cv_s04_profile(11);
   assert(zinc[0] == 2 && zinc[3] == CV_S04_GAS_H2);
+  const double *zincPair = cv_s04_redox_pair(11, 0);
+  assert(zincPair[0] == 30 && zincPair[2] == 2 && zincPair[4] == 1 && zincPair[5] == 1 && zincPair[6] == 0 && zincPair[7] == 2 && zincPair[8] == 2);
   assert(zinc[4] == CV_S04_GAS_BUBBLES);
 
   const double *silver = cv_s04_profile(5);
   const double *barium = cv_s04_profile(12);
   assert(silver[2] == CV_S04_SOLID_IONIC_PRECIPITATE);
   assert(barium[2] == CV_S04_SOLID_IONIC_PRECIPITATE);
+  const double *calciumOxide = cv_s04_profile(8);
+  assert(calciumOxide[2] == CV_S04_SOLID_CRYSTAL_PRODUCT);
 
   const double *precipitation = cv_s04_effects(5, 0.90);
   assert(precipitation[4] > 0.99 && precipitation[5] > 0.80);
