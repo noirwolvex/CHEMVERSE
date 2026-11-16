@@ -159,7 +159,7 @@ jobs:
             }
             const stagedSummary = new Float64Array(a.memory.buffer,a.cv_afm_summary(),12);
             if (Math.abs(stagedSummary[1]-3)>1e-8 ||
-                Math.abs(stagedSummary[4]-stagedSummary[4])>1e-9) {
+                !Number.isFinite(stagedSummary[4])) {
               throw new Error('AFM incremental summary values are invalid');
             }
             console.log('Electron Monte Carlo energy balance and AFM contact-force/height map validation passed');
