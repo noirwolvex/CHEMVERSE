@@ -34,4 +34,14 @@ MECHANISM_OUT="$OUT_DIR/chemverse-reaction-mechanism-test"
   "$ROOT/cpp/reaction_mechanism.cpp" "$ROOT/tests/reaction_mechanism_test.cpp" -o "$MECHANISM_OUT"
 "$MECHANISM_OUT"
 
-rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$LAB04_ATOM_OUT"
+ELECTRON_OUT="$OUT_DIR/chemverse-electron-transport-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/electron_transport.cpp" "$ROOT/tests/electron_transport_test.cpp" -o "$ELECTRON_OUT"
+"$ELECTRON_OUT"
+
+AFM_OUT="$OUT_DIR/chemverse-afm-interaction-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/afm_interaction.cpp" "$ROOT/tests/afm_interaction_test.cpp" -o "$AFM_OUT"
+"$AFM_OUT"
+
+rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$LAB04_ATOM_OUT" "$ELECTRON_OUT" "$AFM_OUT"
