@@ -227,7 +227,9 @@ extern "C" const double *cv_afm_scan(
     contact_cells++;
    }
    const int offset=index*CV_AFM_OUTPUT_FIELDS;
-   output[offset]=stage_z;
+   const double measured_topography=scan_mode==1?
+     stage_z+indentation+deflection:stage_z;
+   output[offset]=measured_topography;
    output[offset+1]=deflection;
    output[offset+2]=peak_force;
    output[offset+3]=measured_amplitude;
@@ -235,7 +237,7 @@ extern "C" const double *cv_afm_scan(
    output[offset+5]=static_cast<double>(feedback_iterations);
    total_force+=peak_force;max_force=maxv(max_force,peak_force);
    total_deflection+=deflection;total_amplitude+=measured_amplitude;
-   total_topography+=stage_z;max_indent=maxv(max_indent,indentation);
+   total_topography+=measured_topography;max_indent=maxv(max_indent,indentation);
    feedback_total+=feedback_iterations;
    if(scan_mode==0&&peak_force>0.0)contact_cells++;
    previous_stage_z=stage_z+(scan_mode==0?free_amplitude_nm*.96:0.0);
