@@ -103,5 +103,79 @@ int main() {
   }
   assert(cv_lab04_atom_engine_validate() == 0);
 
+  /* Reconfigure the same C++ engine for the 28-atom, 24-bond AgCl model. */
+  assert(cv_lab04_atom_engine_configure(28, 24) == 1);
+  atoms = cv_lab04_atom_engine_atom_input();
+  const int agcl_atomic_numbers[28] = {
+    47,47,47,47, 17,17,17,17,
+    7,8,8,8, 7,8,8,8, 7,8,8,8, 7,8,8,8,
+    11,11,11,11
+  };
+  for (int atom = 0; atom < 28; ++atom) {
+    const int offset = atom * CV_LAB04_ATOM_INPUT_FIELDS;
+    atoms[offset] = agcl_atomic_numbers[atom];
+    atoms[offset + 1] = 3001 + atom;
+    for (int axis = 0; axis < 9; ++axis) {
+      const double coordinate = static_cast<double>((atom % 7) - 3) * 0.35 +
+                                static_cast<double>(axis % 3) * 0.12;
+      atoms[offset + 2 + axis] = coordinate;
+    }
+  }
+
+  bonds = cv_lab04_atom_engine_bond_input();
+  int bond_index = 0;
+  for (int group = 0; group < 4; ++group) {
+    const int nitrogen = 8 + group * 4;
+    for (int oxygen = 1; oxygen <= 3; ++oxygen) {
+      const int offset = bond_index * CV_LAB04_BOND_INPUT_FIELDS;
+      bonds[offset] = nitrogen;
+      bonds[offset + 1] = nitrogen + oxygen;
+      bonds[offset + 2] = 0;
+      bonds[offset + 3] = 4.0 / 3.0;
+      bonds[offset + 4] = 4.0 / 3.0;
+      bonds[offset + 5] = 4.0 / 3.0;
+      ++bond_index;
+    }
+  }
+  const int vertex_to_atom[8] = {0,4,5,1,6,2,3,7};
+  const int cube_edges[12][2] = {
+    {0,1},{0,2},{0,4},{3,1},{3,2},{3,7},
+    {5,1},{5,4},{5,7},{6,2},{6,4},{6,7}
+  };
+  for (int edge = 0; edge < 12; ++edge) {
+    const int offset = bond_index * CV_LAB04_BOND_INPUT_FIELDS;
+    bonds[offset] = vertex_to_atom[cube_edges[edge][0]];
+    bonds[offset + 1] = vertex_to_atom[cube_edges[edge][1]];
+    bonds[offset + 2] = 1;
+    bonds[offset + 3] = 0.0;
+    bonds[offset + 4] = edge < 4 ? 1.0 : 0.0;
+    bonds[offset + 5] = 1.0;
+    ++bond_index;
+  }
+  assert(bond_index == 24);
+  assert(cv_lab04_atom_engine_validate() == 1);
+  const int agcl_bond_offset = 28 * CV_LAB04_ATOM_OUTPUT_FIELDS;
+  const double *dissolved = cv_lab04_atom_engine_sample(0.0);
+  for (int bond = 12; bond < 24; ++bond) {
+    assert(near(dissolved[agcl_bond_offset + bond], 0.0));
+  }
+  const double *nucleus = cv_lab04_atom_engine_sample(0.5);
+  for (int bond = 12; bond < 16; ++bond) {
+    assert(near(nucleus[agcl_bond_offset + bond], 1.0));
+  }
+  for (int bond = 16; bond < 24; ++bond) {
+    assert(near(nucleus[agcl_bond_offset + bond], 0.0));
+  }
+  const double *lattice_fragment = cv_lab04_atom_engine_sample(1.0);
+  for (int bond = 12; bond < 24; ++bond) {
+    assert(near(lattice_fragment[agcl_bond_offset + bond], 1.0));
+  }
+  for (int atom = 0; atom < 28; ++atom) {
+    const int offset = atom * CV_LAB04_ATOM_OUTPUT_FIELDS;
+    for (int axis = 0; axis < 3; ++axis) {
+      assert(std::isfinite(lattice_fragment[offset + axis]));
+    }
+  }
+
   std::puts("CHEMVERSE Lab 04 atom-mapped mechanism engine: all tests passed");
 }
