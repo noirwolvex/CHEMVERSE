@@ -204,7 +204,6 @@ extern "C" const double *cv_afm_scan(
       poisson_ratio,adhesion_energy_mj_m2,hamaker_constant_j,
       cycles_per_pixel,steps_per_cycle,&deflection,&peak_force,&indentation,&phase);
     if(!finite(measured_amplitude)){last_error=ERR_NUMERIC;return 0;}
-    stage_z-=free_amplitude_nm*0.96;
     total_error+=absd(measured_amplitude-target_amplitude);
    }else{
     const double effective_modulus=young_modulus_gpa/(1.0-poisson_ratio*poisson_ratio);
@@ -222,7 +221,7 @@ extern "C" const double *cv_afm_scan(
    }
    const int offset=index*CV_AFM_OUTPUT_FIELDS;
    const double measured_topography=scan_mode==1?
-     stage_z+indentation+deflection:stage_z;
+     stage_z+indentation+deflection:stage_z-free_amplitude_nm*0.96;
    output[offset]=measured_topography;
    output[offset+1]=deflection;
    output[offset+2]=peak_force;
