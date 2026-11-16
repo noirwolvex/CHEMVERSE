@@ -204,7 +204,13 @@ function seekReaction(value){
 }
 function setOpacity(root,opacity){root.traverse(obj=>{if(obj.isMesh&&obj.material){obj.material.opacity=opacity;obj.material.transparent=true;obj.material.depthWrite=opacity>.98}})}
 function setSideTransform(root,side,amount){root.children.forEach((m,i)=>{const base=m.userData.startPosition;if(!base)return;m.position.x=base.x+(side==='reactants'?1:-1)*amount*.26;m.position.y=base.y+Math.sin(amount*Math.PI+i)*.12;m.rotation.y=(i%2?-.16:.13)+amount*.25*(side==='reactants'?1:-1);m.scale.setScalar(.78*(side==='reactants'?1-.13*amount:.86+.14*amount))})}
-function updateTimeline(value){progress=clamp(value,0,1);if(reactantRoot)setOpacity(reactantRoot,0);if(productRoot)setOpacity(productRoot,0);const frame=sampleStation04ReactionNow(reactionNumber(),progress);station04Profile=frame?.profile??station04Profile;station04Effects=frame?.effects??null;updateAtomMappedScene(progress);const phase=progress<.24?'REACTANTS':progress<.49?'APPROACH':progress<.76?'REARRANGEMENT':'PRODUCTS';txt('view-phase',phase);const stageIndex=progress<.12?0:progress<.36?1:progress<.70?2:3;txt('stage-label',stageTitles[stageIndex]);txt('scene-caption',stageDescriptions[activeReaction.id]?.[stageIndex]||'عرض جزيئي تخطيطي');txt('progress-label',Math.round(progress*100)+'%');const bar=byId('timeline-progress');if(bar)bar.style.width=(progress*100)+'%';const scrubber=byId('reaction-scrubber');if(scrubber)scrubber.value=String(Math.round(progress*1000));updateMechanismCopy(progress)}
+function getKineticConversion(displayProgress){
+ if(!kineticsResults?.rows?.length)return displayProgress;
+ const rows=kineticsResults.rows,position=clamp(displayProgress,0,1)*(rows.length-1);
+ const lower=Math.floor(position),upper=Math.min(rows.length-1,lower+1),fraction=position-lower;
+ return rows[lower][1]+(rows[upper][1]-rows[lower][1])*fraction;
+}
+function updateTimeline(value){progress=clamp(value,0,1);if(reactantRoot)setOpacity(reactantRoot,0);if(productRoot)setOpacity(productRoot,0);const conversion=getKineticConversion(progress);const frame=sampleStation04ReactionNow(reactionNumber(),conversion);station04Profile=frame?.profile??station04Profile;station04Effects=frame?.effects??null;updateAtomMappedScene(conversion);const phase=progress<.24?'REACTANTS':progress<.49?'APPROACH':progress<.76?'REARRANGEMENT':'PRODUCTS';txt('view-phase',phase);const stageIndex=progress<.12?0:progress<.36?1:progress<.70?2:3;txt('stage-label',stageTitles[stageIndex]);txt('scene-caption',stageDescriptions[activeReaction.id]?.[stageIndex]||'عرض جزيئي تخطيطي');txt('progress-label',Math.round(conversion*100)+'%');const bar=byId('timeline-progress');if(bar)bar.style.width=(progress*100)+'%';const scrubber=byId('reaction-scrubber');if(scrubber)scrubber.value=String(Math.round(progress*1000));updateMechanismCopy(progress)}
 function renderScene(){
  const canvas=byId('molecule-canvas');try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'})}catch(error){byId('webgl-fallback').hidden=false;canvas.hidden=true;return}
  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;scene=new THREE.Scene();scene.background=new THREE.Color(0x0c1721);scene.fog=new THREE.Fog(0x0c1721,14,27);
@@ -215,7 +221,7 @@ function renderScene(){
  const resize=()=>{const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()};
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;if(observer)observer.observe(canvas.parentElement||canvas);else window.addEventListener('resize',resize,{passive:true});resize();
  window.addEventListener('pagehide',()=>{observer?.disconnect();if(!observer)window.removeEventListener('resize',resize);orbit?.dispose();renderer?.dispose();cancelAnimationFrame(raf)},{once:true});
- const loop=now=>{raf=requestAnimationFrame(loop);if(playing){const delta=lastTime?Math.min(50,now-lastTime):0;updateTimeline(progress+delta/durationMs);if(progress>=1){playing=false;txt('play-reaction','↻ إعادة المحاكاة');txt('scene-caption','اكتمل العرض البصري للنواتج')}}lastTime=now;orbit?.update();renderer.render(scene,camera)};
+ const loop=now=>{raf=requestAnimationFrame(loop);if(playing){const delta=lastTime?Math.min(50,now-lastTime):0;const activeDuration=kineticsResults?.rows?.length?kineticsResults.rows[kineticsResults.rows.length-1][0]*1000:durationMs;updateTimeline(progress+delta/Math.max(1,activeDuration));if(progress>=1){playing=false;txt('play-reaction','↻ إعادة المحاكاة');txt('scene-caption','اكتمل العرض البصري للنواتج')}}lastTime=now;orbit?.update();renderer.render(scene,camera)};
  raf=requestAnimationFrame(loop)
 }
 function formatAmount(value){return Number(value).toFixed(3)+' mol'}
@@ -235,7 +241,7 @@ function supportsCurrentKinetics(){
 }
 function kineticsInput(id){return byId(id)?.value.trim()??''}
 function clearKineticsResults(){
- kineticsResults=null;txt('kinetics-summary','لا توجد محاكاة حركية بعد.');
+ kineticsResults=null;txt('kinetics-summary','لا توجد محاكاة حركية بعد.');txt('reaction-duration-label','عرض توضيحي / 8.2 s');
  const canvas=byId('kinetics-chart');if(canvas){const context=canvas.getContext('2d');context?.clearRect(0,0,canvas.width,canvas.height)}
 }
 function updateKineticsAvailability(){
@@ -305,11 +311,11 @@ async function runKinetics(){
    temperatureC,referenceTemperatureC,activationEnergyKjMol,useArrhenius:hasActivationEnergy,
    durationSeconds:20,maximumStepSeconds:.05,sampleCount:101
   });
-  kineticsResults=result;drawKineticsChart(result.rows,volumeMl);
+  kineticsResults=result;drawKineticsChart(result.rows,volumeMl);txt('reaction-duration-label','زمن النموذج / 20 s');updateTimeline(progress);
   const first=result.rows[0],last=result.rows[result.rows.length-1];
   const initialRate=first[5],finalRate=last[5];
   const finalA=last[3]/volumeMl,finalB=last[4]/volumeMl;
-  const order=orderA+orderB,rateUnits=order===1?'s⁻¹':('M⁻'+(order-1).toFixed(2)+' s⁻¹');
+  const order=orderA+orderB,concentrationPower=1-order,rateUnits=Math.abs(concentrationPower)<1e-9?'s⁻¹':('M^'+concentrationPower.toFixed(2)+' s⁻¹');
   txt('kinetics-summary',
    'k الفعّال = '+result.effectiveRateConstant.toPrecision(5)+' '+rateUnits+
    ' · السرعة الابتدائية = '+initialRate.toPrecision(4)+' M/s'+
@@ -325,7 +331,7 @@ async function runKinetics(){
 }
 function updateAmounts(){
  const container=byId('reactant-amounts');container.replaceChildren();
- for(const entry of activeReaction.reactants){const item=materialById.get(entry.species),row=document.createElement('div');row.className='amount-row';const label=document.createElement('label');label.htmlFor='amount-'+item.id;label.textContent=item.nameAr+' / '+item.formulaDisplay;const input=document.createElement('input');input.type='number';input.id='amount-'+item.id;input.min='0';input.max='1000';input.step='0.001';input.value=initialAmounts[item.id]??'0.100';input.inputMode='decimal';input.addEventListener('input',()=>{initialAmounts[item.id]=input.value;updateStoichiometry();updateKineticsAvailability()});row.append(label,input);container.append(row)}
+ for(const entry of activeReaction.reactants){const item=materialById.get(entry.species),row=document.createElement('div');row.className='amount-row';const label=document.createElement('label');label.htmlFor='amount-'+item.id;label.textContent=item.nameAr+' / '+item.formulaDisplay;const input=document.createElement('input');input.type='number';input.id='amount-'+item.id;input.min='0';input.max='1000';input.step='0.001';input.value=initialAmounts[item.id]??'0.100';input.inputMode='decimal';input.addEventListener('input',()=>{initialAmounts[item.id]=input.value;clearKineticsResults();updateStoichiometry();updateKineticsAvailability()});row.append(label,input);container.append(row)}
  updateStoichiometry();updateKineticsAvailability()
 }
 function updateReactionDisplay(){
@@ -376,7 +382,7 @@ async function init(){
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
- ['kinetics-volume','kinetics-temperature','kinetics-reference-temperature','kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>byId(id).addEventListener('input',updateKineticsAvailability));
+ ['kinetics-volume','kinetics-temperature','kinetics-reference-temperature','kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>byId(id).addEventListener('input',()=>{clearKineticsResults();updateKineticsAvailability()}));
  byId('kinetics-run').addEventListener('click',runKinetics);
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
  byId('reset-reaction').addEventListener('click',()=>{playing=false;lastTime=0;updateTimeline(0);byId('play-reaction').textContent='▶ ابدأ المحاكاة'});byId('previous-stage').addEventListener('click',()=>seekReaction(stageStops.filter(stop=>stop<progress-1e-4).pop()??0));byId('next-stage').addEventListener('click',()=>seekReaction(stageStops.find(stop=>stop>progress+1e-4)??1));byId('reaction-scrubber').addEventListener('input',event=>seekReaction(Number(event.target.value)/1000));
