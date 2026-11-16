@@ -41,6 +41,7 @@ function expandReactionSide(entries,side){
  const spacing=Math.min(1.62,4.5/Math.max(1,moleculeCount-1));
  for(const entry of entries){
   const species=materialById.get(entry.species);if(!species)return null;
+  const ionicOrDissociated=new Set(['mgo','cao','nacl','agcl','zncl2','bacl2','hcl']);
   for(let copy=0;copy<entry.coefficient;copy++){
    const center=(side==='reactants'?-2.85:2.85)+(moleculeIndex-(moleculeCount-1)/2)*spacing;
    const z=side==='reactants'?.15:-.15,y=.95+(moleculeIndex%2)*.08;
@@ -49,7 +50,7 @@ function expandReactionSide(entries,side){
     expanded.push({element:atom.element,position:new THREE.Vector3(center+atom.x*.78,y+atom.y*.78,z+atom.z*.78),localIndex,moleculeIndex});
     return index;
    });
-   for(const [a,b] of species.bonds)bondList.push([indices[a],indices[b]]);
+   if(!ionicOrDissociated.has(species.id)){for(const [a,b] of species.bonds)bondList.push([indices[a],indices[b]])}
    moleculeIndex++;
   }
  }
