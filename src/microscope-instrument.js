@@ -57,7 +57,7 @@ export function createMicroscopeInstrument(options={}){
  syncSpherical();
  function setStatus(message){if(status)status.textContent=message}
  function updateSlide(hasSample,hasMedium,hasCover,mounted){
-  slide.position.x=mounted?0:1.16;droplet.visible=Boolean(hasMedium);coverslip.visible=Boolean(hasCover);grains.clear();
+  slide.position.x=mounted?0:1.16;droplet.visible=Boolean(hasMedium);coverslip.visible=Boolean(hasCover);for(const child of [...grains.children]){child.geometry?.dispose();if(Array.isArray(child.material))child.material.forEach(material=>material.dispose());else child.material?.dispose()}grains.clear();
   if(hasSample){
    let seed=sampleId.split('').reduce((value,ch)=>value+ch.charCodeAt(0),17)>>>0;
    const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
@@ -100,14 +100,14 @@ export function createMicroscopeInstrument(options={}){
   if(readout)readout.textContent=objective+'× OBJECTIVE  /  '+(objective*10)+'× TOTAL'+(objective===100?' / OIL':'');
  }
  function setObjective(value){
-  if(!objectives.includes(value)||mode!=='light')return;
-  if(value===100&&(!oilApplied||!slideState?.mounted)){setStatus('100× OIL OBJECTIVE REQUIRES A MOUNTED SLIDE AND IMMERSION OIL');updateControls();return}
+  if(!objectives.includes(value)||mode!=='light')return false;
+  if(value===100&&(!oilApplied||!slideState?.mounted)){setStatus('100× OIL OBJECTIVE REQUIRES A MOUNTED SLIDE AND IMMERSION OIL');updateControls();return false}
   objective=value;const index=objectives.indexOf(value);nosepiece.rotation.y=-Math.PI*2*index/objectives.length;
   focusWheels.forEach(({large,inner},i)=>{large.rotation.y=(i?-1:1)*index*.42;inner.rotation.y=(i?1:-1)*index*.72});
   objectiveButtons.forEach(b=>{const active=Number(b.dataset.objective)===value;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active))});
   if(readout)readout.textContent=value+'× OBJECTIVE  /  '+(value*10)+'× TOTAL'+(value===100?' / OIL':'');
   if(options.onObjectiveChange)options.onObjectiveChange(value);
-  updateControls();
+  updateControls();return true;
  }
  function setCoarse(value){if(objective>=40)return;const v=clamp(Number(value)||0,0,100);stage.position.y=1.37+((v-50)/50)*.10;focusWheels.forEach(({large},i)=>{large.rotation.x=(v-50)*.012*(i?-1:1)})}
  function setFine(value){const v=clamp(Number(value)||0,0,100);nosepiece.position.y=((v-50)/50)*(objective>=40?.022:.045);if(options.onFineFocusChange)options.onFineFocusChange(v)}
