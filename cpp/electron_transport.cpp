@@ -199,7 +199,6 @@ extern "C" const double *cv_electron_simulate(
     Vec3 direction=initial_direction;
     double energy=beam_energy_kev;
     double primary_deposited=0.0;
-    double path_length=0.0;
     int collisions=0;
     int outcome=0;
     const int track=primary<tracks_to_record?primary:-1;
@@ -232,7 +231,6 @@ extern "C" const double *cv_electron_simulate(
       energy=maxv(0.0,energy-loss);
       primary_deposited+=loss;
       deposited_total+=loss;
-      path_length+=travel;
       position=add(position,scale(direction,travel));
 
       int event=1;
@@ -247,9 +245,8 @@ extern "C" const double *cv_electron_simulate(
       /* A near-surface inelastic event can liberate a low-energy secondary. */
       const double escape_depth=expFast(-maxv(0.0,position.z)/2.5);
       const double expected_secondaries=(loss*1000.0/35.0)*0.018*escape_depth;
-      if(random01()<clamp(expected_secondaries,0.0,0.92)&&energy>0.01){
-        const double secondary_energy=minv(energy,0.005+0.025*random01());
-        energy-=secondary_energy;
+      if(random01()<clamp(expected_secondaries,0.0,0.92)&&loss>0.005){
+        const double secondary_energy=minv(loss,0.005+0.025*random01());
         deposited_total=maxv(0.0,deposited_total-secondary_energy);
         primary_deposited=maxv(0.0,primary_deposited-secondary_energy);
         secondary_energy_total+=secondary_energy;
