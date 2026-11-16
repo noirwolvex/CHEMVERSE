@@ -60,10 +60,10 @@ export function loadMicroscopePhysics(basePath='./wasm/'){
    instantiateWasm(root+'afm_interaction.wasm')
   ]).then(([electron,afm])=>{
    const requiredElectron=['memory','cv_electron_simulate','cv_electron_summary','cv_electron_histogram','cv_electron_tracks','cv_electron_secondary_tracks','cv_electron_secondary_track_count','cv_electron_last_error','cv_electron_engine_version'];
-   const requiredAfm=['memory','cv_afm_height_input','cv_afm_scan','cv_afm_summary','cv_afm_output','cv_afm_last_error','cv_afm_engine_version'];
+   const requiredAfm=['memory','cv_afm_height_input','cv_afm_scan_begin','cv_afm_scan_advance','cv_afm_scan_progress','cv_afm_scan_complete','cv_afm_scan','cv_afm_summary','cv_afm_output','cv_afm_last_error','cv_afm_engine_version'];
    for(const name of requiredElectron)if(!(name in electron))throw new Error('Electron WASM export missing: '+name);
    for(const name of requiredAfm)if(!(name in afm))throw new Error('AFM WASM export missing: '+name);
-   if(electron.cv_electron_engine_version()!==110||afm.cv_afm_engine_version()!==110){
+   if(electron.cv_electron_engine_version()!==110||afm.cv_afm_engine_version()!==120){
     throw new Error('Unsupported microscope physics engine version');
    }
    return Object.freeze({electron,afm});
@@ -188,7 +188,7 @@ export function generateAFMSurface(sample,{gridSize=32,scanWidthNm=2000,seed}={}
  return Object.freeze({gridSize:grid,scanWidthNm:width,heightsNm:map,
   minimumHeightNm:minimum+offset,maximumHeightNm:maximum+offset,heightRangeNm:maximum-minimum});
 }
-export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,seed,
+export function startAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,seed,
  mode='tapping',freeAmplitudeNm=8,amplitudeSetpointRatio=.72,
  springConstantNPerM=2,resonanceFrequencyKHz=300,qualityFactor=80,
  tipRadiusNm=10,tipGeometry='sphere',tipHalfAngleDegrees=30,
@@ -200,7 +200,7 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
  const api=engines.afm,count=surface.heightsNm.length;
  const inputPointer=api.cv_afm_height_input();
  new Float64Array(api.memory.buffer,inputPointer,count).set(surface.heightsNm);
- const pointer=api.cv_afm_scan(
+ const pointer=api.cv_afm_scan_begin(
   surface.gridSize,surface.scanWidthNm,Number(freeAmplitudeNm),
   Number(amplitudeSetpointRatio),Number(springConstantNPerM),
   Number(resonanceFrequencyKHz),Number(qualityFactor),Number(tipRadiusNm),
@@ -211,32 +211,71 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
   ({sphere:0,cone:1,pyramid:2}[tipGeometry]??0),Number(tipHalfAngleDegrees)
  );
  if(pointer===null||pointer===undefined||api.cv_afm_last_error()!==0){
-  throw new Error('AFM interaction solver failed (engine error '+api.cv_afm_last_error()+')');
+  throw new Error('AFM interaction solver could not begin (engine error '+api.cv_afm_last_error()+')');
+ }
+ const result={
+  mode,material,tipGeometry,tipHalfAngleDegrees:Number(tipHalfAngleDegrees),
+  gridSize:surface.gridSize,scanWidthNm:surface.scanWidthNm,sourceHeightsNm:surface.heightsNm,
+  topographyNm:surface.heightsNm.slice(),deflectionNm:new Float64Array(count),
+  peakForceNn:new Float64Array(count),amplitudeNm:new Float64Array(count),
+  phaseDegrees:new Float64Array(count),feedbackIterations:new Uint8Array(count),
+  meanPeakForceNn:0,maximumPeakForceNn:0,meanDeflectionNm:0,meanTopographyNm:0,
+  meanAmplitudeNm:0,amplitudeRatio:0,maximumIndentationNm:0,
+  meanFeedbackIterations:0,meanAmplitudeErrorNm:0,contactFraction:0,
+  scannedPixels:0,scanProgress:0,scanComplete:false
+ };
+ return {api,result,count,copiedPixels:0};
+}
+export function advanceAFMInteraction(session,maxPixels=12){
+ if(!session?.api||!session?.result)throw new TypeError('An active AFM scan session is required');
+ const {api,result,count}=session;
+ if(result.scanComplete)return result;
+ const batch=Math.max(1,Math.min(count,Math.round(Number(maxPixels)||1)));
+ const progressReturned=api.cv_afm_scan_advance(batch);
+ if(progressReturned<0||api.cv_afm_last_error()!==0){
+  throw new Error('AFM scan step failed (engine error '+api.cv_afm_last_error()+')');
+ }
+ const progress=Math.max(0,Math.min(count,api.cv_afm_scan_progress()));
+ if(progress<session.copiedPixels||progressReturned!==progress){
+  throw new Error('AFM scan progress counter is inconsistent');
+ }
+ const records=new Float64Array(api.memory.buffer,api.cv_afm_output(),progress*AFM_OUTPUT_FIELDS);
+ for(let i=session.copiedPixels;i<progress;i++){
+  const base=i*AFM_OUTPUT_FIELDS;
+  result.topographyNm[i]=records[base];
+  result.deflectionNm[i]=records[base+1];
+  result.peakForceNn[i]=records[base+2];
+  result.amplitudeNm[i]=records[base+3];
+  result.phaseDegrees[i]=records[base+4];
+  result.feedbackIterations[i]=records[base+5];
+ }
+ session.copiedPixels=progress;
+ result.scannedPixels=progress;
+ result.scanProgress=progress/count;
+ result.scanComplete=api.cv_afm_scan_complete()===1;
+ if(result.scanComplete!==(progress===count)){
+  throw new Error('AFM solver completion flag does not match its pixel count');
  }
  const summary=copyF64(api.memory,api.cv_afm_summary(),AFM_SUMMARY_FIELDS);
- const records=copyF64(api.memory,api.cv_afm_output(),count*AFM_OUTPUT_FIELDS);
- const topographyNm=new Float64Array(count),deflectionNm=new Float64Array(count);
- const peakForceNn=new Float64Array(count),amplitudeNm=new Float64Array(count);
- const phaseDegrees=new Float64Array(count),feedbackIterations=new Uint8Array(count);
- for(let i=0;i<count;i++){
-  const base=i*AFM_OUTPUT_FIELDS;
-  topographyNm[i]=records[base];deflectionNm[i]=records[base+1];
-  peakForceNn[i]=records[base+2];amplitudeNm[i]=records[base+3];
-  phaseDegrees[i]=records[base+4];feedbackIterations[i]=records[base+5];
- }
- return Object.freeze({
-  mode,material,tipGeometry,tipHalfAngleDegrees:Number(tipHalfAngleDegrees),gridSize:surface.gridSize,scanWidthNm:surface.scanWidthNm,
-  sourceHeightsNm:surface.heightsNm,topographyNm,deflectionNm,peakForceNn,
-  amplitudeNm,phaseDegrees,feedbackIterations,
-  meanPeakForceNn:summary[1],maximumPeakForceNn:summary[2],
-  meanDeflectionNm:summary[3],meanTopographyNm:summary[4],
-  meanAmplitudeNm:summary[5],amplitudeRatio:summary[6],
-  maximumIndentationNm:summary[7],meanFeedbackIterations:summary[8],
-  meanAmplitudeErrorNm:summary[9],contactFraction:summary[10]
- });
+ result.meanPeakForceNn=summary[1];
+ result.maximumPeakForceNn=summary[2];
+ result.meanDeflectionNm=summary[3];
+ result.meanTopographyNm=summary[4];
+ result.meanAmplitudeNm=summary[5];
+ result.amplitudeRatio=summary[6];
+ result.maximumIndentationNm=summary[7];
+ result.meanFeedbackIterations=summary[8];
+ result.meanAmplitudeErrorNm=summary[9];
+ result.contactFraction=summary[10];
+ return result;
+}
+export function runAFMInteraction(engines,options={}){
+ const session=startAFMInteraction(engines,options);
+ while(!session.result.scanComplete)advanceAFMInteraction(session,session.count);
+ return session.result;
 }
 export const MICROSCOPE_PHYSICS_LAYOUT=Object.freeze({
  electron:{summaryFields:ELECTRON_SUMMARY_FIELDS,histogramBins:ELECTRON_HISTOGRAM_BINS,
   maxTracks:ELECTRON_TRACKS,maxSecondaryTracks:ELECTRON_SECONDARY_TRACKS,maxPoints:ELECTRON_POINTS,trackStride:ELECTRON_TRACK_STRIDE},
- afm:{summaryFields:AFM_SUMMARY_FIELDS,outputFields:AFM_OUTPUT_FIELDS,maxGrid:96,tipGeometries:Object.freeze(['sphere','cone','pyramid'])}
+ afm:{summaryFields:AFM_SUMMARY_FIELDS,outputFields:AFM_OUTPUT_FIELDS,maxGrid:96,incrementalScan:true,tipGeometries:Object.freeze(['sphere','cone','pyramid'])}
 });
