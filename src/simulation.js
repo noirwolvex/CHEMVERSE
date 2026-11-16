@@ -4,6 +4,7 @@ import { getDisplayProgress } from './reaction-stages.mjs';
 import { MECHANISM_CHECKPOINTS, getAdjacentMechanismCheckpoint } from './mechanism-timeline.mjs';
 import { parseInitialRatesCsv, INITIAL_RATES_CSV_TEMPLATE } from './experimental-data.mjs';
 import { parseConcentrationTimeCsv, CONCENTRATION_TIME_CSV_TEMPLATE } from './concentration-data.mjs';
+import { buildReactionReportCsv, calculateReactionQuantities } from './reaction-quantities.mjs';
 
 const view = document.getElementById('molecule-view');
 const moleculePanel = document.querySelector('.molecule-panel');
@@ -97,6 +98,23 @@ const concentrationFitMOutput = document.getElementById('concentration-fit-m');
 const concentrationFitNOutput = document.getElementById('concentration-fit-n');
 const concentrationFitR2Output = document.getElementById('concentration-fit-r2');
 const applyConcentrationFitButton = document.getElementById('apply-concentration-fit');
+const gasPressureInput = document.getElementById('gas-pressure');
+const gasObservationCanvas = document.getElementById('reaction-observation');
+const gasObservationContext = gasObservationCanvas.getContext('2d');
+const gasObservationStatus = document.getElementById('gas-observation-status');
+const experimentNotesInput = document.getElementById('experiment-notes');
+const exportExperimentCsvButton = document.getElementById('export-experiment-csv');
+const quantityCalculationStatus = document.getElementById('quantity-calculation-status');
+const theoreticalExtentOutput = document.getElementById('theoretical-extent');
+const theoreticalAcetateMassOutput = document.getElementById('theoretical-acetate-mass');
+const theoreticalWaterMassOutput = document.getElementById('theoretical-water-mass');
+const theoreticalCo2MassOutput = document.getElementById('theoretical-co2-mass');
+const theoreticalCo2VolumeOutput = document.getElementById('theoretical-co2-volume');
+const currentExtentOutput = document.getElementById('current-extent');
+const currentAcetateMassOutput = document.getElementById('current-acetate-mass');
+const currentWaterMassOutput = document.getElementById('current-water-mass');
+const currentCo2MassOutput = document.getElementById('current-co2-mass');
+const currentCo2VolumeOutput = document.getElementById('current-co2-volume');
 
 const KINETICS_SAMPLE_COUNT = 121;
 const KINETICS_MAX_STEP_SECONDS = 0.05;
@@ -491,6 +509,177 @@ function updateChemistryReadouts(result) {
   effectiveKOutput.textContent = kineticsConfigured ? result.effectiveK.toExponential(3) : '—';
 }
 
+function updateReactionQuantities(result) {
+  const visualDemo = simulationAvailable && !kineticsConfigured;
+  const pressureKpa = Number(gasPressureInput.value);
+  try {
+    const quantities = calculateReactionQuantities({
+      acidConcentrationM, bicarbonateConcentrationM, volumeMl, temperatureC,
+      pressureKpa, currentExtentMmol: kineticsConfigured ? result.extent : null
+    });
+    const theoretical = quantities.theoretical;
+    const current = quantities.current;
+    const mass = (value) => value.toFixed(4) + ' g';
+    const volume = (value) => value.toFixed(1) + ' mL';
+    gasPressureInput.removeAttribute('aria-invalid');
+    theoreticalExtentOutput.textContent = theoretical.extentMmol.toFixed(3) + ' mmol';
+    theoreticalAcetateMassOutput.textContent = mass(theoretical.sodiumAcetateMassG);
+    theoreticalWaterMassOutput.textContent = mass(theoretical.waterMassG);
+    theoreticalCo2MassOutput.textContent = mass(theoretical.carbonDioxideMassG);
+    theoreticalCo2VolumeOutput.textContent = volume(theoretical.carbonDioxideIdealGasVolumeMl);
+    currentExtentOutput.textContent = current ? current.extentMmol.toFixed(3) + ' mmol' : 'غير محسوب';
+    currentAcetateMassOutput.textContent = current ? mass(current.sodiumAcetateMassG) : 'غير محسوب';
+    currentWaterMassOutput.textContent = current ? mass(current.waterMassG) : 'غير محسوب';
+    currentCo2MassOutput.textContent = current ? mass(current.carbonDioxideMassG) : 'غير محسوب';
+    currentCo2VolumeOutput.textContent = current ? volume(current.carbonDioxideIdealGasVolumeMl) : 'غير محسوب';
+    quantityCalculationStatus.textContent = current
+      ? 'القيم الحالية مشتقة من مدى التفاعل المحسوب بمحرك الحركية C++/WASM، وليست قياسات مخبرية.'
+      : 'الحصيلة النظرية معروضة. لم تُدخل معاملات حركية صالحة بعد، لذلك لا توجد حصيلة لحظية محسوبة.';
+    gasObservationStatus.textContent = visualDemo
+      ? 'الفقاعات تحاكي تتابع العرض فقط؛ لا تمثل سرعة أو كمية غاز محسوبة.'
+      : 'تُستخدم نسبة التحول التي حسبها محرك الحركية لتوجيه الرسم؛ حجم الفقاعات ومعدلها بصريان وليسا قياساً تجريبياً.';
+    return quantities;
+  } catch (error) {
+    gasPressureInput.setAttribute('aria-invalid', 'true');
+    quantityCalculationStatus.textContent = 'تعذر إتمام الحساب: ' + error.message;
+    gasObservationStatus.textContent = 'تعذر تحديث تقدير الغاز حتى تصحيح الضغط وبيانات التجربة.';
+    for (const output of [theoreticalExtentOutput, theoreticalAcetateMassOutput,
+      theoreticalWaterMassOutput, theoreticalCo2MassOutput, theoreticalCo2VolumeOutput]) output.textContent = '—';
+    for (const output of [currentExtentOutput, currentAcetateMassOutput,
+      currentWaterMassOutput, currentCo2MassOutput, currentCo2VolumeOutput]) output.textContent = '—';
+    return null;
+  }
+}
+
+function drawGasObservation(progress, elapsedSeconds) {
+  const bounds = gasObservationCanvas.getBoundingClientRect();
+  const cssWidth = Math.max(1, bounds.width);
+  const cssHeight = Math.max(1, bounds.height);
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.round(cssWidth * pixelRatio);
+  const height = Math.round(cssHeight * pixelRatio);
+  if (gasObservationCanvas.width !== width || gasObservationCanvas.height !== height) {
+    gasObservationCanvas.width = width;
+    gasObservationCanvas.height = height;
+  }
+  const ctx = gasObservationContext;
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+  const background = ctx.createLinearGradient(0, 0, 0, cssHeight);
+  background.addColorStop(0, '#112733');
+  background.addColorStop(1, '#0b1822');
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+  const centerX = cssWidth * 0.5;
+  const topY = 23;
+  const beakerWidth = Math.min(168, cssWidth * 0.42);
+  const beakerHeight = Math.max(55, Math.min(120, cssHeight - 36));
+  const left = centerX - beakerWidth * 0.5;
+  const right = centerX + beakerWidth * 0.5;
+  const bottom = topY + beakerHeight;
+  const liquidLevel = topY + beakerHeight * 0.42;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(left + 8, topY);
+  ctx.lineTo(left + 16, bottom);
+  ctx.quadraticCurveTo(centerX, bottom + 8, right - 16, bottom);
+  ctx.lineTo(right - 8, topY);
+  ctx.closePath();
+  ctx.clip();
+
+  const liquid = ctx.createLinearGradient(0, liquidLevel, 0, bottom);
+  liquid.addColorStop(0, 'rgba(97,196,190,.34)');
+  liquid.addColorStop(1, 'rgba(49,130,143,.12)');
+  ctx.fillStyle = liquid;
+  ctx.fillRect(left, liquidLevel, beakerWidth, bottom - liquidLevel + 12);
+  ctx.strokeStyle = 'rgba(133,219,210,.42)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(left + 12, liquidLevel);
+  ctx.quadraticCurveTo(centerX, liquidLevel + 3, right - 12, liquidLevel);
+  ctx.stroke();
+
+  const amount = Math.max(0, Math.min(1, progress));
+  const bubbleCount = Math.round(amount * 34);
+  for (let index = 0; index < bubbleCount; index += 1) {
+    const seed = index * 12.9898 + 78.233;
+    const xOffset = (Math.sin(seed) * .5 + .5) * (beakerWidth - 42) - (beakerWidth - 42) * .5;
+    const radius = 1.8 + (index % 4) * .7;
+    const phase = (elapsedSeconds * (.33 + (index % 5) * .055) + index * .173) % 1;
+    const y = bottom - 8 - phase * (bottom - liquidLevel + 20);
+    const x = centerX + xOffset + Math.sin(elapsedSeconds * 1.1 + index) * 3.4;
+    const glow = ctx.createRadialGradient(x - radius * .35, y - radius * .4, 0, x, y, radius * 1.7);
+    glow.addColorStop(0, 'rgba(226,255,250,.88)');
+    glow.addColorStop(.45, 'rgba(119,226,218,.48)');
+    glow.addColorStop(1, 'rgba(80,175,190,.05)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(205,249,243,.62)';
+    ctx.lineWidth = .8;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(175,223,219,.78)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(left, topY);
+  ctx.lineTo(left + 13, bottom);
+  ctx.quadraticCurveTo(centerX, bottom + 8, right - 13, bottom);
+  ctx.lineTo(right, topY);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(centerX, topY, beakerWidth * .5, 6, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(195,224,218,.82)';
+  ctx.font = '600 9px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('CO₂ RELEASE / SCHEMATIC', 14, 17);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(114,217,197,.88)';
+  ctx.fillText(Math.round(amount * 100) + '% VISUAL PROGRESS', cssWidth - 14, 17);
+}
+
+function downloadExperimentReport() {
+  try {
+    const result = calculateChemistry(elapsed);
+    const pressureKpa = Number(gasPressureInput.value);
+    const quantities = calculateReactionQuantities({
+      acidConcentrationM, bicarbonateConcentrationM, volumeMl, temperatureC,
+      pressureKpa, currentExtentMmol: kineticsConfigured ? result.extent : null
+    });
+    const report = buildReactionReportCsv({
+      inputs: {
+        acidConcentrationM, bicarbonateConcentrationM, volumeMl, temperatureC,
+        pressureKpa, elapsedSeconds: Number(elapsed.toFixed(3)),
+        notes: experimentNotesInput.value.trim()
+      },
+      quantities,
+      model: {
+        enabled: kineticsConfigured, rateConstant, acidOrder: acidReactionOrder,
+        bicarbonateOrder: bicarbonateReactionOrder, activationEnergyKJ,
+        referenceTemperatureC, source: kineticsSourceInput.value.trim()
+      }
+    });
+    const blob = new Blob(['\uFEFF', report], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'chemverse-station-06-reaction-001.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    quantityCalculationStatus.textContent = 'تم تجهيز سجل CSV بمدخلات التجربة وحدود النموذج والقيم المحسوبة.';
+  } catch (error) {
+    quantityCalculationStatus.textContent = 'تعذر تصدير السجل: ' + error.message;
+  }
+}
 
 function setFitFileStatus(message, state = '', target = fitFileStatus) {
   target.classList.remove('is-error', 'is-ready');
@@ -1390,8 +1579,10 @@ function refreshView(rebuildKinetics = false) {
   updateMolecularScene(elapsed, displayProgress);
   updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
+  updateReactionQuantities(result);
   updatePlaybackUI();
   drawChart(result, displayProgress, visualDemo);
+  drawGasObservation(kineticsConfigured ? result.progress : displayProgress, elapsed);
 }
 
 function togglePlayback() {
@@ -1431,8 +1622,10 @@ function animate(timestamp) {
   updateMolecularScene(elapsed, displayProgress);
   updateStageUI(displayProgress, result, visualDemo);
   updateChemistryReadouts(result);
+  updateReactionQuantities(result);
   updatePlaybackUI();
   drawChart(result, displayProgress, visualDemo);
+  drawGasObservation(kineticsConfigured ? result.progress : displayProgress, elapsed);
   orbit.update();
   renderer.render(scene, camera);
 }
@@ -1624,6 +1817,8 @@ document.getElementById('reset-camera').addEventListener('click', () => {
   orbit.target.set(0, 0, 0);
   orbit.update();
 });
+gasPressureInput.addEventListener('change', () => refreshView(false));
+exportExperimentCsvButton.addEventListener('click', downloadExperimentReport);
 timeline.addEventListener('input', () => {
   playing = false;
   elapsed = Number(timeline.value);
