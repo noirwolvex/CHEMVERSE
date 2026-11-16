@@ -35,6 +35,45 @@
 <div class="method-info"><span id="method-name">LIGHT MICROSCOPE</span><strong id="method-resolution"></strong><p id="method-principle"></p></div>
 <div class="limit-note"><b>METHOD LIMIT</b><p id="method-limitation"></p></div></aside></section>
 
+<section class="physics-workbench" id="physics-workbench" aria-label="Microscope physical interaction engines">
+ <div class="physics-workbench-heading"><div><span class="eyebrow">INTERACTIVE PHYSICS / C++ + WEBASSEMBLY</span><h2>Inside the instrument. <em>Inside the interaction.</em></h2><p>Run an electron-transport Monte Carlo for SEM/TEM, or scan the sample with a force-feedback AFM cantilever.</p></div><span class="hands-on-chip">PHYSICS ENGINES <b>02</b></span></div>
+ <div class="physics-grid">
+  <section class="physics-panel electron-physics-panel" id="electron-physics-panel" hidden>
+   <div class="instrument-panel-heading"><div><span class="eyebrow">SEM / TEM · ELECTRON MONTE CARLO</span><h3>Electron transport through the specimen</h3></div><span class="instrument-state"><i></i><b id="electron-physics-status">ENGINE NOT LOADED</b></span></div>
+   <div class="physics-controls electron-controls">
+    <label class="physics-control" for="electron-voltage"><span class="eyebrow">ACCELERATING VOLTAGE</span><strong><output id="electron-voltage-value">15 kV</output></strong><input id="electron-voltage" type="range" min="1" max="300" step="1" value="15"><small>1 kV · 300 kV</small></label>
+    <label class="physics-control" for="electron-thickness"><span class="eyebrow">SPECIMEN THICKNESS</span><strong><output id="electron-thickness-value">500 nm</output></strong><input id="electron-thickness" type="range" min="10" max="5000" step="10" value="500"><small>10 nm · 5 µm</small></label>
+    <label class="physics-control" for="electron-particles"><span class="eyebrow">PRIMARY ELECTRONS</span><strong><output id="electron-particles-value">1,200</output></strong><input id="electron-particles" type="range" min="200" max="5000" step="200" value="1200"><small>200 · 5,000 histories</small></label>
+    <label class="physics-control" for="electron-tilt"><span class="eyebrow">BEAM INCIDENCE</span><strong><output id="electron-tilt-value">0°</output></strong><input id="electron-tilt" type="range" min="-45" max="45" step="1" value="0"><small>−45° · +45°</small></label>
+   </div>
+   <div class="physics-action-row"><button class="instrument-primary" id="run-electron-transport" type="button">RUN ELECTRON TRANSPORT</button><span class="physics-run-note">Screened elastic scattering · continuous energy loss · secondary emission</span></div>
+   <canvas id="electron-track-canvas" class="physics-canvas" width="1200" height="340" aria-label="Monte Carlo electron trajectories through a specimen cross-section"></canvas>
+   <div class="physics-metrics electron-metrics">
+    <div><small>BACKSCATTERED (BSE)</small><b id="electron-bse">—</b></div><div><small>TRANSMITTED</small><b id="electron-transmitted">—</b></div><div><small>SECONDARY ELECTRONS</small><b id="electron-secondary">—</b></div><div><small>ENERGY DEPOSITED</small><b id="electron-deposited">—</b></div><div><small>MEAN PENETRATION</small><b id="electron-depth">—</b></div><div><small>ENERGY BALANCE ERROR</small><b id="electron-balance">—</b></div>
+   </div>
+   <p class="physics-disclaimer">Model: screened-Rutherford angular scattering with a Kanaya–Okayama range-based stopping approximation. Material data are effective homogeneous inputs; this is not a full electron-cascade, phonon, dielectric-response or detector Monte Carlo.</p>
+  </section>
+
+  <section class="physics-panel afm-physics-panel" id="afm-physics-panel" hidden>
+   <div class="instrument-panel-heading"><div><span class="eyebrow">AFM · CANTILEVER / TIP–SAMPLE INTERACTION</span><h3>Force-feedback surface scan</h3></div><span class="instrument-state"><i></i><b id="afm-physics-status">ENGINE NOT LOADED</b></span></div>
+   <div class="physics-controls afm-controls">
+    <label class="physics-control" for="afm-interaction-mode"><span class="eyebrow">SCANNING MODE</span><strong>TIP INTERACTION</strong><select id="afm-interaction-mode"><option value="tapping">Tapping / intermittent contact</option><option value="contact">Contact / constant force</option></select></label>
+    <label class="physics-control" for="afm-amplitude"><span class="eyebrow">FREE AMPLITUDE</span><strong><output id="afm-amplitude-value">8 nm</output></strong><input id="afm-amplitude" type="range" min="2" max="30" step="1" value="8"><small>2 nm · 30 nm</small></label>
+    <label class="physics-control" for="afm-setpoint"><span class="eyebrow">AMPLITUDE SETPOINT</span><strong><output id="afm-setpoint-value">72%</output></strong><input id="afm-setpoint" type="range" min="20" max="95" step="1" value="72"><small>20% · 95%</small></label>
+    <label class="physics-control" for="afm-spring"><span class="eyebrow">CANTILEVER SPRING</span><strong><output id="afm-spring-value">2.0 N/m</output></strong><input id="afm-spring" type="range" min="0.2" max="80" step="0.2" value="2"><small>Soft · Stiff</small></label>
+    <label class="physics-control" for="afm-force"><span class="eyebrow">CONTACT FORCE SETPOINT</span><strong><output id="afm-force-value">3.0 nN</output></strong><input id="afm-force" type="range" min="0.2" max="15" step="0.2" value="3"><small>0.2 nN · 15 nN</small></label>
+    <label class="physics-control" for="afm-tip-radius"><span class="eyebrow">TIP RADIUS</span><strong><output id="afm-tip-radius-value">10 nm</output></strong><input id="afm-tip-radius" type="range" min="2" max="40" step="1" value="10"><small>2 nm · 40 nm</small></label>
+   </div>
+   <div class="physics-action-row"><button class="instrument-primary" id="run-afm-scan" type="button">RUN AFM FEEDBACK SCAN</button><button class="instrument-secondary" id="play-afm-tip-scan" type="button" disabled>PLAY TIP TRACE</button><label class="physics-channel" for="afm-signal-channel">DISPLAY <select id="afm-signal-channel"><option value="topography">Feedback topography</option><option value="deflection">Cantilever deflection</option><option value="force">Peak interaction force</option><option value="amplitude">Oscillation amplitude</option></select></label></div>
+   <canvas id="afm-probe-canvas" class="physics-canvas" width="1200" height="330" aria-label="Simulated AFM cantilever and tip tracing the specimen profile"></canvas>
+   <div class="physics-metrics afm-metrics">
+    <div><small>MEAN PEAK FORCE</small><b id="afm-mean-force">—</b></div><div><small>MAX INDENTATION</small><b id="afm-indentation">—</b></div><div><small>AMPLITUDE RATIO</small><b id="afm-amplitude-ratio">—</b></div><div><small>MEAN DEFLECTION</small><b id="afm-deflection">—</b></div><div><small>CONTACT FRACTION</small><b id="afm-contact-fraction">—</b></div><div><small>FEEDBACK ITERATIONS</small><b id="afm-feedback">—</b></div>
+   </div>
+   <p class="physics-disclaimer">Model: driven damped single-cantilever oscillator, van der Waals attraction, DMT/Hertz repulsive contact and per-pixel feedback. It is a continuum single-asperity model; atomistic adhesion, tip wear, full 3-D sample elasticity and instrument noise are not solved.</p>
+  </section>
+ </div>
+</section>
+
 <section class="hands-on-lab" aria-label="Hands-on optical microscope">
  <div class="hands-on-heading"><div><span class="eyebrow">HANDS-ON OPTICS / PLAYER INTERACTION</span><h2>Prepare. Mount. <em>Look closer.</em></h2><p>Handle the slide, mount the specimen, bring the eyepiece to eye level and turn the objective turret.</p></div><span class="hands-on-chip">OPTICAL WORKFLOW <b>01</b></span></div>
  <div class="hands-on-grid">
