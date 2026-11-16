@@ -225,7 +225,49 @@ jobs:
                 products[14 * 4 + 12] !== 1) {
               throw new Error('Carbonic-acid decomposition bond mapping failed');
             }
-            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, and timeline-event validation passed');
+            const station04 = await WebAssembly.instantiate(fs.readFileSync('wasm/station04_engine.wasm'), {});
+            const s04 = station04.instance.exports;
+            const station04Names = ['memory', 'cv_s04_profile', 'cv_s04_effects',
+              'cv_s04_validate_profile', 'cv_s04_engine_version'];
+            for (const name of station04Names) {
+              if (!(name in s04)) throw new Error('Missing Station 04 export: ' + name);
+            }
+            if (s04.cv_s04_engine_version() !== 100) {
+              throw new Error('Unexpected Station 04 engine version');
+            }
+            for (let id = 1; id <= 12; id++) {
+              if (s04.cv_s04_validate_profile(id) !== 1) {
+                throw new Error('Invalid Station 04 process profile: ' + id);
+              }
+              const profile = Array.from(new Float64Array(
+                s04.memory.buffer, s04.cv_s04_profile(id), 8));
+              const start = Array.from(new Float64Array(
+                s04.memory.buffer, s04.cv_s04_effects(id, 0), 8));
+              const end = Array.from(new Float64Array(
+                s04.memory.buffer, s04.cv_s04_effects(id, 1), 8));
+              if (start.some(value => value !== 0) ||
+                  end.some(value => !(value >= 0 && value <= 1))) {
+                throw new Error('Station 04 normalized effects are out of range: ' + id);
+              }
+              if (profile[0] > 0 && (profile[5] <= 0 || profile[6] <= 0)) {
+                throw new Error('Electron-transfer profile is missing donor/acceptor metadata: ' + id);
+              }
+            }
+            const redox = Array.from(new Float64Array(
+              s04.memory.buffer, s04.cv_s04_profile(4), 8));
+            if (redox[0] !== 2 || redox[5] !== 26 || redox[6] !== 29) {
+              throw new Error('Iron/copper redox event metadata is incorrect');
+            }
+            const acidBase = Array.from(new Float64Array(
+              s04.memory.buffer, s04.cv_s04_profile(6), 8));
+            if (acidBase[1] !== 1) throw new Error('Acid/base proton-transfer profile is missing');
+            const zinc = Array.from(new Float64Array(
+              s04.memory.buffer, s04.cv_s04_profile(11), 8));
+            if (zinc[0] !== 2 || zinc[3] !== 1 || zinc[4] !== 1) {
+              throw new Error('Zinc/acid hydrogen-gas profile is incorrect');
+            }
+
+            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, timeline-event, and Station 04 profile validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -235,7 +277,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/station04_engine.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -252,5 +294,6 @@ jobs:
             wasm/experimental_fit.wasm
             wasm/concentration_fit.wasm
             wasm/reaction_mechanism.wasm
+            wasm/station04_engine.wasm
           if-no-files-found: error
           retention-days: 14
