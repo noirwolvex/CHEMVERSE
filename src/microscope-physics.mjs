@@ -26,6 +26,7 @@ const MATERIALS=Object.freeze({
  'graphite-atomic-lattice':{label:'Graphite',z:6,mass:12.011,density:2.2,young:1000,hamaker:1.0e-19}
 });
 function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
+const between=(rng,min,max)=>min+rng()*(max-min);
 function xorshift(seed){
  let state=(seed>>>0)||0x6d2b79f5;
  return()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296};
