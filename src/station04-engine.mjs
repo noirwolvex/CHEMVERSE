@@ -26,7 +26,8 @@ export function loadStation04Engine() {
   if (!station04Promise) {
     station04Promise = instantiateChemistryModule('station04_engine').then((exports) => {
       const required = ['memory', 'cv_s04_profile', 'cv_s04_effects',
-        'cv_s04_validate_profile', 'cv_s04_engine_version'];
+        'cv_s04_validate_profile', 'cv_s04_redox_pair_count',
+        'cv_s04_redox_pair', 'cv_s04_engine_version'];
       for (const name of required) {
         if (!(name in exports)) throw new Error(`Station 04 WASM export missing: ${name}`);
       }
@@ -49,6 +50,20 @@ export function sampleStation04ReactionNow(reactionNumber, progress) {
   const effectsPointer = station04Exports.cv_s04_effects(id, Number(progress));
   const effects = Array.from(new Float64Array(station04Exports.memory.buffer, effectsPointer, 8));
   return { profile, effects, source: 'cpp-wasm' };
+}
+
+export function sampleStation04RedoxNow(reactionNumber) {
+  if (!station04Exports) return [];
+  const id = Math.trunc(Number(reactionNumber));
+  const count = station04Exports.cv_s04_redox_pair_count(id);
+  const pairs = [];
+  for (let index = 0; index < count; index += 1) {
+    const pointer = station04Exports.cv_s04_redox_pair(id, index);
+    pairs.push(Array.from(new Float64Array(
+      station04Exports.memory.buffer, pointer, 9
+    )));
+  }
+  return pairs;
 }
 
 export async function sampleStation04Reaction(reactionNumber, progress) {
@@ -122,4 +137,46 @@ export async function simulateStation04Kinetics(parameters) {
     atomBalanceOk: engine.cv_kinetics_atom_balance_ok() === 1,
     source: 'cpp-wasm'
   };
+}
+
+let crystalPromise;
+let crystalExports = null;
+
+export function loadCrystalEngine() {
+  if (!crystalPromise) {
+    crystalPromise = instantiateChemistryModule('crystal_engine').then((exports) => {
+      const required = ['memory', 'cv_crystal_profile', 'cv_crystal_site_count',
+        'cv_crystal_site_element', 'cv_crystal_site_role',
+        'cv_crystal_site_fractional', 'cv_crystal_validate',
+        'cv_crystal_engine_version'];
+      for (const name of required) {
+        if (!(name in exports)) throw new Error(`Crystal WASM export missing: ${name}`);
+      }
+      if (exports.cv_crystal_engine_version() !== 100) {
+        throw new Error('Unsupported crystal engine version');
+      }
+      crystalExports = exports;
+      return exports;
+    });
+  }
+  return crystalPromise;
+}
+
+export function getCrystalStructureNow(reactionNumber) {
+  if (!crystalExports) return null;
+  const id = Math.trunc(Number(reactionNumber));
+  if (!Number.isInteger(id) || crystalExports.cv_crystal_validate(id) !== 1) return null;
+  const profilePointer = crystalExports.cv_crystal_profile(id);
+  const profile = Array.from(new Float64Array(
+    crystalExports.memory.buffer, profilePointer, 8
+  ));
+  const count = crystalExports.cv_crystal_site_count(id);
+  const sites = Array.from({ length: count }, (_, index) => ({
+    atomicNumber: crystalExports.cv_crystal_site_element(id, index),
+    role: crystalExports.cv_crystal_site_role(id, index),
+    fractional: [0, 1, 2].map(axis =>
+      crystalExports.cv_crystal_site_fractional(id, index, axis)
+    )
+  }));
+  return { profile, sites, source: 'cpp-wasm-crystallography' };
 }
