@@ -8,27 +8,34 @@ import {
 
 function makeElectronEngine(){
  const memory=new WebAssembly.Memory({initial:2});
- const summaryPointer=64,histogramPointer=256,tracksPointer=1024;
- const summary=new Float64Array(memory.buffer,summaryPointer,16);
+ const summaryPointer=64,histogramPointer=256,tracksPointer=1024,secondaryTracksPointer=50000;
+ const summary=new Float64Array(memory.buffer,summaryPointer,22);
  const histogram=new Float64Array(memory.buffer,histogramPointer,32);
  const tracks=new Float64Array(memory.buffer,tracksPointer,24*243);
+ const secondaryTracks=new Float64Array(memory.buffer,secondaryTracksPointer,24*243);
  return {
   memory,
-  cv_electron_engine_version:()=>100,
+  cv_electron_engine_version:()=>110,
   cv_electron_last_error:()=>0,
   cv_electron_summary:()=>summaryPointer,
   cv_electron_histogram:()=>histogramPointer,
   cv_electron_tracks:()=>tracksPointer,
+  cv_electron_secondary_tracks:()=>secondaryTracksPointer,
+  cv_electron_secondary_track_count:()=>1,
   cv_electron_simulate:(count,z,mass,density,energy,thickness,tilt,seed,recorded,maxCollisions)=>{
    summary.fill(0);histogram.fill(0);tracks.fill(0);
    summary[0]=count;summary[1]=count*.2;summary[2]=count*.3;summary[3]=count*.5;
    summary[4]=count*.4;summary[5]=10;summary[6]=20;summary[7]=energy*count-30;
    summary[8]=.4;summary[9]=thickness*.25;summary[10]=24;summary[11]=.2;
    summary[12]=.3;summary[13]=.4;summary[14]=0;summary[15]=count*24;
-   histogram[2]=10;
+   summary[16]=20;summary[17]=20;summary[18]=1;summary[19]=.1;summary[20]=.3;summary[21]=.4;
+   histogram[2]=10;secondaryTracks.fill(0);
    tracks[0]=2;tracks[1]=1;tracks[2]=energy;
    tracks[3]=0;tracks[4]=0;tracks[5]=0;tracks[6]=energy;tracks[7]=0;
    tracks[8]=2;tracks[9]=0;tracks[10]=thickness*.25;tracks[11]=energy*.8;tracks[12]=2;
+   secondaryTracks[0]=2;secondaryTracks[1]=1;secondaryTracks[2]=.02;
+   secondaryTracks[3]=0;secondaryTracks[4]=0;secondaryTracks[5]=1;secondaryTracks[6]=.02;secondaryTracks[7]=6;
+   secondaryTracks[8]=2;secondaryTracks[9]=0;secondaryTracks[10]=.2;secondaryTracks[11]=0;secondaryTracks[12]=.01;secondaryTracks[13]=8;
    return summaryPointer;
   }
  };
@@ -40,12 +47,12 @@ function makeAfmEngine(){
  const output=new Float64Array(memory.buffer,outputPointer,96*96*6);
  return {
   memory,
-  cv_afm_engine_version:()=>100,
+  cv_afm_engine_version:()=>110,
   cv_afm_last_error:()=>0,
   cv_afm_height_input:()=>inputPointer,
   cv_afm_summary:()=>summaryPointer,
   cv_afm_output:()=>outputPointer,
-  cv_afm_scan(grid,width,amplitude,setpoint,spring,freq,q,radius,young,poisson,adhesion,hamaker,mode,force){
+  cv_afm_scan(grid,width,amplitude,setpoint,spring,freq,q,radius,young,poisson,adhesion,hamaker,mode,force,cycles,steps,tipGeometry,tipAngle){
    const count=grid*grid,input=new Float64Array(memory.buffer,inputPointer,count);
    output.fill(0);summary.fill(0);
    summary[0]=grid;summary[1]=2;summary[2]=4;summary[3]=.2;
@@ -103,6 +110,12 @@ test('electron wrapper decodes Monte Carlo summary, histogram and tracks from WA
  assert.equal(result.trajectories[0].points[1].depthNm,125);
  assert.equal(result.trajectories[0].points[1].energyKeV,16);
  assert.equal(result.histogram[2],10);
+ assert.equal(result.secondaryTrajectories.length,1);
+ assert.equal(result.secondaryTrajectories[0].points[0].event,6);
+ assert.equal(result.secondaryTrajectories[0].outcome,1);
+ assert.equal(result.secondaryEscaped,20);
+ assert.equal(result.secondaryAbsorbed,20);
+ assert.equal(result.secondaryEnergyKeV,.4);
 });
 test('electron wrapper rejects unsupported imaging modes',()=>{
  assert.throws(()=>runElectronTransport({electron:makeElectronEngine()},{
@@ -112,7 +125,7 @@ test('electron wrapper rejects unsupported imaging modes',()=>{
 test('AFM wrapper writes a physical height map and returns force, deflection and amplitude channels',()=>{
  const result=runAFMInteraction({afm:makeAfmEngine()},{
   sample:getMicroscopeSample('cellulose-fibres'),scanWidthNm:2000,gridSize:8,
-  mode:'tapping',freeAmplitudeNm:8,amplitudeSetpointRatio:.72,seed:24
+  mode:'tapping',freeAmplitudeNm:8,amplitudeSetpointRatio:.72,tipGeometry:'pyramid',tipHalfAngleDegrees:28,seed:24
  });
  assert.equal(result.topographyNm.length,64);
  assert.ok(Math.abs(result.topographyNm[0]-result.sourceHeightsNm[0])<1e-5);
@@ -120,6 +133,10 @@ test('AFM wrapper writes a physical height map and returns force, deflection and
  assert.equal(result.deflectionNm[0],.2);
  assert.equal(result.amplitudeNm[0],5.76);
  assert.ok(Math.abs(result.amplitudeRatio-.72)<1e-9);
+ assert.equal(result.tipGeometry,'pyramid');
+ assert.equal(result.tipHalfAngleDegrees,28);
+ assert.equal(result.material.poisson,.32);
+ assert.equal(result.material.adhesion,28);
 });
 test('AFM wrapper rejects an invalid operation mode',()=>{
  assert.throws(()=>runAFMInteraction({afm:makeAfmEngine()},{
@@ -127,7 +144,9 @@ test('AFM wrapper rejects an invalid operation mode',()=>{
  }),RangeError);
 });
 test('physics memory layouts remain fixed for C++ and JavaScript ABI compatibility',()=>{
- assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.summaryFields,16);
+ assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.summaryFields,22);
+ assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.maxSecondaryTracks,24);
  assert.equal(MICROSCOPE_PHYSICS_LAYOUT.electron.trackStride,243);
  assert.equal(MICROSCOPE_PHYSICS_LAYOUT.afm.outputFields,6);
+ assert.deepEqual(MICROSCOPE_PHYSICS_LAYOUT.afm.tipGeometries,['sphere','cone','pyramid']);
 });

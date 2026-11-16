@@ -68,18 +68,18 @@ int main(){
  const int n=16*16;
  for(int i=0;i<n;++i)input[i]=0.0;
  const double *stiff=cv_afm_scan(16,800.0,8.0,0.72,2.0,300.0,80.0,
-  10.0,700.0,0.23,25.0,1.0e-19,1,3.0,8,32);
+  10.0,700.0,0.23,25.0,1.0e-19,1,3.0,8,32,0,30.0);
  assert(stiff);
  const double stiffIndent=cv_afm_summary()[7];
  assert(stiffIndent<softIndent);
 
  /* Stronger adhesion increases the contact indentation at the same net load. */
  const double *lowAdhesion=cv_afm_scan(16,800.0,8.0,.72,2.0,300.0,80.0,
-  10.0,70.0,.23,5.0,1.0e-19,1,3.0,8,32);
+  10.0,70.0,.23,5.0,1.0e-19,1,3.0,8,32,0,30.0);
  assert(lowAdhesion);
  const double lowAdhesionIndent=cv_afm_summary()[7];
  const double *highAdhesion=cv_afm_scan(16,800.0,8.0,.72,2.0,300.0,80.0,
-  10.0,70.0,.23,100.0,1.0e-19,1,3.0,8,32);
+  10.0,70.0,.23,100.0,1.0e-19,1,3.0,8,32,0,30.0);
  assert(highAdhesion);
  assert(cv_afm_summary()[7]>lowAdhesionIndent);
 

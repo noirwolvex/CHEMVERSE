@@ -1,29 +1,30 @@
 const ELECTRON_TRACKS=24;
+const ELECTRON_SECONDARY_TRACKS=24;
 const ELECTRON_POINTS=48;
 const ELECTRON_POINT_FIELDS=5;
 const ELECTRON_TRACK_HEADER=3;
 const ELECTRON_TRACK_STRIDE=ELECTRON_TRACK_HEADER+ELECTRON_POINTS*ELECTRON_POINT_FIELDS;
-const ELECTRON_SUMMARY_FIELDS=16;
+const ELECTRON_SUMMARY_FIELDS=22;
 const ELECTRON_HISTOGRAM_BINS=32;
 const AFM_OUTPUT_FIELDS=6;
 const AFM_SUMMARY_FIELDS=12;
 
 const MATERIALS=Object.freeze({
- 'nacl-crystals':{label:'Sodium chloride',z:14,mass:29.22,density:2.16,young:40,hamaker:1.0e-19},
- 'sucrose-crystals':{label:'Sucrose',z:4.04,mass:7.61,density:1.59,young:15,hamaker:0.8e-19},
- 'copper-sulfate':{label:'Copper sulfate pentahydrate',z:9.8,mass:15.3,density:2.28,young:35,hamaker:1.0e-19},
- 'iodine-crystals':{label:'Iodine',z:53,mass:126.9,density:4.93,young:8,hamaker:1.1e-19},
- 'barium-sulfate':{label:'Barium sulfate',z:36,mass:68.67,density:4.5,young:70,hamaker:1.0e-19},
- 'oil-emulsion':{label:'Oil droplets in water',z:5,mass:8,density:.95,young:.002,hamaker:.5e-19},
- 'cellulose-fibres':{label:'Cellulose',z:3.43,mass:6.00,density:1.5,young:10,hamaker:.8e-19},
- 'insoluble-powder':{label:'Mixed mineral powder (effective medium)',z:12,mass:24,density:2.5,young:30,hamaker:.9e-19},
- 'gold-nanoparticles':{label:'Gold',z:79,mass:196.967,density:19.32,young:79,hamaker:3.0e-19},
- 'silver-nanoparticles':{label:'Silver',z:47,mass:107.868,density:10.49,young:83,hamaker:2.0e-19},
- 'tio2-nanoparticles':{label:'Titanium dioxide (effective medium)',z:12.67,mass:26.62,density:4.23,young:230,hamaker:1.5e-19},
- 'carbon-nanotubes':{label:'Graphitic carbon',z:6,mass:12.011,density:2.2,young:1000,hamaker:1.0e-19},
- 'graphene-sheet':{label:'Graphitic carbon',z:6,mass:12.011,density:2.2,young:1000,hamaker:1.0e-19},
- 'porous-catalyst':{label:'Silica-rich porous catalyst (effective medium)',z:10,mass:20,density:2.2,young:50,hamaker:.9e-19},
- 'graphite-atomic-lattice':{label:'Graphite',z:6,mass:12.011,density:2.2,young:1000,hamaker:1.0e-19}
+ 'nacl-crystals':{label:'Sodium chloride',z:14,mass:29.22,density:2.16,young:40,poisson:.25,adhesion:55,hamaker:1.0e-19},
+ 'sucrose-crystals':{label:'Sucrose',z:4.04,mass:7.61,density:1.59,young:15,poisson:.30,adhesion:24,hamaker:0.8e-19},
+ 'copper-sulfate':{label:'Copper sulfate pentahydrate',z:9.8,mass:15.3,density:2.28,young:35,poisson:.28,adhesion:38,hamaker:1.0e-19},
+ 'iodine-crystals':{label:'Iodine',z:53,mass:126.9,density:4.93,young:8,poisson:.32,adhesion:42,hamaker:1.1e-19},
+ 'barium-sulfate':{label:'Barium sulfate',z:36,mass:68.67,density:4.5,young:70,poisson:.24,adhesion:62,hamaker:1.0e-19},
+ 'oil-emulsion':{label:'Oil droplets in water',z:5,mass:8,density:.95,young:.002,poisson:.49,adhesion:3,hamaker:.5e-19},
+ 'cellulose-fibres':{label:'Cellulose',z:3.43,mass:6.00,density:1.5,young:10,poisson:.32,adhesion:28,hamaker:.8e-19},
+ 'insoluble-powder':{label:'Mixed mineral powder (effective medium)',z:12,mass:24,density:2.5,young:30,poisson:.27,adhesion:35,hamaker:.9e-19},
+ 'gold-nanoparticles':{label:'Gold',z:79,mass:196.967,density:19.32,young:79,poisson:.44,adhesion:65,hamaker:3.0e-19},
+ 'silver-nanoparticles':{label:'Silver',z:47,mass:107.868,density:10.49,young:83,poisson:.37,adhesion:58,hamaker:2.0e-19},
+ 'tio2-nanoparticles':{label:'Titanium dioxide (effective medium)',z:12.67,mass:26.62,density:4.23,young:230,poisson:.27,adhesion:72,hamaker:1.5e-19},
+ 'carbon-nanotubes':{label:'Graphitic carbon',z:6,mass:12.011,density:2.2,young:1000,poisson:.19,adhesion:16,hamaker:1.0e-19},
+ 'graphene-sheet':{label:'Graphitic carbon',z:6,mass:12.011,density:2.2,young:1000,poisson:.19,adhesion:16,hamaker:1.0e-19},
+ 'porous-catalyst':{label:'Silica-rich porous catalyst (effective medium)',z:10,mass:20,density:2.2,young:50,poisson:.22,adhesion:34,hamaker:.9e-19},
+ 'graphite-atomic-lattice':{label:'Graphite',z:6,mass:12.011,density:2.2,young:1000,poisson:.19,adhesion:16,hamaker:1.0e-19}
 });
 function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
 const between=(rng,min,max)=>min+rng()*(max-min);
@@ -58,11 +59,11 @@ export function loadMicroscopePhysics(basePath='./wasm/'){
    instantiateWasm(root+'electron_transport.wasm'),
    instantiateWasm(root+'afm_interaction.wasm')
   ]).then(([electron,afm])=>{
-   const requiredElectron=['memory','cv_electron_simulate','cv_electron_summary','cv_electron_histogram','cv_electron_tracks','cv_electron_last_error','cv_electron_engine_version'];
+   const requiredElectron=['memory','cv_electron_simulate','cv_electron_summary','cv_electron_histogram','cv_electron_tracks','cv_electron_secondary_tracks','cv_electron_secondary_track_count','cv_electron_last_error','cv_electron_engine_version'];
    const requiredAfm=['memory','cv_afm_height_input','cv_afm_scan','cv_afm_summary','cv_afm_output','cv_afm_last_error','cv_afm_engine_version'];
    for(const name of requiredElectron)if(!(name in electron))throw new Error('Electron WASM export missing: '+name);
    for(const name of requiredAfm)if(!(name in afm))throw new Error('AFM WASM export missing: '+name);
-   if(electron.cv_electron_engine_version()!==100||afm.cv_afm_engine_version()!==100){
+   if(electron.cv_electron_engine_version()!==110||afm.cv_afm_engine_version()!==110){
     throw new Error('Unsupported microscope physics engine version');
    }
    return Object.freeze({electron,afm});
@@ -100,23 +101,24 @@ export function runElectronTransport(engines,{sample,mode='sem',energyKeV,thickn
  const summary=copyF64(engines.electron.memory,engines.electron.cv_electron_summary(),ELECTRON_SUMMARY_FIELDS);
  const histogram=copyF64(engines.electron.memory,engines.electron.cv_electron_histogram(),ELECTRON_HISTOGRAM_BINS);
  const tracks=copyF64(engines.electron.memory,engines.electron.cv_electron_tracks(),ELECTRON_TRACKS*ELECTRON_TRACK_STRIDE);
- const trajectory=[];
- for(let index=0;index<ELECTRON_TRACKS;index++){
-  const base=index*ELECTRON_TRACK_STRIDE,pointCount=Math.min(ELECTRON_POINTS,Math.round(tracks[base]||0));
-  if(!pointCount)continue;
-  const points=[];
-  for(let p=0;p<pointCount;p++){
-   const offset=base+ELECTRON_TRACK_HEADER+p*ELECTRON_POINT_FIELDS;
-   points.push(Object.freeze({
-    xNm:tracks[offset],yNm:tracks[offset+1],depthNm:tracks[offset+2],
-    energyKeV:tracks[offset+3],event:Math.round(tracks[offset+4])
-   }));
+ const secondaryTrackCount=clamp(Math.round(engines.electron.cv_electron_secondary_track_count()),0,ELECTRON_SECONDARY_TRACKS);
+ const secondaryTracks=copyF64(engines.electron.memory,engines.electron.cv_electron_secondary_tracks(),ELECTRON_SECONDARY_TRACKS*ELECTRON_TRACK_STRIDE);
+ const decodeTracks=(buffer,maximum)=>{
+  const output=[];
+  for(let index=0;index<maximum;index++){
+   const base=index*ELECTRON_TRACK_STRIDE,pointCount=Math.min(ELECTRON_POINTS,Math.round(buffer[base]||0));
+   if(!pointCount)continue;
+   const points=[];
+   for(let p=0;p<pointCount;p++){
+    const offset=base+ELECTRON_TRACK_HEADER+p*ELECTRON_POINT_FIELDS;
+    points.push(Object.freeze({xNm:buffer[offset],yNm:buffer[offset+1],depthNm:buffer[offset+2],energyKeV:buffer[offset+3],event:Math.round(buffer[offset+4])}));
+   }
+   output.push(Object.freeze({outcome:Math.round(buffer[base+1]),initialEnergyKeV:buffer[base+2],points:Object.freeze(points)}));
   }
-  trajectory.push(Object.freeze({
-   outcome:Math.round(tracks[base+1]),initialEnergyKeV:tracks[base+2],
-   points:Object.freeze(points)
-  }));
- }
+  return Object.freeze(output);
+ };
+ const trajectory=decodeTracks(tracks,ELECTRON_TRACKS);
+ const secondaryTrajectories=decodeTracks(secondaryTracks,secondaryTrackCount);
  return Object.freeze({
   mode,material,energyKeV:z,thicknessNm:thickness,particleCount:count,
   backscattered:Math.round(summary[1]),transmitted:Math.round(summary[2]),
@@ -124,9 +126,12 @@ export function runElectronTransport(engines,{sample,mode='sem',energyKeV,thickn
   backscatterCoefficient:summary[11],transmissionCoefficient:summary[12],
   secondaryYield:summary[13],backscatterEnergyKeV:summary[5],
   transmittedEnergyKeV:summary[6],depositedEnergyKeV:summary[7],
-  secondaryEnergyKeV:summary[8],meanPenetrationNm:summary[9],
+  secondaryEnergyKeV:summary[21],secondaryEscapedEnergyKeV:summary[19],
+  secondaryDepositedEnergyKeV:summary[20],secondaryEscaped:Math.round(summary[16]),
+  secondaryAbsorbed:Math.round(summary[17]),secondaryTracksRecorded:Math.round(summary[18]),
+  meanPenetrationNm:summary[9],
   meanCollisions:summary[10],energyClosureKeV:summary[14],
-  eventCount:Math.round(summary[15]),histogram,trajectories:Object.freeze(trajectory)
+  eventCount:Math.round(summary[15]),histogram,trajectories:trajectory,secondaryTrajectories
  });
 }
 function featureProfile(sample){
@@ -186,8 +191,8 @@ export function generateAFMSurface(sample,{gridSize=32,scanWidthNm=2000,seed}={}
 export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,seed,
  mode='tapping',freeAmplitudeNm=8,amplitudeSetpointRatio=.72,
  springConstantNPerM=2,resonanceFrequencyKHz=300,qualityFactor=80,
- tipRadiusNm=10,youngModulusGPa,poissonRatio=.23,
- adhesionEnergyMilliJPerM2=25,hamakerConstantJ,contactForceSetpointNn=3,
+ tipRadiusNm=10,tipGeometry='sphere',tipHalfAngleDegrees=30,
+ youngModulusGPa,poissonRatio,adhesionEnergyMilliJPerM2,hamakerConstantJ,contactForceSetpointNn=3,
  cyclesPerPixel=6,stepsPerCycle=24}={}){
  if(!engines?.afm)throw new TypeError('AFM WASM engine is not loaded');
  if(mode!=='tapping'&&mode!=='contact')throw new RangeError('AFM mode must be tapping or contact');
@@ -199,10 +204,11 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
   surface.gridSize,surface.scanWidthNm,Number(freeAmplitudeNm),
   Number(amplitudeSetpointRatio),Number(springConstantNPerM),
   Number(resonanceFrequencyKHz),Number(qualityFactor),Number(tipRadiusNm),
-  Number(youngModulusGPa??material.young),Number(poissonRatio),
-  Number(adhesionEnergyMilliJPerM2),Number(hamakerConstantJ??material.hamaker),
+  Number(youngModulusGPa??material.young),Number(poissonRatio??material.poisson),
+  Number(adhesionEnergyMilliJPerM2??material.adhesion),Number(hamakerConstantJ??material.hamaker),
   mode==='tapping'?0:1,Number(contactForceSetpointNn),
-  Math.round(cyclesPerPixel),Math.round(stepsPerCycle)
+  Math.round(cyclesPerPixel),Math.round(stepsPerCycle),
+  ({sphere:0,cone:1,pyramid:2}[tipGeometry]??0),Number(tipHalfAngleDegrees)
  );
  if(pointer===null||pointer===undefined||api.cv_afm_last_error()!==0){
   throw new Error('AFM interaction solver failed (engine error '+api.cv_afm_last_error()+')');
@@ -219,7 +225,7 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
   phaseDegrees[i]=records[base+4];feedbackIterations[i]=records[base+5];
  }
  return Object.freeze({
-  mode,material,gridSize:surface.gridSize,scanWidthNm:surface.scanWidthNm,
+  mode,material,tipGeometry,tipHalfAngleDegrees:Number(tipHalfAngleDegrees),gridSize:surface.gridSize,scanWidthNm:surface.scanWidthNm,
   sourceHeightsNm:surface.heightsNm,topographyNm,deflectionNm,peakForceNn,
   amplitudeNm,phaseDegrees,feedbackIterations,
   meanPeakForceNn:summary[1],maximumPeakForceNn:summary[2],
@@ -231,6 +237,6 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
 }
 export const MICROSCOPE_PHYSICS_LAYOUT=Object.freeze({
  electron:{summaryFields:ELECTRON_SUMMARY_FIELDS,histogramBins:ELECTRON_HISTOGRAM_BINS,
-  maxTracks:ELECTRON_TRACKS,maxPoints:ELECTRON_POINTS,trackStride:ELECTRON_TRACK_STRIDE},
- afm:{summaryFields:AFM_SUMMARY_FIELDS,outputFields:AFM_OUTPUT_FIELDS,maxGrid:96}
+  maxTracks:ELECTRON_TRACKS,maxSecondaryTracks:ELECTRON_SECONDARY_TRACKS,maxPoints:ELECTRON_POINTS,trackStride:ELECTRON_TRACK_STRIDE},
+ afm:{summaryFields:AFM_SUMMARY_FIELDS,outputFields:AFM_OUTPUT_FIELDS,maxGrid:96,tipGeometries:Object.freeze(['sphere','cone','pyramid'])}
 });

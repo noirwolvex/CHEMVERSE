@@ -71,6 +71,7 @@ mkdir -p "$ROOT/wasm"
   -Wl,--no-entry -Wl,--export-memory \
   -Wl,--export=cv_electron_simulate -Wl,--export=cv_electron_summary \
   -Wl,--export=cv_electron_histogram -Wl,--export=cv_electron_tracks \
+  -Wl,--export=cv_electron_secondary_tracks -Wl,--export=cv_electron_secondary_track_count \
   -Wl,--export=cv_electron_last_error -Wl,--export=cv_electron_engine_version \
   -Wl,--strip-all "$ROOT/cpp/electron_transport.cpp" -o "$ROOT/wasm/electron_transport.wasm"
 
