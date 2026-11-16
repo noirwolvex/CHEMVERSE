@@ -262,7 +262,15 @@ extern "C" const double *cv_electron_simulate(
       collisions++;
       global_events++;
       if(track>=0)appendPoint(track,position.x,position.y,position.z,energy,event);
-      if(energy<=MIN_ENERGY_KEV){outcome=3;break;}
+      if(energy<=MIN_ENERGY_KEV){
+        deposited_total+=energy;
+        primary_deposited+=energy;
+        energy=0.0;
+        absorbed++;
+        outcome=3;
+        if(track>=0)appendPoint(track,position.x,position.y,position.z,energy,5);
+        break;
+      }
     }
     if(outcome==0){
       /* Stopped or collision-limited primaries deposit their remaining energy. */
