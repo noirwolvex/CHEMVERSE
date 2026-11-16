@@ -27,6 +27,21 @@ enum {
  * This remains a single-asperity continuum model, not atomistic tip chemistry.
  */
 double *cv_afm_height_input(void);
+/* Begin and advance a scan incrementally. Each advance processes at most max_pixels.
+ * Progress is a row-major pixel count; scan_complete is 1 only when every pixel is solved. */
+const double *cv_afm_scan_begin(
+ int grid_size, double scan_width_nm, double free_amplitude_nm,
+ double amplitude_setpoint_ratio, double spring_constant_n_m,
+ double resonance_frequency_khz, double quality_factor, double tip_radius_nm,
+ double young_modulus_gpa, double poisson_ratio, double adhesion_energy_mj_m2,
+ double hamaker_constant_j, int scan_mode, double contact_force_setpoint_nn,
+ int cycles_per_pixel, int steps_per_cycle, int tip_geometry,
+ double tip_half_angle_degrees);
+int cv_afm_scan_advance(int max_pixels);
+int cv_afm_scan_progress(void);
+int cv_afm_scan_complete(void);
+
+/* Compatibility API: performs the complete scan in one call. */
 const double *cv_afm_scan(
   int grid_size,
   double scan_width_nm,
