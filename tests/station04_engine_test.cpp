@@ -15,10 +15,11 @@ int main() {
     assert(cv_s04_profile(id) != nullptr);
     assert(cv_s04_validate_profile(id) == 1);
     const double *start = cv_s04_effects(id, 0.0);
+    assert(start != nullptr);
+    for (int field = 0; field < CV_S04_EFFECT_FIELDS; ++field) assert(near(start[field], 0.0));
     const double *end = cv_s04_effects(id, 1.0);
-    assert(start != nullptr && end != nullptr);
+    assert(end != nullptr);
     for (int field = 0; field < CV_S04_EFFECT_FIELDS; ++field) {
-      assert(near(start[field], 0.0));
       assert(end[field] >= 0.0 && end[field] <= 1.0);
     }
   }
