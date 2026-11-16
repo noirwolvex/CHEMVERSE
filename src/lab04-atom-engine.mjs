@@ -63,7 +63,7 @@ const nitrateCenters=[
 ];
 const nitrateOffsets=[[0,.68,0],[-.59,-.34,0],[.59,-.34,0]];
 const sodiumPositions=[
- [-2.8,.05,2.65],[2.8,.1,-2.65],[-3.2,2.75,1.65],[3.2,-2.75,1.65]
+ [-2.8,.05,2.65],[2.8,.1,-2.65],[-3.2,2.1,1.65],[3.2,-2.1,1.65]
 ];
 
 const precipitationAtoms=[];
@@ -82,7 +82,7 @@ for(let index=0;index<4;index++){
 for(let group=0;group<4;group++){
  const center=nitrateCenters[group],nIndex=8+group*4;
  precipitationAtoms.push(mappedAtom(2101+group,'N',center,center,center,
-  {ionGroup:'NO3−-'+(group+1),ionCharge:-1,role:'spectator-nitrate'}));
+  {ionGroup:'NO3−-'+(group+1),ionGroupCharge:-1,role:'spectator-nitrate'}));
  for(let oxygen=0;oxygen<3;oxygen++){
   const offset=nitrateOffsets[oxygen],position=center.map((value,axis)=>value+offset[axis]);
   precipitationAtoms.push(mappedAtom(2201+group*3+oxygen,'O',position,position,position,
