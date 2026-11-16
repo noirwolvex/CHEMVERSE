@@ -65,7 +65,26 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_mechanism_engine_version \
   -Wl,--strip-all "$ROOT/cpp/reaction_mechanism.cpp" -o "$ROOT/wasm/reaction_mechanism.wasm"
 
-printf 'Built %s, %s, %s, %s, %s, and %s\\n' \
+# Monte Carlo electron transport for SEM/TEM detector and cross-section models.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_electron_simulate -Wl,--export=cv_electron_summary \
+  -Wl,--export=cv_electron_histogram -Wl,--export=cv_electron_tracks \
+  -Wl,--export=cv_electron_last_error -Wl,--export=cv_electron_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/electron_transport.cpp" -o "$ROOT/wasm/electron_transport.wasm"
+
+# Dynamic tapping/contact AFM tip-sample interaction solver.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_afm_height_input -Wl,--export=cv_afm_scan \
+  -Wl,--export=cv_afm_summary -Wl,--export=cv_afm_output \
+  -Wl,--export=cv_afm_last_error -Wl,--export=cv_afm_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/afm_interaction.cpp" -o "$ROOT/wasm/afm_interaction.wasm"
+
+printf 'Built %s, %s, %s, %s, %s, %s, %s, and %s\\n' \
   "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
   "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm" \
-  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/lab04_atom_engine.wasm"
+  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/lab04_atom_engine.wasm" \\
+  "$ROOT/wasm/electron_transport.wasm" "$ROOT/wasm/afm_interaction.wasm"
