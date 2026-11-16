@@ -94,7 +94,7 @@ double runTapping(double sample_z,double stage_z,double amplitude,double spring,
  double *deflection,double *peak_force,double *indentation,double *phase_out){
  const double omega=TWO_PI*frequency_hz;
  const double dt=1.0/(frequency_hz*static_cast<double>(steps));
- State state{amplitude,0.0};
+ State state{-amplitude,0.0};
  double maximum=-1.0e300,minimum=1.0e300,force_max=-1.0e300;
  double max_indent=0.0,last_phase=0.0;
  const int total=cycles*steps;
