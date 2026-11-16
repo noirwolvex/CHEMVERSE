@@ -241,7 +241,7 @@ function updatePrecipitationCondition(refreshEngine=false){
 }
 function updateStoichiometry(){
  const result=calculateStoichiometry(activeReaction,Object.fromEntries(activeReaction.reactants.map(e=>[e.species,Number(initialAmounts[e.species]??.1)])));
- if(!result){txt('limiting-result','أدخل قيماً صحيحة غير سالبة');txt('amount-note','تحقق من أن جميع الكميات أرقام غير سالبة ولا تتجاوز الحد المسموح.');return}
+ if(!result){txt('limiting-result','أدخل قيماً صحيحة غير سالبة');txt('amount-note','تحقق من أن جميع الكميات أرقام غير سالبة ولا تتجاوز الحد المسموح.');updatePrecipitationCondition(true);return}
  txt('limiting-result',result.limiting.map(id=>materialById.get(id).nameAr).join(' + '));
  const products=activeReaction.products.map(e=>materialById.get(e.species).formulaDisplay+' = '+formatAmount(result.produced[e.species])).join(' · ');
  const remaining=activeReaction.reactants.map(e=>materialById.get(e.species).formulaDisplay+' = '+formatAmount(result.remaining[e.species])).join(' · ');
