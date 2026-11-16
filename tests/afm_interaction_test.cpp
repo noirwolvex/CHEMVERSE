@@ -43,6 +43,7 @@ int main(){
  for(int y=2;y<14;++y)for(int x=2;x<7;++x)left+=output[(y*16+x)*CV_AFM_OUTPUT_FIELDS];
  for(int y=2;y<14;++y)for(int x=9;x<14;++x)right+=output[(y*16+x)*CV_AFM_OUTPUT_FIELDS];
  left/=60.0;right/=60.0;
+ std::printf("AFM step recovery left=%.6f right=%.6f delta=%.6f\\n",left,right,right-left);
  assert(right-left>12.0&&right-left<28.0);
 
  /* Contact mode solves the Hertz/DMT force setpoint and returns surface height. */
