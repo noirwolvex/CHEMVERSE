@@ -40,7 +40,7 @@ function sampleMaterial(sample){
  return MATERIALS[sample?.id]||MATERIALS['insoluble-powder'];
 }
 function copyF64(memory,pointer,length){
- if(!pointer)throw new Error('Physics engine returned an empty result buffer');
+ if(pointer===null||pointer===undefined)throw new Error('Physics engine returned an empty result buffer');
  return new Float64Array(memory.buffer,pointer,length).slice();
 }
 async function instantiateWasm(path){
@@ -94,7 +94,7 @@ export function runElectronTransport(engines,{sample,mode='sem',energyKeV,thickn
   Number(beamTiltDegrees),randomSeed,clamp(Math.round(recordedTracks),0,ELECTRON_TRACKS),
   clamp(Math.round(maximumCollisions),1,2000)
  );
- if(!pointer||engines.electron.cv_electron_last_error()!==0){
+ if(pointer===null||pointer===undefined||engines.electron.cv_electron_last_error()!==0){
   throw new Error('Electron Monte Carlo failed (engine error '+engines.electron.cv_electron_last_error()+')');
  }
  const summary=copyF64(engines.electron.memory,engines.electron.cv_electron_summary(),ELECTRON_SUMMARY_FIELDS);
@@ -204,14 +204,14 @@ export function runAFMInteraction(engines,{sample,scanWidthNm=2000,gridSize=32,s
   mode==='tapping'?0:1,Number(contactForceSetpointNn),
   Math.round(cyclesPerPixel),Math.round(stepsPerCycle)
  );
- if(!pointer||api.cv_afm_last_error()!==0){
+ if(pointer===null||pointer===undefined||api.cv_afm_last_error()!==0){
   throw new Error('AFM interaction solver failed (engine error '+api.cv_afm_last_error()+')');
  }
  const summary=copyF64(api.memory,api.cv_afm_summary(),AFM_SUMMARY_FIELDS);
  const records=copyF64(api.memory,api.cv_afm_output(),count*AFM_OUTPUT_FIELDS);
- const topographyNm=new Float32Array(count),deflectionNm=new Float32Array(count);
- const peakForceNn=new Float32Array(count),amplitudeNm=new Float32Array(count);
- const phaseDegrees=new Float32Array(count),feedbackIterations=new Uint8Array(count);
+ const topographyNm=new Float64Array(count),deflectionNm=new Float64Array(count);
+ const peakForceNn=new Float64Array(count),amplitudeNm=new Float64Array(count);
+ const phaseDegrees=new Float64Array(count),feedbackIterations=new Uint8Array(count);
  for(let i=0;i<count;i++){
   const base=i*AFM_OUTPUT_FIELDS;
   topographyNm[i]=records[base];deflectionNm[i]=records[base+1];
