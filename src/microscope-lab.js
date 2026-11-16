@@ -275,14 +275,16 @@ function afmColour(value){
  const scaled=clamp(value,0,.9999)*3,index=Math.floor(scaled),fraction=scaled-index,a=AFM_STOPS[index],b=AFM_STOPS[index+1];
  return [Math.round(mix(a[0],b[0],fraction)),Math.round(mix(a[1],b[1],fraction)),Math.round(mix(a[2],b[2],fraction))];
 }
-function createTopographyFeatures(rng,w,h){
+function createTopographyFeatures(rng,w,h,fieldWidthNm){
  const features=[],count=sample.shape==='porous'?38:sample.shape==='fibre'?12:sample.shape==='sheet'?17:28;
+ const range=sample.physicalSizeRangeNm||[1000,10000];
  for(let index=0;index<count;index++){
   const x=between(rng,-.08*w,1.08*w),y=between(rng,-.08*h,1.08*h);
-  const radius=between(rng,Math.min(w,h)*.018,Math.min(w,h)*.09);
+  const physicalSize=between(rng,range[0],range[1]);
+  const radius=clamp(fieldToPixels(physicalSize,fieldWidthNm,w)/2,.6,Math.min(w,h)*.3);
   features.push({
    x,y,rx:sample.shape==='fibre'?radius*between(rng,2,5):radius,
-   ry:sample.shape==='fibre'?radius*between(rng,.14,.3):radius*between(rng,.55,1.15),
+   ry:sample.shape==='fibre'?Math.max(.7,radius*between(rng,.14,.3)):radius*between(rng,.55,1.15),
    angle:between(rng,-Math.PI,Math.PI),
    height:sample.shape==='porous'?between(rng,-.8,.8):sample.shape==='fibre'?between(rng,.3,1.2):sample.shape==='sheet'?between(rng,.3,1.0):between(rng,.2,1)
   });
@@ -305,10 +307,10 @@ function sampleHeight(x,y,features){
  }
  return height;
 }
-function drawAFM(context,w,h,rng){
+function drawAFM(context,w,h,fieldWidthNm,rng){
  const rasterWidth=240,rasterHeight=Math.max(120,Math.round(rasterWidth*h/w));
  const image=context.createImageData(rasterWidth,rasterHeight);
- const features=createTopographyFeatures(rng,rasterWidth,rasterHeight);
+ const features=createTopographyFeatures(rng,rasterWidth,rasterHeight,fieldWidthNm);
  const heights=new Float32Array(rasterWidth*rasterHeight);
  let min=Infinity,max=-Infinity;
  for(let y=0;y<rasterHeight;y++)for(let x=0;x<rasterWidth;x++){
@@ -392,7 +394,7 @@ function draw(){
  }else if(mode==='tem'){
   drawTEM(ctx,width,height,fieldWidthNm,rng);
  }else if(mode==='afm'){
-  drawAFM(ctx,width,height,rng);
+  drawAFM(ctx,width,height,fieldWidthNm,rng);
  }else{
   drawSTM(ctx,width,height,fieldWidthNm,rng);
  }
