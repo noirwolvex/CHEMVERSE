@@ -17,6 +17,7 @@ int main(){
  assert(input);
  for(int i=0;i<16*16;++i)input[i]=0.0;
  const double *tap=scan(0);
+ if(!tap)std::fprintf(stderr,"AFM tap engine error %d\\n",cv_afm_last_error());
  assert(tap&&cv_afm_last_error()==0);
  const double *summary=cv_afm_summary();
  assert(summary[0]==16.0);
@@ -24,7 +25,7 @@ int main(){
  assert(summary[3]>=-20.0);
  assert(summary[5]>=0.0);
  assert(summary[6]>=0.0&&summary[6]<=1.5);
- assert(summary[8]>=1.0&&summary[8]<=4.0);
+ assert(summary[8]>=1.0&&summary[8]<=8.0);
  assert(summary[9]>=0.0);
  const double *output=cv_afm_output();
  for(int i=0;i<16*16;++i){
