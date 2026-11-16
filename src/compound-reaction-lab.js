@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
 import {loadStation04Engine,loadKineticsEngine,loadCrystalEngine,sampleStation04ReactionNow,sampleStation04RedoxNow,getCrystalStructureNow,simulateStation04Kinetics} from './station04-engine.mjs';
+const crystalTransform=new THREE.Object3D();
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomicNumbers=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.atomicNumber])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
 let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,interactionRoot=null,solidRoot=null,gasRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,electronParticles=[],electronPaths=[],electronShells=[],protonParticles=[],solidParticles=[],gasParticles=[],crystalBondMeshes=[],crystalLinkObject=null,crystalStructure=null,redoxPairs=[],station04Profile=null,station04Effects=null,station04EngineReady=false,crystalEngineReady=false,kineticsEngineReady=false,kineticsResults=null,raf=0,playing=false,progress=0,lastTime=0;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
@@ -117,12 +118,7 @@ function buildCrystalLinks(structure){
  const toWorld=site=>new THREE.Vector3(
   site.fractional[0]*a,site.fractional[1]*b,site.fractional[2]*c
  );
- const physicalSites=solidParticles.map(item=>({
-  ...item,
-  position:toWorld(item.site).add(new THREE.Vector3(
-   item.cell[0]*a,item.cell[1]*b,item.cell[2]*c
-  ))
- }));
+ const physicalSites=solidParticles.map(item=>({...item,position:toWorld(item.site).add(new THREE.Vector3(item.cell[0]*a,item.cell[1]*b,item.cell[2]*c)),worldPosition:item.position}));
  if(kind===3){
   const sulphurs=physicalSites.filter(item=>item.site.atomicNumber===16);
   const oxygens=physicalSites.filter(item=>item.site.atomicNumber===8);
@@ -134,7 +130,7 @@ function buildCrystalLinks(structure){
    })).filter(item=>item.distance>1e-6&&item.distance<1.9)
     .sort((left,right)=>left.distance-right.distance).slice(0,4);
    nearest.forEach(({oxygen})=>{
-    const start=sulphur.mesh.position,end=oxygen.mesh.position;
+    const start=sulphur.worldPosition,end=oxygen.worldPosition;
     points.push(start.x,start.y,start.z,end.x,end.y,end.z);
    });
   });
@@ -156,7 +152,7 @@ function buildCrystalLinks(structure){
     .forEach(({anion})=>{
      const key=[cation.mesh.id,anion.mesh.id].sort((x,y)=>x-y).join(':');
      if(seen.has(key))return;seen.add(key);
-     const start=cation.mesh.position,end=anion.mesh.position;
+     const start=cation.worldPosition,end=anion.worldPosition;
      points.push(start.x,start.y,start.z,end.x,end.y,end.z);
     });
   });
@@ -171,45 +167,54 @@ function buildCrystalLinks(structure){
  }
 }
 function buildCrystalLattice(){
- crystalParticles=[];crystalBondMeshes=[];crystalStructure=getCrystalStructureNow(reactionNumber());
+ solidParticles=[];crystalBondMeshes=[];crystalStructure=getCrystalStructureNow(reactionNumber());
  if(!crystalStructure||!solidRoot)return false;
  const profile=crystalStructure.profile,kind=profile[0],a=profile[2],b=profile[3],c=profile[4];
  const cellCount=3,cellScale=3.45/Math.max(a*cellCount,b*cellCount,c*cellCount);
  const cellOffset=new THREE.Vector3((a*cellCount*cellScale)/2,(b*cellCount*cellScale)/2,(c*cellCount*cellScale)/2);
- const sphere=new THREE.SphereGeometry(1,16,12);
- const colourByAtomicNumber={1:0xeaf0f4,6:0x59646d,8:0xe45c54,12:0x58b9ad,16:0xe1b342,17:0x76bd76,20:0x68a8d7,26:0xc38a52,29:0xd58a4a,30:0x8ca6ac,47:0xc8d1d9,56:0xa6b1bf};
+ const colourByAtomicNumber={8:0xe45c54,12:0x58b9ad,16:0xe1b342,17:0x76bd76,20:0x68a8d7,29:0xd58a4a,47:0xc8d1d9,56:0xa6b1bf};
  const radiusByAtomicNumber={8:.10,12:.145,16:.105,17:.14,20:.155,29:.145,47:.15,56:.18};
- const maxCell=(cellCount-1)*1.5;
- for(let cx=0;cx<cellCount;cx++)for(let cy=0;cy<cellCount;cy++)for(let cz=0;cz<cellCount;cz++){
-  const layer=Math.abs(cx-1)+Math.abs(cy-1)+Math.abs(cz-1);
-  for(const site of crystalStructure.sites){
-   const atomicNumber=site.atomicNumber,colour=colourByAtomicNumber[atomicNumber]??0xb5c2c0;
+ const instancesByElement=new Map();
+ const cellsTotal=cellCount*cellCount*cellCount;
+ for(const site of crystalStructure.sites){
+  const atomicNumber=site.atomicNumber;
+  if(!instancesByElement.has(atomicNumber)){
+   const perCell=crystalStructure.sites.filter(entry=>entry.atomicNumber===atomicNumber).length;
+   const radius=(radiusByAtomicNumber[atomicNumber]??.12)*(kind===3?1:.9);
+   const colour=colourByAtomicNumber[atomicNumber]??0xb5c2c0;
+   const geometry=new THREE.SphereGeometry(1,16,12);
    const material=new THREE.MeshStandardMaterial({
     color:colour,roughness:atomicNumber===29?.23:.34,
     metalness:atomicNumber===29?.68:.16,emissive:colour,emissiveIntensity:.045
    });
-   const mesh=new THREE.Mesh(sphere,material);
+   const mesh=new THREE.InstancedMesh(geometry,material,perCell*cellsTotal);
+   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+   mesh.count=perCell*cellsTotal;solidRoot.add(mesh);
+   instancesByElement.set(atomicNumber,{mesh,next:0,radius});
+  }
+ }
+ for(let cx=0;cx<cellCount;cx++)for(let cy=0;cy<cellCount;cy++)for(let cz=0;cz<cellCount;cz++){
+  const layer=Math.abs(cx-1)+Math.abs(cy-1)+Math.abs(cz-1);
+  for(const site of crystalStructure.sites){
+   const atomicNumber=site.atomicNumber,entry=instancesByElement.get(atomicNumber);
+   const instanceId=entry.next++;
    const position=new THREE.Vector3(
     (cx+site.fractional[0])*a*cellScale-cellOffset.x+.35,
     (cy+site.fractional[1])*b*cellScale-cellOffset.y+.62,
     (cz+site.fractional[2])*c*cellScale-cellOffset.z
    );
-   mesh.position.copy(position);
-   const radius=(radiusByAtomicNumber[atomicNumber]??.12)*(kind===3?1:.9);
-   mesh.scale.setScalar(radius);mesh.castShadow=true;solidRoot.add(mesh);
-   crystalParticles.push({
-    mesh,site,cell:[cx,cy,cz],layer,
-    baseRadius:radius,
-    physicalPosition:new THREE.Vector3(
-     (cx+site.fractional[0])*a,
-     (cy+site.fractional[1])*b,
-     (cz+site.fractional[2])*c
-    )
+   crystalTransform.position.copy(position);crystalTransform.scale.setScalar(.001);
+   crystalTransform.updateMatrix();entry.mesh.setMatrixAt(instanceId,crystalTransform.matrix);
+   solidParticles.push({
+    mesh:entry.mesh,instanceId,site,cell:[cx,cy,cz],layer,baseRadius:entry.radius,
+    position,
+    physicalPosition:new THREE.Vector3((cx+site.fractional[0])*a,(cy+site.fractional[1])*b,(cz+site.fractional[2])*c)
    });
   }
  }
+ instancesByElement.forEach(entry=>{entry.mesh.instanceMatrix.needsUpdate=true;entry.mesh.computeBoundingSphere()});
  buildCrystalLinks(crystalStructure);
- return crystalParticles.length>0;
+ return solidParticles.length>0;
 }
 function createDynamicGasParticles(){
  if(station04Profile[3]<=0)return;
@@ -290,11 +295,15 @@ function updateDynamicEffects(value){
  }
  const nucleation=station04Effects[4],growth=station04Effects[5];
  const layerThreshold=.45+3.2*growth;
+ const updatedInstances=new Set();
  solidParticles.forEach(item=>{
   const visible=nucleation>.01&&item.layer<=layerThreshold;
   const scale=visible?item.baseRadius*(.58+.42*clamp(nucleation*1.1,0,1)):.001;
-  item.mesh.scale.setScalar(scale);item.mesh.visible=visible;
+  crystalTransform.position.copy(item.position);crystalTransform.scale.setScalar(scale);
+  crystalTransform.updateMatrix();item.mesh.setMatrixAt(item.instanceId,crystalTransform.matrix);
+  updatedInstances.add(item.mesh);
  });
+ updatedInstances.forEach(mesh=>{mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere()});
  if(crystalLinkObject){
   crystalLinkObject.visible=nucleation>.01;
   crystalLinkObject.material.opacity=crystalStructure?.profile?.[0]===3?.78:.46;
@@ -533,11 +542,12 @@ function selectReaction(id){
 }
 async function init(){
  renderScene();
- const engines=await Promise.allSettled([loadStation04Engine(),loadKineticsEngine()]);
+ const engines=await Promise.allSettled([loadStation04Engine(),loadKineticsEngine(),loadCrystalEngine()]);
  station04EngineReady=engines[0].status==='fulfilled';
  kineticsEngineReady=engines[1].status==='fulfilled';
+ crystalEngineReady=engines[2].status==='fulfilled';
  const engineStatus=byId('s04-engine-status');
- if(engineStatus){engineStatus.textContent=station04EngineReady?'C++ PROCESS ENGINE / ONLINE':'C++ PROCESS ENGINE / OFFLINE';engineStatus.classList.toggle('is-offline',!station04EngineReady)}
+ if(engineStatus){engineStatus.textContent=station04EngineReady&&crystalEngineReady?'C++ REDOX + CRYSTAL / ONLINE':'C++ ENGINE / PARTIAL';engineStatus.classList.toggle('is-offline',!station04EngineReady||!crystalEngineReady)}
  renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
