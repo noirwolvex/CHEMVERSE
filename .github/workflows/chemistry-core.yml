@@ -47,7 +47,7 @@ jobs:
         run: node --input-type=module --check < src/lab04-atom-engine.mjs
       - name: Test compounds, equations, atom conservation and stoichiometry
         run: node --test tests/compound-reactions.test.mjs
-      - name: Test Lab 04 atom mapping and proton-transfer keyframes
+      - name: Test Lab 04 atom mapping, proton transfer, AgCl precipitation and Ksp gate
         run: node --test tests/lab04-atom-engine.test.mjs
       - name: Check microscope UI JavaScript syntax
         run: node --input-type=module --check < src/microscope-lab.js
