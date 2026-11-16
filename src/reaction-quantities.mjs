@@ -116,7 +116,7 @@ export function buildReactionReportCsv({ inputs, quantities, model }) {
     ["solution_volume", inputs.volumeMl, "mL"],
     ["temperature", inputs.temperatureC, "degC"],
     ["assumed_gas_pressure", inputs.pressureKpa, "kPa"],
-    ["elapsed_presentation_time", inputs.elapsedSeconds, "s"],
+    ["elapsed_simulation_time", inputs.elapsedSeconds, "s"],
     ["kinetic_model_enabled", Boolean(model && model.enabled), ""],
     ["rate_constant_k", model && model.rateConstant, "units depend on total reaction order"],
     ["acid_reaction_order_m", model && model.acidOrder, ""],
