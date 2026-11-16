@@ -54,7 +54,16 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_mechanism_engine_version \
   -Wl,--strip-all "$ROOT/cpp/reaction_mechanism.cpp" -o "$ROOT/wasm/reaction_mechanism.wasm"
 
-printf 'Built %s, %s, %s, %s, and %s\\n' \
+# Station 04 reaction effects: electron/proton-transfer timing, phase changes,
+# precipitation nucleation/growth, and gas-release presentation channels.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_s04_profile -Wl,--export=cv_s04_effects \
+  -Wl,--export=cv_s04_validate_profile -Wl,--export=cv_s04_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/station04_engine.cpp" -o "$ROOT/wasm/station04_engine.wasm"
+
+printf 'Built %s, %s, %s, %s, %s, and %s\\n' \
   "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
   "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm" \
-  "$ROOT/wasm/reaction_mechanism.wasm"
+  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/station04_engine.wasm"
