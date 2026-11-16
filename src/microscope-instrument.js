@@ -44,7 +44,7 @@ export function createMicroscopeInstrument(options={}){
  cylinder(nosepiece,.36,.36,.13,[0,0,.22],steel,48);
  const objectives=[4,10,40,100];
  const objectiveRings=new Map([[4,mat(0xd94b43,.28,.36)],[10,mat(0xdfc23b,.28,.36)],[40,mat(0x4786d2,.28,.36)],[100,mat(0xe8e8df,.28,.36)]]);
- objectives.forEach((value,i)=>{const a=Math.PI/4+Math.PI*2*i/objectives.length,unit=new THREE.Group();unit.position.set(Math.sin(a)*.31,-.12,.22+Math.cos(a)*.31);const length=value===100?.53:value===40?.43:.34;cylinder(unit,.095,.078,length,[0,-.22,0],value===40||value===100?shell:steel,24);cylinder(unit,.073,.073,.045,[0,-.22-length*.7,0],dark,24);cylinder(unit,.052,.052,.018,[0,-.22-length*.82,0],lensGlass,24);cylinder(unit,.102,.102,.035,[0,-.035,0],objectiveRings.get(value),28);nosepiece.add(unit)});
+ objectives.forEach((value,i)=>{const a=Math.PI/4+Math.PI*2*i/objectives.length,unit=new THREE.Group();unit.position.set(Math.sin(a)*.31,value===100?-.04:-.12,.22+Math.cos(a)*.31);const length=value===100?.53:value===40?.43:.34;cylinder(unit,.095,.078,length,[0,-.22,0],value===40||value===100?shell:steel,24);cylinder(unit,.073,.073,.045,[0,-.22-length*.7,0],dark,24);cylinder(unit,.052,.052,.018,[0,-.22-length*.82,0],lensGlass,24);cylinder(unit,.102,.102,.035,[0,-.035,0],objectiveRings.get(value),28);nosepiece.add(unit)});
  between(head,[0,.1,.24],[0,.81,.72],.14,dark);between(head,[0,.76,.69],[0,.93,.81],.19,rubber);between(head,[0,.86,.76],[0,.95,.82],.13,lensGlass);box(head,[.52,.16,.34],[0,.03,.21],shell,.045);
  // Paired focus wheels rotate when the slide or objective is focused.
  const focusWheels=[];
