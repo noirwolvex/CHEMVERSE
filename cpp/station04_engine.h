@@ -12,6 +12,7 @@ enum {
   CV_S04_SOLID_NONE = 0,
   CV_S04_SOLID_IONIC_PRECIPITATE = 1,
   CV_S04_SOLID_METAL_DEPOSITION = 2,
+  CV_S04_SOLID_CRYSTAL_PRODUCT = 3,
   CV_S04_GAS_NONE = 0,
   CV_S04_GAS_H2 = 1,
   CV_S04_GAS_CO2 = 2,
@@ -37,6 +38,14 @@ enum {
 const double *cv_s04_profile(int reaction_id);
 const double *cv_s04_effects(int reaction_id, double progress);
 int cv_s04_validate_profile(int reaction_id);
+/*
+ * Redox pair fields:
+ * [donor_Z, donor_charge_before, donor_charge_after, donor_site_count,
+ *  acceptor_Z, acceptor_charge_before, acceptor_charge_after,
+ *  acceptor_site_count, total_electrons].
+ */
+int cv_s04_redox_pair_count(int reaction_id);
+const double *cv_s04_redox_pair(int reaction_id, int pair_index);
 int cv_s04_engine_version(void);
 
 #ifdef __cplusplus
