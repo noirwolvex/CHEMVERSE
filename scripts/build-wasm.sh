@@ -80,6 +80,8 @@ mkdir -p "$ROOT/wasm"
   -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
   -Wl,--no-entry -Wl,--export-memory \
   -Wl,--export=cv_afm_height_input -Wl,--export=cv_afm_scan \
+  -Wl,--export=cv_afm_scan_begin -Wl,--export=cv_afm_scan_advance \
+  -Wl,--export=cv_afm_scan_progress -Wl,--export=cv_afm_scan_complete \
   -Wl,--export=cv_afm_summary -Wl,--export=cv_afm_output \
   -Wl,--export=cv_afm_last_error -Wl,--export=cv_afm_engine_version \
   -Wl,--strip-all "$ROOT/cpp/afm_interaction.cpp" -o "$ROOT/wasm/afm_interaction.wasm"
