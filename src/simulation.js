@@ -106,6 +106,8 @@ const experimentNotesInput = document.getElementById('experiment-notes');
 const exportExperimentCsvButton = document.getElementById('export-experiment-csv');
 const quantityCalculationStatus = document.getElementById('quantity-calculation-status');
 const theoreticalExtentOutput = document.getElementById('theoretical-extent');
+const theoreticalAcidRemainingOutput = document.getElementById('theoretical-acid-remaining');
+const theoreticalBicarbonateRemainingOutput = document.getElementById('theoretical-bicarbonate-remaining');
 const theoreticalAcetateMassOutput = document.getElementById('theoretical-acetate-mass');
 const theoreticalWaterMassOutput = document.getElementById('theoretical-water-mass');
 const theoreticalCo2MassOutput = document.getElementById('theoretical-co2-mass');
@@ -523,6 +525,8 @@ function updateReactionQuantities(result) {
     const volume = (value) => value.toFixed(1) + ' mL';
     gasPressureInput.removeAttribute('aria-invalid');
     theoreticalExtentOutput.textContent = theoretical.extentMmol.toFixed(3) + ' mmol';
+    theoreticalAcidRemainingOutput.textContent = theoretical.acidRemainingMmol.toFixed(3) + ' mmol';
+    theoreticalBicarbonateRemainingOutput.textContent = theoretical.bicarbonateRemainingMmol.toFixed(3) + ' mmol';
     theoreticalAcetateMassOutput.textContent = mass(theoretical.sodiumAcetateMassG);
     theoreticalWaterMassOutput.textContent = mass(theoretical.waterMassG);
     theoreticalCo2MassOutput.textContent = mass(theoretical.carbonDioxideMassG);
@@ -543,7 +547,7 @@ function updateReactionQuantities(result) {
     gasPressureInput.setAttribute('aria-invalid', 'true');
     quantityCalculationStatus.textContent = 'تعذر إتمام الحساب: ' + error.message;
     gasObservationStatus.textContent = 'تعذر تحديث تقدير الغاز حتى تصحيح الضغط وبيانات التجربة.';
-    for (const output of [theoreticalExtentOutput, theoreticalAcetateMassOutput,
+    for (const output of [theoreticalExtentOutput, theoreticalAcidRemainingOutput, theoreticalBicarbonateRemainingOutput, theoreticalAcetateMassOutput,
       theoreticalWaterMassOutput, theoreticalCo2MassOutput, theoreticalCo2VolumeOutput]) output.textContent = '—';
     for (const output of [currentExtentOutput, currentAcetateMassOutput,
       currentWaterMassOutput, currentCo2MassOutput, currentCo2VolumeOutput]) output.textContent = '—';
