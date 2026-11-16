@@ -165,7 +165,7 @@ function drawOptical(context,w,h,fieldWidth,rng,metrics){
   context.fillStyle='rgba(39,66,58,'+shade+')';context.fillRect(rng()*fieldPixels,rng()*fieldPixels,.7,.7);
  }
  const defocus=getOpticalDefocusBlurPx(objective,Number(focus.value),fieldPixels);
- context.save();context.filter='blur('+defocus.toFixed(2)+'px) contrast('+(95+Number(focus.value)*.12)+'%)';
+ context.save();context.filter='blur('+defocus.toFixed(2)+'px) brightness('+(Number(gain.value)/100).toFixed(2)+') contrast('+(95+Number(focus.value)*.12)+'%)';
  if(sample.shape==='cube'||sample.shape==='prism'||sample.shape==='needle'||sample.shape==='plate')drawOpticalCrystals(context,fieldPixels,fieldPixels,fieldWidth,rng);
  else if(sample.shape==='particle')drawOpticalPrecipitate(context,fieldPixels,fieldPixels,fieldWidth,rng);
  else if(sample.shape==='droplet')drawOpticalEmulsion(context,fieldPixels,fieldPixels,fieldWidth,rng);
@@ -532,7 +532,10 @@ function setMode(id){
   const active=button.dataset.mode===id;button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',String(active));
  });
  const available=getMicroscopeSamples(id);
- if(!available.some(item=>item.id===sample.id))sample=available[0];
+ if(!available.some(item=>item.id===sample.id)){
+  sample=available[0];slideState=createSlidePreparationState(sample.id);
+  instrument?.setSample(sample.id);instrument?.setPreparationState(slideState);
+ }
  zoom.min='1';zoom.max=String(MICROSCOPE_ZOOM_PRESETS[id].length);
  zoom.value=id==='light'?String(opticalIndexForObjective(objective)):String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));scanValue=Number(zoom.value);
  renderSamples();updateDetails();instrument?.setMode(mode);renderPreparation();draw();
