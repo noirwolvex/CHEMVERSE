@@ -621,6 +621,7 @@ function drawAFMPhysicsImage(context,w,h,result){
  context.fillStyle='rgba(4,12,18,.72)';rounded(context,10,h-29,Math.min(255,w*.55),20,4);context.fill();
  context.fillStyle='rgba(239,245,230,.9)';context.font='600 8px "Space Grotesk"';
  context.fillText(channel.toUpperCase()+' · '+minimum.toFixed(3)+' TO '+maximum.toFixed(3),18,h-16);
+ if(!result.scanComplete){context.fillStyle='rgba(4,12,18,.78)';rounded(context,w-185,9,169,22,4);context.fill();context.fillStyle='#c8eadf';context.fillText('LIVE RASTER '+Math.round((result.scanProgress||0)*100)+'%',w-174,23)}
 }
 function drawAFMProbeTrace(result){
  const canvas=document.getElementById('afm-probe-canvas'),context=canvas?.getContext('2d');
