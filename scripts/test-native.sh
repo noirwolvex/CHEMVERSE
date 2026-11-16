@@ -34,4 +34,9 @@ STATION04_OUT="$OUT_DIR/chemverse-station04-engine-test"
   "$ROOT/cpp/station04_engine.cpp" "$ROOT/tests/station04_engine_test.cpp" -o "$STATION04_OUT"
 "$STATION04_OUT"
 
-rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$STATION04_OUT"
+CRYSTAL_OUT="$OUT_DIR/chemverse-crystal-engine-test"
+"$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+  "$ROOT/cpp/crystal_engine.cpp" "$ROOT/tests/crystal_engine_test.cpp" -o "$CRYSTAL_OUT"
+"$CRYSTAL_OUT"
+
+rm -f "$CHEMISTRY_OUT" "$KINETICS_OUT" "$FIT_OUT" "$CONCENTRATION_OUT" "$MECHANISM_OUT" "$STATION04_OUT" "$CRYSTAL_OUT"
