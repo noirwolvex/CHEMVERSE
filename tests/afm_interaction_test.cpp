@@ -20,6 +20,7 @@ int main(){
  if(!tap)std::fprintf(stderr,"AFM tap engine error %d\\n",cv_afm_last_error());
  assert(tap&&cv_afm_last_error()==0);
  const double *summary=cv_afm_summary();
+ std::fprintf(stderr,"AFM tapping diagnostics: amplitude=%.6f nm ratio=%.6f force=%.6f nN indentation=%.6f nm feedback=%.3f\\n",summary[5],summary[6],summary[1],summary[7],summary[8]);
  assert(summary[0]==16.0);
  assert(summary[1]>=-12.0&&summary[2]>=summary[1]);
  assert(summary[3]>=-20.0);
