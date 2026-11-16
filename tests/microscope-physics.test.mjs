@@ -19,7 +19,7 @@ function makeElectronEngine(){
   cv_electron_summary:()=>summaryPointer,
   cv_electron_histogram:()=>histogramPointer,
   cv_electron_tracks:()=>tracksPointer,
-  cv_electron_simulate(count,z,mass,density,energy,thickness,tilt,seed,recorded)=>{
+  cv_electron_simulate:(count,z,mass,density,energy,thickness,tilt,seed,recorded,maxCollisions)=>{
    summary.fill(0);histogram.fill(0);tracks.fill(0);
    summary[0]=count;summary[1]=count*.2;summary[2]=count*.3;summary[3]=count*.5;
    summary[4]=count*.4;summary[5]=10;summary[6]=20;summary[7]=energy*count-30;
