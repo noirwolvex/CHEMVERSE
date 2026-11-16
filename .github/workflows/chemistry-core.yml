@@ -271,7 +271,55 @@ jobs:
             if (Math.abs(productSample[8]) > 1e-9) {
               throw new Error('Lab 04 atom-engine final broken-bond state failed');
             }
-            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, Lab 04 atom engine, and timeline-event validation passed');
+            const lab04Models = await import('./src/lab04-atom-engine.mjs');
+            const agcl = lab04Models.configureAtomEngine(le, 'silver-chloride-precipitation',
+              { precipitationAllowed: true });
+            if (agcl.atomCount !== 28 || agcl.bondCount !== 24 ||
+                agcl.atoms.filter(atom => atom.element === 'Ag').length !== 4 ||
+                agcl.atoms.filter(atom => atom.element === 'Cl').length !== 4 ||
+                agcl.atoms.filter(atom => atom.element === 'Na').length !== 4) {
+              throw new Error('AgCl atom map or conserved ion inventory failed');
+            }
+            const agclStartPointer = le.cv_lab04_atom_engine_sample(0);
+            const agclStart = new Float64Array(le.memory.buffer, agclStartPointer, 28 * 4 + 24);
+            const agclOffset = 28 * 4;
+            for (let bond = 12; bond < 24; bond++) {
+              if (Math.abs(agclStart[agclOffset + bond]) > 1e-9) {
+                throw new Error('AgCl ionic contacts must start dissociated');
+              }
+            }
+            const agclNucleusPointer = le.cv_lab04_atom_engine_sample(0.5);
+            const agclNucleus = new Float64Array(le.memory.buffer, agclNucleusPointer, 28 * 4 + 24);
+            for (let bond = 12; bond < 16; bond++) {
+              if (Math.abs(agclNucleus[agclOffset + bond] - 1) > 1e-9) {
+                throw new Error('AgCl initial four-ion nucleus did not form');
+              }
+            }
+            for (let bond = 16; bond < 24; bond++) {
+              if (Math.abs(agclNucleus[agclOffset + bond]) > 1e-9) {
+                throw new Error('AgCl lattice growth occurred before the nucleus stage');
+              }
+            }
+            const agclProductPointer = le.cv_lab04_atom_engine_sample(1);
+            const agclProduct = new Float64Array(le.memory.buffer, agclProductPointer, 28 * 4 + 24);
+            for (let bond = 12; bond < 24; bond++) {
+              if (Math.abs(agclProduct[agclOffset + bond] - 1) > 1e-9) {
+                throw new Error('AgCl ionic cluster did not complete its keyframed growth');
+              }
+            }
+            lab04Models.configureAtomEngine(le, 'silver-chloride-precipitation',
+              { precipitationAllowed: false });
+            const unsaturatedPointer = le.cv_lab04_atom_engine_sample(1);
+            const unsaturated = new Float64Array(le.memory.buffer, unsaturatedPointer, 28 * 4 + 24);
+            for (let bond = 12; bond < 24; bond++) {
+              if (Math.abs(unsaturated[agclOffset + bond]) > 1e-9) {
+                throw new Error('Unsaturated solution must not form an AgCl precipitate');
+              }
+            }
+            if (Math.abs(unsaturated[0] - (-2.45)) > 1e-9) {
+              throw new Error('Unsaturated Ag+ coordinate changed despite the Ksp gate');
+            }
+            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped neutralization, AgCl precipitation, Ksp gate, and timeline-event validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
