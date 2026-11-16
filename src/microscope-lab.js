@@ -7,6 +7,7 @@ import {
  getTunnellingCurrentRelative,getObjectiveFocusingLimits
 } from './microscope-optics.mjs';
 import {createMicroscopeInstrument} from './microscope-instrument.js';
+import {loadMicroscopePhysics,runElectronTransport,runAFMInteraction,getElectronRunDefaults} from './microscope-physics.mjs';
 import {
  createSlidePreparationState,completeSlidePreparationStep,
  getSlidePreparationPlan,getSlidePreparationProgress
@@ -24,6 +25,8 @@ const OBJECTIVES=[4,10,40,100];
 let mode='light',objective=10,scanValue=2;
 let sample=getMicroscopeSample('nacl-crystals');
 let slideState=createSlidePreparationState(sample.id),instrument=null;
+let physicsEngines=null,physicsLoadPromise=null,electronResult=null,afmResult=null;
+let afmScanFrame=0,afmScanIndex=0,afmAnimationRequest=0;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const mix=(a,b,t)=>a+(b-a)*t;
 const between=(rng,min,max)=>min+rng()*(max-min);
