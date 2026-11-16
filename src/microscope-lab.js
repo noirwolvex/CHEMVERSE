@@ -422,6 +422,23 @@ function draw(){
  }
  drawScaleBar(ctx,width,height,fieldWidthNm,optical);
 }
+function clearPhysicsResults(){
+ electronResult=null;afmResult=null;afmScanIndex=0;
+ if(afmAnimationRequest){cancelAnimationFrame(afmAnimationRequest);afmAnimationRequest=0}
+ const play=document.getElementById('play-afm-tip-scan');if(play){play.disabled=true;play.textContent='PLAY TIP TRACE'}
+ for(const id of ['electron-bse','electron-transmitted','electron-secondary','electron-deposited','electron-depth','electron-balance',
+  'afm-mean-force','afm-indentation','afm-amplitude-ratio','afm-deflection','afm-contact-fraction','afm-feedback']){
+  const node=document.getElementById(id);if(node)node.textContent='—';
+ }
+ const electronStatus=document.getElementById('electron-physics-status');
+ const afmStatus=document.getElementById('afm-physics-status');
+ if(electronStatus)electronStatus.textContent='SETTINGS CHANGED / RUN AGAIN';
+ if(afmStatus)afmStatus.textContent='SETTINGS CHANGED / RUN AGAIN';
+ for(const id of ['electron-track-canvas','afm-probe-canvas']){
+  const node=document.getElementById(id),context=node?.getContext('2d');
+  if(context)context.clearRect(0,0,node.width,node.height);
+ }
+}
 function updatePhysicsPanelVisibility(){
  const electronPanel=document.getElementById('electron-physics-panel');
  const afmPanel=document.getElementById('afm-physics-panel');
