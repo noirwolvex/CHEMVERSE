@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
-const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
-let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,raf=0,playing=false,progress=0,lastTime=0;
+import {loadStation04Engine,loadKineticsEngine,sampleStation04ReactionNow,simulateStation04Kinetics} from './station04-engine.mjs';
+const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomicNumbers=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.atomicNumber])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
+let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,interactionRoot=null,solidRoot=null,gasRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,electronParticles=[],protonParticles=[],solidParticles=[],gasParticles=[],station04Profile=null,station04Effects=null,station04EngineReady=false,kineticsEngineReady=false,kineticsResults=null,raf=0,playing=false,progress=0,lastTime=0;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
 function buildMolecule(parent,species){
@@ -71,7 +72,7 @@ function buildAtomMappedScene(){
   const colour=atomColors[atom.element]||'#b5c2c0';
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),new THREE.MeshStandardMaterial({color:colour,roughness:.28,metalness:.16,emissive:colour,emissiveIntensity:.08,transparent:true,opacity:1}));
   mesh.scale.setScalar((atomRadii[atom.element]||.34)*.78);mesh.position.copy(atom.position);mesh.castShadow=true;atomRoot.add(mesh);
-  mappedAtoms.push({mesh,start:atom.position.clone(),end:right.atoms[targetIndex].position.clone()});
+  mappedAtoms.push({mesh,element:atom.element,start:atom.position.clone(),end:right.atoms[targetIndex].position.clone()});
  });
  const addBonds=(pairs,side)=>pairs.forEach(([a,b])=>{
   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1,10),new THREE.MeshStandardMaterial({color:0xb4c5c9,roughness:.34,metalness:.42,transparent:true,opacity:side==='reactants'?1:0}));
@@ -83,17 +84,114 @@ function buildAtomMappedScene(){
  updateAtomMappedScene(progress);
  return atomMapReady;
 }
+
+function reactionNumber(){return Number.parseInt(activeReaction.number,10)}
+function createParticle(parent,geometry,colour,opacity=1){
+ const material=new THREE.MeshStandardMaterial({color:colour,emissive:colour,emissiveIntensity:.7,roughness:.28,metalness:.12,transparent:opacity<1,opacity,depthWrite:opacity>=1});
+ const mesh=new THREE.Mesh(geometry,material);parent.add(mesh);return mesh;
+}
+function findMappedAtom(atomicNumber,exclude=-1){
+ return mappedAtoms.findIndex((atom,index)=>index!==exclude&&atomicNumbers[atom.element]===atomicNumber);
+}
+function configureDynamicEffects(){
+ [interactionRoot,solidRoot,gasRoot].forEach(root=>{if(root)disposeGroup(root)});
+ electronParticles=[];protonParticles=[];solidParticles=[];gasParticles=[];
+ const sample=sampleStation04ReactionNow(reactionNumber(),progress);
+ station04Profile=sample?.profile??null;station04Effects=sample?.effects??null;
+ if(!station04Profile||!interactionRoot||!solidRoot||!gasRoot)return;
+ const electronCount=Math.min(6,Math.max(0,Math.round(station04Profile[0])));
+ const protonCount=Math.min(3,Math.max(0,Math.round(station04Profile[1])));
+ for(let i=0;i<electronCount;i++){
+  electronParticles.push(createParticle(interactionRoot,new THREE.SphereGeometry(.095,16,12),0x8bcfff,1));
+ }
+ for(let i=0;i<protonCount;i++){
+  protonParticles.push(createParticle(interactionRoot,new THREE.SphereGeometry(.13,18,14),0xffc879,1));
+ }
+ if(station04Profile[2]>0){
+  const colour=station04Profile[2]===2?0xc8844b:(reactionNumber()===5?0xe8e7dc:0xe5ebed);
+  for(let i=0;i<72;i++){
+   const geometry=station04Profile[2]===2?new THREE.SphereGeometry(.105,12,10):new THREE.OctahedronGeometry(.105,0);
+   const particle=createParticle(solidRoot,geometry,colour,.92);
+   const angle=i*2.3999632297,radius=.08+.032*Math.sqrt(i);
+   particle.userData.clusterPosition=new THREE.Vector3(Math.cos(angle)*radius,.10+(i%5)*.075,Math.sin(angle)*radius);
+   particle.scale.setScalar(.001);solidParticles.push(particle);
+  }
+ }
+ if(station04Profile[3]>0){
+  const gasColour=station04Profile[3]===1?0xa9d9ee:(station04Profile[3]===3?0xb9e7e9:0xd5e0e7);
+  for(let i=0;i<24;i++){
+   const particle=createParticle(gasRoot,new THREE.SphereGeometry(.105+(i%3)*.018,14,10),gasColour,.72);
+   particle.userData.phase=i/24;particle.userData.seed=i;gasParticles.push(particle);
+  }
+ }
+}
+function updateDynamicEffects(value){
+ if(!station04Profile||!station04Effects)return;
+ const electronProgress=station04Effects[0],protonProgress=station04Effects[1];
+ const electronStartIndex=findMappedAtom(station04Profile[5]);
+ const electronEndIndex=findMappedAtom(station04Profile[6],electronStartIndex);
+ if(electronStartIndex>=0&&electronEndIndex>=0){
+  const start=mappedAtoms[electronStartIndex].mesh.position,end=mappedAtoms[electronEndIndex].mesh.position;
+  electronParticles.forEach((particle,index)=>{
+   const phase=clamp(electronProgress*1.08-index*.035,0,1);
+   particle.position.lerpVectors(start,end,phase);
+   particle.position.y+=Math.sin(phase*Math.PI)*(.28+index*.045);
+   particle.position.x+=Math.sin(index*2.1)*.06;
+   particle.visible=electronProgress>.005;
+  });
+ }
+ const hydrogenIndex=findMappedAtom(1),oxygenIndex=findMappedAtom(8,hydrogenIndex);
+ if(hydrogenIndex>=0&&oxygenIndex>=0){
+  const start=mappedAtoms[hydrogenIndex].mesh.position,end=mappedAtoms[oxygenIndex].mesh.position;
+  protonParticles.forEach((particle,index)=>{
+   const phase=clamp(protonProgress*1.06-index*.05,0,1);
+   particle.position.lerpVectors(start,end,phase);
+   particle.position.y+=Math.sin(phase*Math.PI)*.2;
+   particle.visible=protonProgress>.005;
+  });
+ }
+ const nucleation=station04Effects[4],growth=station04Effects[5];
+ solidParticles.forEach((particle,index)=>{
+  const base=particle.userData.clusterPosition;
+  const scale=(.12+.88*growth)*(.35+.65*nucleation);
+  particle.position.set((station04Profile[2]===2?-2.15:.35)+base.x,base.y*scale,base.z);
+  particle.scale.setScalar(Math.max(.001,scale*(.45+(index%4)*.14)));
+  particle.visible=nucleation>.01;
+ });
+ const gasNucleation=station04Effects[6],gasRelease=station04Effects[7];
+ gasParticles.forEach(particle=>{
+  const phase=(value*2.65+particle.userData.phase)%1;
+  const bubbleMode=station04Profile[4]===1;
+  particle.position.set(Math.sin(phase*5.1+particle.userData.seed)*.42,
+   .20+phase*(bubbleMode?1.55:2.75),
+   Math.cos(particle.userData.seed*2.17)*.38);
+  const scale=(.45+.55*gasNucleation)*(bubbleMode?1:.82);
+  particle.scale.setScalar(scale);
+  particle.material.opacity=Math.max(0,.72*gasNucleation*(.45+.55*gasRelease)*(1-phase*.18));
+  particle.visible=gasNucleation>.01&&gasRelease>.01;
+ });
+ const readout=byId('reaction-effect-readout');
+ if(readout){
+  const messages=[];
+  if(station04Profile[0]>0)messages.push('e⁻ '+station04Profile[0]+' / '+Math.round(electronProgress*100)+'%');
+  if(station04Profile[1]>0)messages.push('H⁺ '+Math.round(protonProgress*100)+'%');
+  if(station04Profile[2]>0)messages.push((station04Profile[2]===2?'ترسيب فلزي ':'تكوّن راسب ')+Math.round(growth*100)+'%');
+  if(station04Profile[3]>0)messages.push((station04Profile[4]===1?'فقاعات ':'تحرر غاز ')+Math.round(gasRelease*100)+'%');
+  readout.textContent=messages.length?messages.join('  ·  '):'تغيّر الروابط / حفظ الذرات';
+ }
+}
 function updateAtomMappedScene(value){
  if(!atomMapReady)return;
- const p=smooth(value);
+ const p=smooth(value),breaking=station04Effects?.[2]??smooth((value-.20)/.38),forming=station04Effects?.[3]??smooth((value-.52)/.40);
  mappedAtoms.forEach(atom=>atom.mesh.position.lerpVectors(atom.start,atom.end,p));
  mappedBonds.forEach(bond=>{
   const a=mappedAtoms[bond.a]?.mesh.position,b=mappedAtoms[bond.b]?.mesh.position;if(!a||!b)return;
   const direction=new THREE.Vector3().subVectors(b,a),length=direction.length();
   bond.mesh.position.copy(a).add(b).multiplyScalar(.5);bond.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());bond.mesh.scale.y=Math.max(.001,length);
-  const fade=bond.side==='reactants'?1-smooth((value-.20)/.38):smooth((value-.52)/.40);
+  const fade=bond.side==='reactants'?1-breaking:forming;
   bond.mesh.material.opacity=fade;bond.mesh.visible=fade>.015;
  });
+ updateDynamicEffects(value);
 }
 function updateMechanismCopy(value){
  const index=value<.12?0:value<.36?1:value<.70?2:3;
@@ -106,14 +204,14 @@ function seekReaction(value){
 }
 function setOpacity(root,opacity){root.traverse(obj=>{if(obj.isMesh&&obj.material){obj.material.opacity=opacity;obj.material.transparent=true;obj.material.depthWrite=opacity>.98}})}
 function setSideTransform(root,side,amount){root.children.forEach((m,i)=>{const base=m.userData.startPosition;if(!base)return;m.position.x=base.x+(side==='reactants'?1:-1)*amount*.26;m.position.y=base.y+Math.sin(amount*Math.PI+i)*.12;m.rotation.y=(i%2?-.16:.13)+amount*.25*(side==='reactants'?1:-1);m.scale.setScalar(.78*(side==='reactants'?1-.13*amount:.86+.14*amount))})}
-function updateTimeline(value){progress=clamp(value,0,1);if(reactantRoot)setOpacity(reactantRoot,0);if(productRoot)setOpacity(productRoot,0);updateAtomMappedScene(progress);const phase=progress<.24?'REACTANTS':progress<.49?'APPROACH':progress<.76?'REARRANGEMENT':'PRODUCTS';txt('view-phase',phase);const stageIndex=progress<.12?0:progress<.36?1:progress<.70?2:3;txt('stage-label',stageTitles[stageIndex]);txt('scene-caption',stageDescriptions[activeReaction.id]?.[stageIndex]||'عرض جزيئي تخطيطي');txt('progress-label',Math.round(progress*100)+'%');const bar=byId('timeline-progress');if(bar)bar.style.width=(progress*100)+'%';const scrubber=byId('reaction-scrubber');if(scrubber)scrubber.value=String(Math.round(progress*1000));updateMechanismCopy(progress)}
+function updateTimeline(value){progress=clamp(value,0,1);if(reactantRoot)setOpacity(reactantRoot,0);if(productRoot)setOpacity(productRoot,0);const frame=sampleStation04ReactionNow(reactionNumber(),progress);station04Profile=frame?.profile??station04Profile;station04Effects=frame?.effects??null;updateAtomMappedScene(progress);const phase=progress<.24?'REACTANTS':progress<.49?'APPROACH':progress<.76?'REARRANGEMENT':'PRODUCTS';txt('view-phase',phase);const stageIndex=progress<.12?0:progress<.36?1:progress<.70?2:3;txt('stage-label',stageTitles[stageIndex]);txt('scene-caption',stageDescriptions[activeReaction.id]?.[stageIndex]||'عرض جزيئي تخطيطي');txt('progress-label',Math.round(progress*100)+'%');const bar=byId('timeline-progress');if(bar)bar.style.width=(progress*100)+'%';const scrubber=byId('reaction-scrubber');if(scrubber)scrubber.value=String(Math.round(progress*1000));updateMechanismCopy(progress)}
 function renderScene(){
  const canvas=byId('molecule-canvas');try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'})}catch(error){byId('webgl-fallback').hidden=false;canvas.hidden=true;return}
  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;scene=new THREE.Scene();scene.background=new THREE.Color(0x0c1721);scene.fog=new THREE.Fog(0x0c1721,14,27);
  camera=new THREE.PerspectiveCamera(42,1,.1,80);camera.position.set(0,5.2,14);scene.add(new THREE.HemisphereLight(0xe6f4f1,0x34434d,2.4));
  const key=new THREE.DirectionalLight(0xffe9c8,3.4);key.position.set(-5,9,7);scene.add(key);const fill=new THREE.PointLight(0x64cbb8,35,18,2);fill.position.set(4,4,2);scene.add(fill);
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(20,10),new THREE.MeshStandardMaterial({color:0x172933,roughness:.9}));floor.rotation.x=-Math.PI/2;floor.position.y=-.25;scene.add(floor);
- reactantRoot=new THREE.Group();productRoot=new THREE.Group();atomRoot=new THREE.Group();scene.add(reactantRoot,productRoot,atomRoot);orbit=new OrbitControls(camera,renderer.domElement);orbit.enableDamping=true;orbit.dampingFactor=.06;orbit.minDistance=7;orbit.maxDistance=23;orbit.maxPolarAngle=Math.PI*.49;orbit.target.set(0,.9,0);
+ reactantRoot=new THREE.Group();productRoot=new THREE.Group();atomRoot=new THREE.Group();interactionRoot=new THREE.Group();solidRoot=new THREE.Group();gasRoot=new THREE.Group();scene.add(reactantRoot,productRoot,atomRoot,interactionRoot,solidRoot,gasRoot);orbit=new OrbitControls(camera,renderer.domElement);orbit.enableDamping=true;orbit.dampingFactor=.06;orbit.minDistance=7;orbit.maxDistance=23;orbit.maxPolarAngle=Math.PI*.49;orbit.target.set(0,.9,0);
  const resize=()=>{const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()};
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;if(observer)observer.observe(canvas.parentElement||canvas);else window.addEventListener('resize',resize,{passive:true});resize();
  window.addEventListener('pagehide',()=>{observer?.disconnect();if(!observer)window.removeEventListener('resize',resize);orbit?.dispose();renderer?.dispose();cancelAnimationFrame(raf)},{once:true});
@@ -165,12 +263,12 @@ function renderLegend(){const root=byId('atom-legend');root.replaceChildren();EL
 function selectReaction(id){
  const next=getReactionById(id);if(!next)return;activeReaction=next;selectedSpecies=null;selectedMaterial=next.reactants[0].species;activeCategory='all';initialAmounts=Object.fromEntries(next.reactants.map(item=>[item.species,'0.100']));
  playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();updateAmounts();
- if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();updateTimeline(0)}
+ if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
 }
 function init(){
  renderScene();renderCategories();renderReactionList();renderMaterials();renderLegend();updateReactionDisplay();initialAmounts={h2:'0.100',o2:'0.100'};updateAmounts();updateSelectedMaterial();
- if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();updateTimeline(0)}
+ if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
