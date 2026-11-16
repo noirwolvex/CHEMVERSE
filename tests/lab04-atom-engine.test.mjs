@@ -43,6 +43,18 @@ test('AgCl precipitation map conserves every atom and spectator ion charge',()=>
  assert.equal(SILVER_CHLORIDE_BONDS.length,24);
  assert.equal(SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===0).length,12);
  assert.equal(SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===1).length,12);
+ for(const bond of SILVER_CHLORIDE_BONDS){
+  assert.ok(bond.a>=0&&bond.a<SILVER_CHLORIDE_ATOMS.length);
+  assert.ok(bond.b>=0&&bond.b<SILVER_CHLORIDE_ATOMS.length);
+  assert.notEqual(bond.a,bond.b);
+  if(bond.kind===1){
+   const pair=[SILVER_CHLORIDE_ATOMS[bond.a].element,SILVER_CHLORIDE_ATOMS[bond.b].element].sort();
+   assert.deepEqual(pair,['Ag','Cl']);
+  }else{
+   const pair=[SILVER_CHLORIDE_ATOMS[bond.a].element,SILVER_CHLORIDE_ATOMS[bond.b].element].sort();
+   assert.deepEqual(pair,['N','O']);
+  }
+ }
 });
 
 test('AgCl nucleus begins as a four-ion face and expands to twelve alternating ionic contacts',()=>{
