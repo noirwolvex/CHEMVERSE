@@ -82,7 +82,7 @@ for(let index=0;index<4;index++){
 for(let group=0;group<4;group++){
  const center=nitrateCenters[group],nIndex=8+group*4;
  precipitationAtoms.push(mappedAtom(2101+group,'N',center,center,center,
-  {ionGroup:'NO3−-'+(group+1),role:'spectator-nitrate'}));
+  {ionGroup:'NO3−-'+(group+1),ionCharge:-1,role:'spectator-nitrate'}));
  for(let oxygen=0;oxygen<3;oxygen++){
   const offset=nitrateOffsets[oxygen],position=center.map((value,axis)=>value+offset[axis]);
   precipitationAtoms.push(mappedAtom(2201+group*3+oxygen,'O',position,position,position,
