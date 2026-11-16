@@ -234,10 +234,11 @@ function updateStoichiometry(){
 }
 
 function supportsCurrentKinetics(){
- return activeReaction.reactants.length===2&&activeReaction.reactants.every(entry=>{
-  const item=materialById.get(entry.species);
-  return entry.coefficient===1&&item?.phase==='aqueous';
- });
+ return activeReaction.id==='acid-base-neutralization'&&
+  activeReaction.reactants.length===2&&activeReaction.reactants.every(entry=>{
+   const item=materialById.get(entry.species);
+   return entry.coefficient===1&&item?.phase==='aqueous';
+  });
 }
 function kineticsInput(id){return byId(id)?.value.trim()??''}
 function clearKineticsResults(){
