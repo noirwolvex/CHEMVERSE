@@ -230,7 +230,8 @@ jobs:
             const station04 = await WebAssembly.instantiate(fs.readFileSync('wasm/station04_engine.wasm'), {});
             const s04 = station04.instance.exports;
             const station04Names = ['memory', 'cv_s04_profile', 'cv_s04_effects',
-              'cv_s04_validate_profile', 'cv_s04_engine_version'];
+              'cv_s04_validate_profile', 'cv_s04_redox_pair_count', 'cv_s04_redox_pair',
+              'cv_s04_engine_version'];
             for (const name of station04Names) {
               if (!(name in s04)) throw new Error('Missing Station 04 export: ' + name);
             }
@@ -269,7 +270,67 @@ jobs:
               throw new Error('Zinc/acid hydrogen-gas profile is incorrect');
             }
 
-            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, timeline-event, and Station 04 profile validation passed');
+            const mgRedox = new Float64Array(s04.memory.buffer, s04.cv_s04_redox_pair(2, 0), 9);
+            const mgPair = Array.from(mgRedox);
+            if (s04.cv_s04_redox_pair_count(2) !== 1 ||
+                mgPair[0] !== 12 || mgPair[2] !== 2 || mgPair[3] !== 2 ||
+                mgPair[4] !== 8 || mgPair[6] !== -2 || mgPair[7] !== 2 || mgPair[8] !== 4) {
+              throw new Error('Magnesium/oxygen per-site electron accounting failed');
+            }
+            const ironPair = Array.from(new Float64Array(s04.memory.buffer, s04.cv_s04_redox_pair(4, 0), 9));
+            if (ironPair[0] !== 26 || ironPair[2] !== 2 ||
+                ironPair[4] !== 29 || ironPair[5] !== 2 || ironPair[6] !== 0) {
+              throw new Error('Iron/copper oxidation-state accounting failed');
+            }
+            const zincPair = Array.from(new Float64Array(s04.memory.buffer, s04.cv_s04_redox_pair(11, 0), 9));
+            if (zincPair[0] !== 30 || zincPair[2] !== 2 ||
+                zincPair[4] !== 1 || zincPair[5] !== 1 || zincPair[6] !== 0 ||
+                zincPair[7] !== 2) {
+              throw new Error('Zinc/proton electron accounting failed');
+            }
+
+            const crystal = await WebAssembly.instantiate(fs.readFileSync('wasm/crystal_engine.wasm'), {});
+            const x = crystal.instance.exports;
+            const crystalNames = ['memory', 'cv_crystal_profile', 'cv_crystal_site_count',
+              'cv_crystal_site_element', 'cv_crystal_site_role',
+              'cv_crystal_site_fractional', 'cv_crystal_validate', 'cv_crystal_engine_version'];
+            for (const name of crystalNames) {
+              if (!(name in x)) throw new Error('Missing crystal engine export: ' + name);
+            }
+            if (x.cv_crystal_engine_version() !== 100) throw new Error('Unexpected crystal engine version');
+            const crystalCounts = {2:8, 4:4, 5:8, 8:8, 12:24};
+            const crystalGroups = {2:225, 4:225, 5:225, 8:225, 12:62};
+            for (const [idText, expectedCount] of Object.entries(crystalCounts)) {
+              const id = Number(idText);
+              if (x.cv_crystal_validate(id) !== 1 || x.cv_crystal_site_count(id) !== expectedCount) {
+                throw new Error('Crystallographic unit-cell validation failed for reaction ' + id);
+              }
+              const profile = Array.from(new Float64Array(x.memory.buffer, x.cv_crystal_profile(id), 8));
+              if (profile[1] !== crystalGroups[id] || profile[5] !== expectedCount) {
+                throw new Error('Unexpected crystal symmetry or unit-cell contents for reaction ' + id);
+              }
+              for (let site = 0; site < expectedCount; site++) {
+                if (x.cv_crystal_site_element(id, site) <= 0) {
+                  throw new Error('Invalid crystal atom site for reaction ' + id);
+                }
+                for (let axis = 0; axis < 3; axis++) {
+                  const value = x.cv_crystal_site_fractional(id, site, axis);
+                  if (!(value >= 0 && value < 1)) throw new Error('Invalid fractional coordinate');
+                }
+              }
+            }
+            const bariteCounts = {Ba:0, S:0, O:0};
+            for (let site = 0; site < 24; site++) {
+              const z = x.cv_crystal_site_element(12, site);
+              if (z === 56) bariteCounts.Ba++;
+              else if (z === 16) bariteCounts.S++;
+              else if (z === 8) bariteCounts.O++;
+            }
+            if (bariteCounts.Ba !== 4 || bariteCounts.S !== 4 || bariteCounts.O !== 16) {
+              throw new Error('Barite Pnma unit cell must contain Ba4S4O16');
+            }
+
+            console.log('Stoichiometry, kinetics, fitting, concentration-time, atom-mapped mechanism, Station 04 redox sites, and crystallographic unit-cell validation passed');
           })().catch(error => {
             console.error(error);
             process.exit(1);
@@ -279,7 +340,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/station04_engine.wasm
+          git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/station04_engine.wasm wasm/crystal_engine.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
@@ -297,5 +358,6 @@ jobs:
             wasm/concentration_fit.wasm
             wasm/reaction_mechanism.wasm
             wasm/station04_engine.wasm
+            wasm/crystal_engine.wasm
           if-no-files-found: error
           retention-days: 14
