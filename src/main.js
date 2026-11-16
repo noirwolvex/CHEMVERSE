@@ -28,7 +28,7 @@ const stationInfo = [
   { title: 'Microscopy & Materials', description: 'Prepare a specimen, choose an imaging technique and inspect crystals, precipitates, fibres, nanoparticles and atomic-scale surface maps.' },
   { title: 'Elements, Compounds & Reactions', description: 'Explore elements and compounds, select balanced reactions, and inspect molecular reactants and products in a three-dimensional simulator.' },
   { title: 'Materials & Compounds', description: 'Investigate samples, compounds and the properties of different materials.' },
-  { title: 'Practical Experiments', description: 'A flexible station for guided experiments and independent discovery.' }
+  { title: 'Molecular Reaction & Kinetics', description: 'Explore a mapped proton-transfer reaction, inspect atom and bond bookkeeping, compare theoretical yield with parameterised kinetic estimates, and export a structured experiment record.' }
 ];
 
 let renderer;
