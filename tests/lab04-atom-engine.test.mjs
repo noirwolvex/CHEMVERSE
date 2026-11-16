@@ -38,7 +38,7 @@ test('AgCl precipitation map conserves every atom and spectator ion charge',()=>
  assert.equal(new Set(ids).size,28);
  const inventory=SILVER_CHLORIDE_ATOMS.reduce((result,atom)=>{result[atom.element]=(result[atom.element]||0)+1;return result},{});
  assert.deepEqual(inventory,{Ag:4,Cl:4,N:4,O:12,Na:4});
- const charge=SILVER_CHLORIDE_ATOMS.reduce((total,atom)=>total+(atom.formalCharge||0)+(atom.ionCharge||0),0);
+ const charge=SILVER_CHLORIDE_ATOMS.reduce((total,atom)=>total+(atom.formalCharge||0)+(atom.ionGroupCharge||0),0);
  assert.equal(charge,0);
  assert.equal(SILVER_CHLORIDE_BONDS.length,24);
  assert.equal(SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===0).length,12);
