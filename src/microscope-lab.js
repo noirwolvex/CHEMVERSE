@@ -27,6 +27,8 @@ let sample=getMicroscopeSample('nacl-crystals');
 let slideState=createSlidePreparationState(sample.id),instrument=null;
 let physicsEngines=null,physicsLoadPromise=null,electronResult=null,afmResult=null;
 let afmScanFrame=0,afmScanIndex=0,afmAnimationRequest=0;
+const electronCamera={yaw:-.62,pitch:.42,zoom:1};
+const afmCamera={yaw:-.72,pitch:.58,zoom:1};
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const mix=(a,b,t)=>a+(b-a)*t;
 const between=(rng,min,max)=>min+rng()*(max-min);
@@ -44,6 +46,20 @@ function rounded(context,x,y,width,height,radius){
  context.arcTo(x,y+height,x,y,radius);
  context.arcTo(x,y,x+width,y,radius);
  context.closePath();
+}
+function bindOrbitCanvas(canvas,camera,redraw){
+ if(!canvas||canvas.dataset.orbitBound==='true')return;
+ canvas.dataset.orbitBound='true';
+ let dragging=false,lastX=0,lastY=0;
+ canvas.addEventListener('pointerdown',event=>{dragging=true;lastX=event.clientX;lastY=event.clientY;canvas.setPointerCapture?.(event.pointerId)});
+ canvas.addEventListener('pointermove',event=>{
+  if(!dragging)return;
+  const dx=event.clientX-lastX,dy=event.clientY-lastY;lastX=event.clientX;lastY=event.clientY;
+  camera.yaw+=dx*.009;camera.pitch=clamp(camera.pitch+dy*.008,-1.15,1.15);redraw();
+ });
+ const stop=()=>{dragging=false};
+ canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);canvas.addEventListener('lostpointercapture',stop);
+ canvas.addEventListener('wheel',event=>{event.preventDefault();camera.zoom=clamp(camera.zoom*Math.exp(-event.deltaY*.001),.62,2.5);redraw()},{passive:false});
 }
 function getActivePreset(){
  return mode==='light'
@@ -426,7 +442,7 @@ function clearPhysicsResults(){
  electronResult=null;afmResult=null;afmScanIndex=0;
  if(afmAnimationRequest){cancelAnimationFrame(afmAnimationRequest);afmAnimationRequest=0}
  const play=document.getElementById('play-afm-tip-scan');if(play){play.disabled=true;play.textContent='PLAY TIP TRACE'}
- for(const id of ['electron-bse','electron-transmitted','electron-secondary','electron-deposited','electron-depth','electron-balance',
+ for(const id of ['electron-bse','electron-transmitted','electron-secondary','electron-secondary-escaped','electron-secondary-energy','electron-deposited','electron-depth','electron-balance',
   'afm-mean-force','afm-indentation','afm-amplitude-ratio','afm-deflection','afm-contact-fraction','afm-feedback']){
   const node=document.getElementById(id);if(node)node.textContent='—';
  }
@@ -434,10 +450,18 @@ function clearPhysicsResults(){
  const afmStatus=document.getElementById('afm-physics-status');
  if(electronStatus)electronStatus.textContent='SETTINGS CHANGED / RUN AGAIN';
  if(afmStatus)afmStatus.textContent='SETTINGS CHANGED / RUN AGAIN';
- for(const id of ['electron-track-canvas','afm-probe-canvas']){
+ for(const id of ['electron-track-canvas','afm-probe-canvas','afm-topography-3d-canvas']){
   const node=document.getElementById(id),context=node?.getContext('2d');
   if(context)context.clearRect(0,0,node.width,node.height);
  }
+}
+function renderAFMMaterialProperties(){
+ const material=getElectronMaterial(sample);
+ const values=[['afm-material-young',material.young.toFixed(3)+' GPa'],
+  ['afm-material-poisson',material.poisson.toFixed(2)],
+  ['afm-material-adhesion',material.adhesion.toFixed(1)+' mJ/m²'],
+  ['afm-material-hamaker',material.hamaker.toExponential(2)+' J']];
+ for(const [id,value] of values){const node=document.getElementById(id);if(node)node.textContent=value}
 }
 function updatePhysicsPanelVisibility(){
  const electronPanel=document.getElementById('electron-physics-panel');
@@ -458,6 +482,7 @@ function updatePhysicsPanelVisibility(){
   if(status)status.textContent=electronResult?'MONTE CARLO RESULT READY':'READY / '+mode.toUpperCase();
  }
  if(isAfm){
+  renderAFMMaterialProperties();
   const status=document.getElementById('afm-physics-status');
   if(status)status.textContent=afmResult?'FORCE MAP READY':'READY / AFM PROBE';
  }
@@ -472,7 +497,8 @@ function updatePhysicsControlReadouts(){
   ['afm-setpoint','afm-setpoint-value',value=>value+'%'],
   ['afm-spring','afm-spring-value',value=>Number(value).toFixed(1)+' N/m'],
   ['afm-force','afm-force-value',value=>Number(value).toFixed(1)+' nN'],
-  ['afm-tip-radius','afm-tip-radius-value',value=>value+' nm']
+  ['afm-tip-radius','afm-tip-radius-value',value=>value+' nm'],
+  ['afm-tip-angle','afm-tip-angle-value',value=>value+'°']
  ];
  for(const [inputId,outputId,format] of outputs){
   const input=document.getElementById(inputId),output=document.getElementById(outputId);
@@ -500,63 +526,56 @@ function ensurePhysicsEngines(){
  }
  return physicsLoadPromise;
 }
-function drawElectronCrossSection(result){
- const target=document.getElementById('electron-track-canvas');
- const context=target?.getContext('2d');
+function drawElectronVolume(result){
+ const canvas=document.getElementById('electron-track-canvas'),context=canvas?.getContext('2d');
  if(!context||!result)return;
- const w=target.width,h=target.height;
- context.clearRect(0,0,w,h);
- const background=context.createLinearGradient(0,0,0,h);
- background.addColorStop(0,'#081824');background.addColorStop(1,'#111e26');
- context.fillStyle=background;context.fillRect(0,0,w,h);
- const left=78,top=45,slabWidth=w-156,slabHeight=218,bottom=top+slabHeight;
- context.fillStyle='#243e49';context.fillRect(left,top,slabWidth,slabHeight);
- context.fillStyle='rgba(118,174,168,.12)';context.fillRect(left,top,slabWidth,slabHeight);
- context.strokeStyle='rgba(196,227,218,.42)';context.lineWidth=1.2;
- context.strokeRect(left,top,slabWidth,slabHeight);
- context.font='600 10px "Space Grotesk"';context.fillStyle='rgba(219,239,231,.86)';
- context.fillText(result.material.label+' / '+result.thicknessNm.toLocaleString('en-US')+' nm',left+10,top+17);
- context.fillStyle='rgba(113,208,191,.88)';context.fillText('PRIMARY BEAM',left+slabWidth*.5-38,18);
- context.strokeStyle='rgba(113,208,191,.85)';context.lineWidth=2;
- context.beginPath();context.moveTo(left+slabWidth*.5,23);context.lineTo(left+slabWidth*.5,top-3);context.stroke();
- context.beginPath();context.moveTo(left+slabWidth*.5,top-3);context.lineTo(left+slabWidth*.5-5,top-11);context.moveTo(left+slabWidth*.5,top-3);context.lineTo(left+slabWidth*.5+5,top-11);context.stroke();
- let minX=Infinity,maxX=-Infinity;
- for(const track of result.trajectories)for(const point of track.points){minX=Math.min(minX,point.xNm);maxX=Math.max(maxX,point.xNm)}
- const xSpan=Math.max(12,maxX-minX),xPadding=Math.max(3,xSpan*.08);
- minX-=xPadding;maxX+=xPadding;
- const mapX=value=>left+10+(value-minX)/(maxX-minX)*(slabWidth-20);
- const mapY=value=>top+8+clamp(value/result.thicknessNm,0,1)*(slabHeight-16);
- for(const track of result.trajectories){
-  const colour=track.outcome===1?'#ff9b79':track.outcome===2?'#79d9c7':'#e4ca80';
-  context.strokeStyle=colour;context.globalAlpha=.82;context.lineWidth=1.45;
-  context.beginPath();
-  track.points.forEach((point,index)=>{
-   const x=mapX(point.xNm),y=mapY(point.depthNm);
-   if(index===0)context.moveTo(x,y);else context.lineTo(x,y);
-  });
-  context.stroke();context.globalAlpha=1;
-  const last=track.points[track.points.length-1];
-  if(last){
-   context.fillStyle=track.outcome===1?'#ff9b79':track.outcome===2?'#79d9c7':'#e4ca80';
-   context.beginPath();context.arc(mapX(last.xNm),mapY(last.depthNm),2.5,0,TWO_PI_SAFE);context.fill();
-  }
-  for(const point of track.points){
-   if(point.event===4){
-    context.fillStyle='#f6e2a0';context.beginPath();context.arc(mapX(point.xNm),mapY(point.depthNm),2.1,0,TWO_PI_SAFE);context.fill();
-   }
-  }
+ const w=canvas.width,h=canvas.height;context.clearRect(0,0,w,h);
+ const bg=context.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#081824');bg.addColorStop(1,'#111e26');
+ context.fillStyle=bg;context.fillRect(0,0,w,h);
+ const allTracks=[...result.trajectories,...result.secondaryTrajectories];
+ let maxX=25,maxY=25;
+ for(const track of allTracks)for(const point of track.points){maxX=Math.max(maxX,Math.abs(point.xNm));maxY=Math.max(maxY,Math.abs(point.yNm))}
+ const halfWidth=Math.max(35,maxX*1.28,maxY*1.28),yaw=electronCamera.yaw,pitch=electronCamera.pitch;
+ const cx=w*.52,cy=h*.55,scale=Math.min(w*.26,h*.34)*electronCamera.zoom;
+ const cosY=Math.cos(yaw),sinY=Math.sin(yaw),cosP=Math.cos(pitch),sinP=Math.sin(pitch);
+ const project=(x,y,z)=>{
+  const rx=x*cosY-y*sinY,ry=x*sinY+y*cosY,vertical=ry*cosP+(z-.5)*sinP,depth=ry*sinP-(z-.5)*cosP;
+  const perspective=1/(1-depth*.11);return {x:cx+rx*scale*perspective,y:cy+vertical*scale*perspective,d:depth};
+ };
+ const faces=[
+  {p:[[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0]],fill:'rgba(113,174,172,.24)'},
+  {p:[[-1,-1,0],[1,-1,0],[1,-1,1],[-1,-1,1]],fill:'rgba(67,112,125,.36)'},
+  {p:[[-1,1,0],[1,1,0],[1,1,1],[-1,1,1]],fill:'rgba(28,64,79,.62)'},
+  {p:[[-1,-1,0],[-1,1,0],[-1,1,1],[-1,-1,1]],fill:'rgba(53,93,108,.52)'},
+  {p:[[1,-1,0],[1,1,0],[1,1,1],[1,-1,1]],fill:'rgba(41,83,100,.48)'},
+  {p:[[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],fill:'rgba(24,52,67,.58)'}
+ ].map(face=>({...face,points:face.p.map(p=>project(...p)),depth:face.p.reduce((s,p)=>s+project(...p).d,0)/4}));
+ faces.sort((a,b)=>a.depth-b.depth);
+ for(const face of faces){context.beginPath();face.points.forEach((p,i)=>i?context.lineTo(p.x,p.y):context.moveTo(p.x,p.y));context.closePath();context.fillStyle=face.fill;context.fill();context.strokeStyle='rgba(174,218,211,.42)';context.lineWidth=1.1;context.stroke()}
+ const grain=randomFor(result.material.label+':'+result.thicknessNm+':volume');
+ for(let i=0;i<165;i++){
+  const p=project(between(grain,-.88,.88),between(grain,-.88,.88),between(grain,.035,.965));
+  context.fillStyle='rgba(193,222,213,'+between(grain,.10,.32).toFixed(2)+')';context.beginPath();context.arc(p.x,p.y,between(grain,.7,2.2),0,Math.PI*2);context.fill();
  }
- context.globalAlpha=1;
- const legend=[['#ff9b79','BACKSCATTER'],['#79d9c7','TRANSMISSION'],['#e4ca80','ABSORPTION'],['#f6e2a0','SECONDARY EVENT']];
- let legendX=left;
- for(const [colour,label] of legend){
-  context.fillStyle=colour;context.fillRect(legendX,top+slabHeight+17,7,7);
-  context.fillStyle='rgba(176,201,193,.78)';context.font='600 8px "Space Grotesk"';context.fillText(label,legendX+12,top+slabHeight+24);
-  legendX+=label==='SECONDARY EVENT'?150:130;
- }
- context.fillStyle='rgba(130,166,164,.8)';context.font='600 8px "Space Grotesk"';
- context.fillText('SURFACE / z = 0',left,bottom+37);context.fillText('SPECIMEN BACK FACE',left+slabWidth-120,bottom+37);
- context.textAlign='right';context.fillText(result.energyKeV+' keV · '+result.particleCount.toLocaleString('en-US')+' primary histories',w-18,18);context.textAlign='left';
+ const mapPoint=p=>project(p.xNm/halfWidth,p.yNm/halfWidth,clamp(p.depthNm/result.thicknessNm,-.08,1.08));
+ const drawTrack=(track,secondary)=>{
+  if(track.points.length<2)return;
+  const pts=track.points.map(mapPoint),colour=secondary?'#b9efff':track.outcome===1?'#ff9b79':track.outcome===2?'#79d9c7':'#e4ca80';
+  context.strokeStyle=colour;context.globalAlpha=secondary?.92:.88;context.lineWidth=secondary?1.5:2;context.beginPath();
+  pts.forEach((p,i)=>i?context.lineTo(p.x,p.y):context.moveTo(p.x,p.y));context.stroke();context.globalAlpha=1;
+  const last=pts[pts.length-1];context.fillStyle=colour;context.beginPath();context.arc(last.x,last.y,secondary?2.2:2.8,0,Math.PI*2);context.fill();
+ };
+ result.trajectories.forEach(track=>drawTrack(track,false));result.secondaryTrajectories.forEach(track=>drawTrack(track,true));
+ const beamA=project(0,0,-.30),beamB=project(0,0,.02);
+ context.strokeStyle='#9cead7';context.lineWidth=2.4;context.beginPath();context.moveTo(beamA.x,beamA.y);context.lineTo(beamB.x,beamB.y);context.stroke();
+ context.beginPath();context.moveTo(beamB.x,beamB.y);context.lineTo(beamB.x-5,beamB.y-9);context.moveTo(beamB.x,beamB.y);context.lineTo(beamB.x+5,beamB.y-9);context.stroke();
+ context.textAlign='left';context.font='600 10px "Space Grotesk"';context.fillStyle='rgba(222,240,232,.94)';
+ context.fillText(result.material.label+' / 3D SPECIMEN VOLUME',16,19);
+ context.font='600 8px "Space Grotesk"';context.fillStyle='rgba(132,210,194,.88)';context.fillText('X / Y SCATTERING · Z PENETRATION',16,34);
+ context.fillStyle='rgba(235,244,239,.8)';context.fillText(result.energyKeV+' keV · '+result.particleCount.toLocaleString('en-US')+' primary histories',w-310,19);
+ const legend=[['#ff9b79','BACKSCATTER'],['#79d9c7','TRANSMISSION'],['#e4ca80','ABSORBED'],['#b9efff','SECONDARY TRACKS']];let lx=16;
+ for(const [colour,label] of legend){context.fillStyle=colour;context.fillRect(lx,h-19,8,8);context.fillStyle='rgba(189,211,204,.83)';context.font='600 7px "Space Grotesk"';context.fillText(label,lx+12,h-12);lx+=label==='SECONDARY TRACKS'?132:112}
+ context.textAlign='left';
 }
 const TWO_PI_SAFE=Math.PI*2;
 function renderElectronMetrics(result){
@@ -564,6 +583,8 @@ function renderElectronMetrics(result){
   ['electron-bse',result.backscattered.toLocaleString('en-US')+' / '+(result.backscatterCoefficient*100).toFixed(1)+'%'],
   ['electron-transmitted',result.transmitted.toLocaleString('en-US')+' / '+(result.transmissionCoefficient*100).toFixed(1)+'%'],
   ['electron-secondary',result.secondaryElectrons.toLocaleString('en-US')+' / '+result.secondaryYield.toFixed(2)+' per primary'],
+  ['electron-secondary-escaped',result.secondaryEscaped.toLocaleString('en-US')+' escaped · '+result.secondaryAbsorbed.toLocaleString('en-US')+' absorbed'],
+  ['electron-secondary-energy',result.secondaryEscapedEnergyKeV.toFixed(3)+' keV escaped / '+result.secondaryEnergyKeV.toFixed(3)+' keV emitted'],
   ['electron-deposited',result.depositedEnergyKeV.toFixed(1)+' keV total'],
   ['electron-depth',result.meanPenetrationNm.toFixed(1)+' nm'],
   ['electron-balance',result.energyClosureKeV.toExponential(2)+' keV']
@@ -620,7 +641,11 @@ function drawAFMProbeTrace(result){
  context.beginPath();context.moveTo(px-155,tipTop-9);context.lineTo(px-20,tipTop-9);context.stroke();
  context.strokeStyle='rgba(143,187,183,.85)';context.lineWidth=1;
  context.beginPath();context.moveTo(px-20,tipTop-9);context.lineTo(px-4,tipTop-1);context.stroke();
- context.fillStyle='#d9e7e1';context.beginPath();context.moveTo(px-9,tipTop-2);context.lineTo(px+9,tipTop-2);context.lineTo(px,py+2);context.closePath();context.fill();
+ context.fillStyle='#d9e7e1';context.beginPath();
+ if(result.tipGeometry==='sphere'){context.arc(px,tipTop+4,8,Math.PI,0);context.lineTo(px,py+2);context.closePath()}
+ else if(result.tipGeometry==='cone'){context.moveTo(px-10,tipTop-2);context.lineTo(px+10,tipTop-2);context.lineTo(px,py+2);context.closePath()}
+ else{context.moveTo(px-11,tipTop-3);context.lineTo(px+11,tipTop-3);context.lineTo(px+6,tipTop+5);context.lineTo(px,py+2);context.lineTo(px-6,tipTop+5);context.closePath()}
+ context.fill();
  context.strokeStyle='#f2bf80';context.lineWidth=2;
  context.beginPath();context.moveTo(px,tipTop+9);context.lineTo(px,py-9);context.stroke();
  context.beginPath();context.moveTo(px,py-9);context.lineTo(px-4,py-16);context.moveTo(px,py-9);context.lineTo(px+4,py-16);context.stroke();
@@ -630,6 +655,37 @@ function drawAFMProbeTrace(result){
  context.fillText('PEAK FORCE '+force.toFixed(3)+' nN',14,50);
  context.fillText('SURFACE HEIGHT '+points[index].toFixed(2)+' nm',14,66);
  context.fillStyle='rgba(119,205,188,.75)';context.fillText('SAMPLE PROFILE / '+result.scanWidthNm.toLocaleString('en-US')+' nm scan',14,h-7);
+}
+function drawAFM3DMap(result){
+ const canvas=document.getElementById('afm-topography-3d-canvas'),context=canvas?.getContext('2d');
+ if(!context||!result)return;
+ const w=canvas.width,h=canvas.height,grid=result.gridSize,data=result.topographyNm;context.clearRect(0,0,w,h);
+ const bg=context.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#102b37');bg.addColorStop(1,'#07151f');context.fillStyle=bg;context.fillRect(0,0,w,h);
+ let minimum=Infinity,maximum=-Infinity;for(const value of data){minimum=Math.min(minimum,value);maximum=Math.max(maximum,value)}
+ const range=Math.max(1e-8,maximum-minimum),yaw=afmCamera.yaw,pitch=afmCamera.pitch,cx=w*.5,cy=h*.56,scale=Math.min(w*.39,h*.58)*afmCamera.zoom;
+ const cosY=Math.cos(yaw),sinY=Math.sin(yaw),cosP=Math.cos(pitch),sinP=Math.sin(pitch);
+ const project=(x,y,z)=>{const rx=x*cosY-y*sinY,ry=x*sinY+y*cosY,vertical=ry*cosP+z*sinP,depth=ry*sinP-z*cosP,perspective=1/(1-depth*.13);return {x:cx+rx*scale*perspective,y:cy+vertical*scale*perspective,d:depth}};
+ const points=new Array(grid*grid);
+ for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){const i=y*grid+x,value=(data[i]-minimum)/range;points[i]=project(x/(grid-1)*2-1,y/(grid-1)*2-1,(value-.5)*.78)}
+ const cells=[];
+ for(let y=0;y<grid-1;y++)for(let x=0;x<grid-1;x++){
+  const a=y*grid+x,b=a+1,d=(y+1)*grid+x,e=d+1,quad=[points[a],points[b],points[e],points[d]];
+  const depth=quad.reduce((sum,p)=>sum+p.d,0)/4,avg=(data[a]+data[b]+data[d]+data[e])*.25,value=(avg-minimum)/range,rgb=afmColour(value);
+  const slope=(Math.abs(data[b]-data[a])+Math.abs(data[d]-data[a]))/range,shade=clamp(.88-slope*.045,.48,1.12);
+  cells.push({quad,depth,fill:'rgb('+Math.round(rgb[0]*shade)+','+Math.round(rgb[1]*shade)+','+Math.round(rgb[2]*shade)+')'});
+ }
+ cells.sort((a,b)=>a.depth-b.depth);
+ for(const cell of cells){context.beginPath();cell.quad.forEach((p,i)=>i?context.lineTo(p.x,p.y):context.moveTo(p.x,p.y));context.closePath();context.fillStyle=cell.fill;context.fill();context.strokeStyle='rgba(198,235,224,.13)';context.lineWidth=.5;context.stroke()}
+ context.fillStyle='rgba(220,241,232,.92)';context.font='600 10px "Space Grotesk"';context.fillText('AFM / 3D HEIGHT MAP',16,20);
+ context.fillStyle='rgba(144,206,194,.82)';context.font='600 8px "Space Grotesk"';context.fillText(result.scanWidthNm.toLocaleString('en-US')+' nm scan · '+grid+' × '+grid+' samples',16,36);
+ context.fillStyle='rgba(218,238,230,.88)';context.fillText('TIP: '+result.tipGeometry.toUpperCase()+' · '+result.material.label,16,52);
+ const ix=w-78,iy=55,r=25;context.strokeStyle='#a9e5d8';context.fillStyle='rgba(119,197,180,.25)';context.lineWidth=1.6;context.beginPath();
+ if(result.tipGeometry==='sphere'){context.arc(ix,iy,r*.65,Math.PI,Math.PI*2);context.lineTo(ix+r*.65,iy+r*.25);context.lineTo(ix-r*.65,iy+r*.25);context.closePath()}
+ else if(result.tipGeometry==='cone'){context.moveTo(ix-r*.62,iy-r*.45);context.lineTo(ix+r*.62,iy-r*.45);context.lineTo(ix,iy+r*.7);context.closePath()}
+ else{context.moveTo(ix-r*.62,iy-r*.45);context.lineTo(ix+r*.62,iy-r*.45);context.lineTo(ix+r*.34,iy+r*.34);context.lineTo(ix-r*.34,iy+r*.34);context.closePath()}
+ context.fill();context.stroke();
+ context.fillStyle='rgba(221,239,230,.88)';context.font='600 8px "Space Grotesk"';context.fillText('MIN '+minimum.toFixed(2)+' nm',16,h-29);context.fillText('MAX '+maximum.toFixed(2)+' nm',16,h-15);
+ context.fillStyle='rgba(133,209,190,.82)';context.fillText('TIP-CONVOLVED / RELATIVE HEIGHT',w-260,h-15);
 }
 function renderAFMMetrics(result){
  const fields=[
@@ -657,7 +713,7 @@ async function executeElectronTransport(){
    beamTiltDegrees:Number(document.getElementById('electron-tilt').value),
    seed:defaults.seed
   });
-  electronResult=result;drawElectronCrossSection(result);renderElectronMetrics(result);
+  electronResult=result;drawElectronVolume(result);renderElectronMetrics(result);
   if(status)status.textContent='MONTE CARLO COMPLETE / ENERGY CONSERVED';
  }catch(error){
   console.error('Electron transport simulation failed:',error);
@@ -671,7 +727,7 @@ async function executeAFMScan(){
  try{
   const engines=await ensurePhysicsEngines(),preset=getActivePreset();
   const result=runAFMInteraction(engines,{
-   sample,scanWidthNm:preset.fieldWidthNm,gridSize:32,
+   sample,scanWidthNm:preset.fieldWidthNm,gridSize:48,
    seed:randomFor(sample.id+':AFM:'+preset.fieldWidthNm)()*4294967295,
    mode:document.getElementById('afm-interaction-mode').value,
    freeAmplitudeNm:Number(document.getElementById('afm-amplitude').value),
@@ -679,11 +735,13 @@ async function executeAFMScan(){
    springConstantNPerM:Number(document.getElementById('afm-spring').value),
    resonanceFrequencyKHz:300,qualityFactor:80,
    tipRadiusNm:Number(document.getElementById('afm-tip-radius').value),
-   youngModulusGPa:undefined,poissonRatio:.23,
-   adhesionEnergyMilliJPerM2:25,contactForceSetpointNn:Number(document.getElementById('afm-force').value),
+   tipGeometry:document.getElementById('afm-tip-geometry').value,
+   tipHalfAngleDegrees:Number(document.getElementById('afm-tip-angle').value),
+   youngModulusGPa:undefined,poissonRatio:undefined,
+   adhesionEnergyMilliJPerM2:undefined,contactForceSetpointNn:Number(document.getElementById('afm-force').value),
    cyclesPerPixel:6,stepsPerCycle:24
   });
-  afmResult=result;afmScanIndex=0;draw();drawAFMProbeTrace(result);renderAFMMetrics(result);
+  afmResult=result;afmScanIndex=0;draw();drawAFMProbeTrace(result);drawAFM3DMap(result);renderAFMMetrics(result);
   const signal=document.getElementById('afm-signal-channel');if(signal)signal.disabled=false;
   const play=document.getElementById('play-afm-tip-scan');if(play)play.disabled=false;
   if(status)status.textContent='SCAN COMPLETE / FEEDBACK STABLE';
@@ -836,14 +894,17 @@ zoom.addEventListener('input',()=>{
  scanValue=Number(zoom.value);updateDetails();draw();
 });
 [focus,gain].forEach(input=>input.addEventListener('input',()=>{updateDetails();draw()}));
-for(const id of ['electron-voltage','electron-thickness','electron-particles','electron-tilt','afm-amplitude','afm-setpoint','afm-spring','afm-force','afm-tip-radius']){
+for(const id of ['electron-voltage','electron-thickness','electron-particles','electron-tilt','afm-amplitude','afm-setpoint','afm-spring','afm-force','afm-tip-radius','afm-tip-angle']){
  const input=document.getElementById(id);input?.addEventListener('input',()=>{updatePhysicsControlReadouts();clearPhysicsResults()});
 }
-document.getElementById('afm-signal-channel')?.addEventListener('change',()=>{draw();drawAFMProbeTrace(afmResult)});
+document.getElementById('afm-signal-channel')?.addEventListener('change',()=>{draw();drawAFMProbeTrace(afmResult);drawAFM3DMap(afmResult)});
+document.getElementById('afm-tip-geometry')?.addEventListener('change',()=>clearPhysicsResults());
 document.getElementById('run-electron-transport')?.addEventListener('click',executeElectronTransport);
 document.getElementById('run-afm-scan')?.addEventListener('click',executeAFMScan);
 document.getElementById('play-afm-tip-scan')?.addEventListener('click',playAFMTipTrace);
 document.getElementById('afm-interaction-mode')?.addEventListener('change',()=>clearPhysicsResults());
+bindOrbitCanvas(document.getElementById('electron-track-canvas'),electronCamera,()=>electronResult&&drawElectronVolume(electronResult));
+bindOrbitCanvas(document.getElementById('afm-topography-3d-canvas'),afmCamera,()=>afmResult&&drawAFM3DMap(afmResult));
 if(typeof ResizeObserver==='function'){
  const observer=new ResizeObserver(draw);observer.observe(viewport);window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
 }else window.addEventListener('resize',draw,{passive:true});
