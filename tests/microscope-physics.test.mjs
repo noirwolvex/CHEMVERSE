@@ -8,7 +8,7 @@ import {
 
 function makeElectronEngine(){
  const memory=new WebAssembly.Memory({initial:2});
- const summaryPointer=0,histogramPointer=256,tracksPointer=1024;
+ const summaryPointer=64,histogramPointer=256,tracksPointer=1024;
  const summary=new Float64Array(memory.buffer,summaryPointer,16);
  const histogram=new Float64Array(memory.buffer,histogramPointer,32);
  const tracks=new Float64Array(memory.buffer,tracksPointer,24*243);
