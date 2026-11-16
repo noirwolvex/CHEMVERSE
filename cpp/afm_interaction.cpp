@@ -280,8 +280,6 @@ extern "C" int cv_afm_scan_advance(int max_pixels){
  const double spring=scan_parameters.spring_constant_n_m;
  while(scan_progress<stop){
   const int index=scan_progress;
-  const int y=index/scan_parameters.grid_size;
-  const int x=index-y*scan_parameters.grid_size;
   const double surface=convolved_height[index];
   double stage_z=scan_previous_stage_z+(surface-scan_previous_surface);
   double deflection=0.0,peak_force=0.0,indentation=0.0,phase=0.0;
