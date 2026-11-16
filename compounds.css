@@ -33,3 +33,5 @@
 .reaction-effect-caption{font-size:10px;line-height:1.7;color:#9db6b9}
 @media(max-width:820px){.kinetics-grid{grid-template-columns:1fr 1fr}.engine-status{display:none}}
 @media(max-width:520px){.kinetics-grid{grid-template-columns:1fr}.kinetics-panel{padding-top:12px}}
+
+.reaction-effect-readout{position:absolute;z-index:4;top:12px;left:12px;max-width:min(78%,440px);padding:7px 10px;border:1px solid rgba(118,194,183,.22);border-radius:8px;background:rgba(5,15,22,.76);color:#bde9dc;font-size:10px;line-height:1.6;direction:rtl;pointer-events:none;backdrop-filter:blur(8px)}
