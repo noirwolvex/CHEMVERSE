@@ -53,6 +53,10 @@ jobs:
         run: node --input-type=module --check < src/microscope-lab.js
       - name: Check interactive microscope instrument syntax
         run: node --input-type=module --check < src/microscope-instrument.js
+      - name: Check microscope optics model syntax
+        run: node --input-type=module --check < src/microscope-optics.mjs
+      - name: Test microscope objective calibration and imaging physics
+        run: node --test tests/microscope-optics.test.mjs
       - name: Test optical slide preparation workflow
         run: node --test tests/microscope-workflow.test.mjs
       - name: Test laboratory station interaction routing
