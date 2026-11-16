@@ -153,25 +153,28 @@ function drawOpticalPowder(context,w,h,fieldWidth,rng){
  }
 }
 function drawOptical(context,w,h,fieldWidth,rng,metrics){
- const background=context.createLinearGradient(0,0,w,h);
+ const fieldPixels=Math.min(w,h)*.96,left=(w-fieldPixels)/2,top=(h-fieldPixels)/2;
+ context.save();context.translate(left,top);
+ const background=context.createLinearGradient(0,0,fieldPixels,fieldPixels);
  const level=Number(gain.value)/100;
  background.addColorStop(0,'rgb('+Math.round(232*level)+','+Math.round(241*level)+','+Math.round(233*level)+')');
  background.addColorStop(1,'rgb('+Math.round(193*level)+','+Math.round(211*level)+','+Math.round(204*level)+')');
- context.fillStyle=background;context.fillRect(0,0,w,h);
- for(let index=0;index<1800;index++){
+ context.fillStyle=background;context.fillRect(0,0,fieldPixels,fieldPixels);
+ for(let index=0;index<Math.round(fieldPixels*fieldPixels*.0025);index++){
   const shade=between(rng,0,1)*.11;
-  context.fillStyle='rgba(39,66,58,'+shade+')';context.fillRect(rng()*w,rng()*h,.7,.7);
+  context.fillStyle='rgba(39,66,58,'+shade+')';context.fillRect(rng()*fieldPixels,rng()*fieldPixels,.7,.7);
  }
- const defocus=getOpticalDefocusBlurPx(objective,Number(focus.value),w);
+ const defocus=getOpticalDefocusBlurPx(objective,Number(focus.value),fieldPixels);
  context.save();context.filter='blur('+defocus.toFixed(2)+'px) contrast('+(95+Number(focus.value)*.12)+'%)';
- if(sample.shape==='cube'||sample.shape==='prism'||sample.shape==='needle'||sample.shape==='plate')drawOpticalCrystals(context,w,h,fieldWidth,rng);
- else if(sample.shape==='particle')drawOpticalPrecipitate(context,w,h,fieldWidth,rng);
- else if(sample.shape==='droplet')drawOpticalEmulsion(context,w,h,fieldWidth,rng);
- else if(sample.shape==='fibre')drawOpticalFibres(context,w,h,fieldWidth,rng);
- else drawOpticalPowder(context,w,h,fieldWidth,rng);
+ if(sample.shape==='cube'||sample.shape==='prism'||sample.shape==='needle'||sample.shape==='plate')drawOpticalCrystals(context,fieldPixels,fieldPixels,fieldWidth,rng);
+ else if(sample.shape==='particle')drawOpticalPrecipitate(context,fieldPixels,fieldPixels,fieldWidth,rng);
+ else if(sample.shape==='droplet')drawOpticalEmulsion(context,fieldPixels,fieldPixels,fieldWidth,rng);
+ else if(sample.shape==='fibre')drawOpticalFibres(context,fieldPixels,fieldPixels,fieldWidth,rng);
+ else drawOpticalPowder(context,fieldPixels,fieldPixels,fieldWidth,rng);
  context.restore();
- context.fillStyle='rgba(248,252,248,.045)';context.fillRect(0,0,w,h);
- return {blurPx:defocus,metrics};
+ context.fillStyle='rgba(248,252,248,.045)';context.fillRect(0,0,fieldPixels,fieldPixels);
+ context.restore();
+ return {blurPx:defocus,metrics,fieldPixels};
 }
 function drawSEMParticle(context,x,y,diameter,shade,rng){
  const radius=Math.max(.45,diameter/2),gradient=context.createRadialGradient(x-radius*.34,y-radius*.38,Math.max(.2,radius*.025),x,y,radius);
@@ -354,10 +357,12 @@ function drawSTM(context,w,h,fieldWidth,rng){
  for(let y=0;y<h;y+=Math.max(6,verticalSpacing)){context.beginPath();context.moveTo(0,y);context.lineTo(w,y);context.stroke()}
  context.fillStyle='rgba(255,238,201,.74)';context.font='600 9px "Space Grotesk"';context.fillText('GRAPHITE SURFACE / a = 0.246 nm',16,h-18);
 }
-function drawScaleBar(context,w,h,fieldWidthNm){
- const calibration=getPhysicalScaleBar(fieldWidthNm,w),barWidth=calibration.widthPx;
- const x=w-barWidth-27,y=h-31;
- context.fillStyle='rgba(4,10,15,.82)';rounded(context,x-10,y-23,barWidth+20,36,5);context.fill();
+function drawScaleBar(context,w,h,fieldWidthNm,optical=false){
+ const fieldPixels=optical?Math.min(w,h)*.96:w;
+ const left=optical?(w-fieldPixels)/2:0,top=optical?(h-fieldPixels)/2:0;
+ const calibration=getPhysicalScaleBar(fieldWidthNm,fieldPixels),barWidth=calibration.widthPx;
+ const x=left+fieldPixels-barWidth-27,y=top+fieldPixels-31;
+ context.fillStyle='rgba(4,10,15,.84)';rounded(context,x-10,y-23,barWidth+20,36,5);context.fill();
  context.fillStyle='#fff';context.fillRect(x,y,barWidth,2.5);
  context.fillRect(x,y-3,2,8);context.fillRect(x+barWidth-2,y-3,2,8);
  context.font='600 10px "Space Grotesk"';context.textAlign='center';context.fillText(calibration.label,x+barWidth/2,y-8);
@@ -409,7 +414,7 @@ function draw(){
   ctx.fillStyle='rgba(245,235,196,.9)';
   ctx.fillText(mode==='afm'?'SURFACE HEIGHT / FALSE COLOUR':'TUNNELLING-CURRENT MAP',16,57);
  }
- drawScaleBar(ctx,width,height,fieldWidthNm);
+ drawScaleBar(ctx,width,height,fieldWidthNm,optical);
 }
 function updateDetails(){
  const preset=getActivePreset(),method=getMicroscopeMode(mode);
@@ -431,7 +436,7 @@ function updateDetails(){
  document.getElementById('zoom-value').textContent=mode==='light'?total.toLocaleString('en-US')+'× total':preset.label;
  document.getElementById('focus-value').textContent=focus.value+'%';
  document.getElementById('light-value').textContent=gain.value+'%';
- document.getElementById('viewport-scale').textContent=getPhysicalScaleBar(preset.fieldWidthNm,1000).label;
+ document.getElementById('viewport-scale').textContent=getPhysicalScaleBar(preset.fieldWidthNm,mode==='light'?Math.min(canvas.clientWidth||900,canvas.clientHeight||540)*.96:(canvas.clientWidth||900)).label;
  const optics=document.getElementById('optics-readout');
  const objectiveLine=document.getElementById('optics-objective');
  const resolutionLine=document.getElementById('optics-resolution');
@@ -529,7 +534,7 @@ function setMode(id){
  const available=getMicroscopeSamples(id);
  if(!available.some(item=>item.id===sample.id))sample=available[0];
  zoom.min='1';zoom.max=String(MICROSCOPE_ZOOM_PRESETS[id].length);
- zoom.value=String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));scanValue=Number(zoom.value);
+ zoom.value=id==='light'?String(opticalIndexForObjective(objective)):String(Math.min(2,MICROSCOPE_ZOOM_PRESETS[id].length));scanValue=Number(zoom.value);
  renderSamples();updateDetails();instrument?.setMode(mode);renderPreparation();draw();
 }
 buttons.forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.mode)));
