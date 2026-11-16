@@ -29,12 +29,6 @@ double sinApprox(double value){
  const double x2=value*value;
  return value*(1.0-x2/6.0+x2*x2/120.0-x2*x2*x2/5040.0);
 }
-double cosApprox(double value){
- while(value>PI)value-=TWO_PI;
- while(value< -PI)value+=TWO_PI;
- const double x2=value*value;
- return 1.0-x2/2.0+x2*x2/24.0-x2*x2*x2/720.0;
-}
 double pow23(double value){
  if(!(value>0.0))return 0.0;
  double root=value>1.0?value:1.0;
