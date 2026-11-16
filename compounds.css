@@ -40,3 +40,7 @@
 .precipitation-disclaimer{margin:8px 0 0;color:#7f9999;font-size:7px;line-height:1.8}
 .precipitation-sources{margin-top:7px!important}
 @media(max-width:820px){.precipitation-metrics b{font-size:10px}.precipitation-concentrations{text-align:left}}
+
+.molecule-view.has-atom-engine .view-equation-arrow{display:none}
+.molecule-view.has-atom-engine .view-legend{justify-content:space-between}
+.molecule-view.has-atom-engine .view-legend>span{max-width:42%;line-height:1.5}
