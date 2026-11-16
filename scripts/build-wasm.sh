@@ -60,7 +60,8 @@ mkdir -p "$ROOT/wasm"
   -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
   -Wl,--no-entry -Wl,--export-memory \
   -Wl,--export=cv_s04_profile -Wl,--export=cv_s04_effects \
-  -Wl,--export=cv_s04_validate_profile -Wl,--export=cv_s04_engine_version \
+  -Wl,--export=cv_s04_validate_profile -Wl,--export=cv_s04_redox_pair_count \
+  -Wl,--export=cv_s04_redox_pair -Wl,--export=cv_s04_engine_version \
   -Wl,--strip-all "$ROOT/cpp/station04_engine.cpp" -o "$ROOT/wasm/station04_engine.wasm"
 
 # Crystallographic unit-cell module: Cu/FCC, MgO/CaO/AgCl/rock-salt, BaSO4/Pnma.
