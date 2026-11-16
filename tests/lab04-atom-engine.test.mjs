@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEUTRALIZATION_ATOMS,NEUTRALIZATION_BONDS,createNeutralizationInput} from '../src/lab04-atom-engine.mjs';
+import {NEUTRALIZATION_ATOMS,NEUTRALIZATION_BONDS,createNeutralizationInput,SILVER_CHLORIDE_ATOMS,SILVER_CHLORIDE_BONDS,AGCL_KSP_25C,createAtomEngineInput,calculateAgClPrecipitationQuotient} from '../src/lab04-atom-engine.mjs';
 
 test('neutralization mechanism has stable unique atom identities and conserved elemental inventory',()=>{
  const input=createNeutralizationInput(),ids=input.atoms.map(atom=>atom.id);
@@ -29,5 +29,69 @@ test('all keyframe coordinates and bond-order transitions remain finite and in r
   assert.ok(bond.b>=0&&bond.b<NEUTRALIZATION_ATOMS.length);
   assert.ok(bond.a!==bond.b);
   for(const order of [bond.start,bond.transition,bond.end])assert.ok(order>=0&&order<=3);
+ }
+});
+
+test('AgCl precipitation map conserves every atom and spectator ion charge',()=>{
+ const ids=SILVER_CHLORIDE_ATOMS.map(atom=>atom.id);
+ assert.equal(SILVER_CHLORIDE_ATOMS.length,28);
+ assert.equal(new Set(ids).size,28);
+ const inventory=SILVER_CHLORIDE_ATOMS.reduce((result,atom)=>{result[atom.element]=(result[atom.element]||0)+1;return result},{});
+ assert.deepEqual(inventory,{Ag:4,Cl:4,N:4,O:12,Na:4});
+ const charge=SILVER_CHLORIDE_ATOMS.reduce((total,atom)=>total+(atom.formalCharge||0)+(atom.ionCharge||0),0);
+ assert.equal(charge,0);
+ assert.equal(SILVER_CHLORIDE_BONDS.length,24);
+ assert.equal(SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===0).length,12);
+ assert.equal(SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===1).length,12);
+});
+
+test('AgCl nucleus begins as a four-ion face and expands to twelve alternating ionic contacts',()=>{
+ const seed=SILVER_CHLORIDE_BONDS.filter(bond=>bond.kind===1);
+ assert.equal(seed.filter(bond=>bond.start===0&&bond.transition===1&&bond.end===1).length,4);
+ assert.equal(seed.filter(bond=>bond.start===0&&bond.transition===0&&bond.end===1).length,8);
+ assert.ok(SILVER_CHLORIDE_BONDS.filter(bond=>bond.role==='nitrate-resonance').every(bond=>
+  bond.start===4/3&&bond.transition===4/3&&bond.end===4/3));
+ const ids=new Set(SILVER_CHLORIDE_ATOMS.filter(atom=>atom.role==='spectator-nitrate'||atom.role==='spectator-cation').map(atom=>atom.id));
+ assert.equal(ids.size,20);
+ for(const atom of SILVER_CHLORIDE_ATOMS.filter(atom=>ids.has(atom.id))){
+  assert.deepEqual(atom.start,atom.transition);
+  assert.deepEqual(atom.start,atom.end);
+ }
+});
+
+test('AgCl precipitation is gated by the ion product compared with Ksp at 25 degrees C',()=>{
+ const saturated=calculateAgClPrecipitationQuotient({
+  silverNitrateMoles:1e-5,sodiumChlorideMoles:1e-5,volumeMl:100
+ });
+ assert.equal(AGCL_KSP_25C,1.6e-10);
+ assert.equal(saturated.silverConcentration,1e-4);
+ assert.equal(saturated.chlorideConcentration,1e-4);
+ assert.equal(saturated.quotient,1e-8);
+ assert.equal(saturated.supersaturated,true);
+ const below=calculateAgClPrecipitationQuotient({
+  silverNitrateMoles:5e-7,sodiumChlorideMoles:5e-7,volumeMl:100
+ });
+ assert.ok(below.quotient<AGCL_KSP_25C);
+ assert.equal(below.supersaturated,false);
+ assert.equal(calculateAgClPrecipitationQuotient({
+  silverNitrateMoles:-1,sodiumChlorideMoles:1e-5,volumeMl:100
+ }),null);
+ assert.equal(calculateAgClPrecipitationQuotient({
+  silverNitrateMoles:1e-5,sodiumChlorideMoles:1e-5,volumeMl:0
+ }),null);
+});
+
+test('generic atom engine input holds Ag and Cl ions apart when the solution is not supersaturated',()=>{
+ const active=createAtomEngineInput('silver-chloride-precipitation',{precipitationAllowed:true});
+ const inactive=createAtomEngineInput('silver-chloride-precipitation',{precipitationAllowed:false});
+ const activeContacts=active.bonds.filter(bond=>bond.kind===1);
+ const inactiveContacts=inactive.bonds.filter(bond=>bond.kind===1);
+ assert.equal(active.atoms.length,28);
+ assert.equal(active.bonds.length,24);
+ assert.equal(activeContacts.filter(bond=>bond.end===1).length,12);
+ assert.ok(inactiveContacts.every(bond=>bond.start===0&&bond.transition===0&&bond.end===0));
+ for(let index=0;index<inactive.atoms.length;index++){
+  assert.deepEqual(inactive.atoms[index].start,inactive.atoms[index].transition);
+  assert.deepEqual(inactive.atoms[index].start,inactive.atoms[index].end);
  }
 });
