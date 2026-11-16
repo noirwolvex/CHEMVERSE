@@ -230,7 +230,7 @@ function updatePrecipitationCondition(refreshEngine=false){
   volumeMl:precipitationVolumeMl
  });
  const result=precipitationResult;
- if(!result){precipitationGate=false;txt('precipitation-q','—');txt('precipitation-ksp',AGCL_KSP_25C.toExponential(2)+' M²');txt('precipitation-concentrations','—');txt('precipitation-status','أدخل كميات غير سالبة وحجماً نهائياً أكبر من صفر.');}
+ if(!result){precipitationGate=false;txt('view-legend-products','الأيونات تبقى مذابة');txt('precipitation-q','—');txt('precipitation-ksp',AGCL_KSP_25C.toExponential(2)+' M²');txt('precipitation-concentrations','—');txt('precipitation-status','أدخل كميات غير سالبة وحجماً نهائياً أكبر من صفر.');}
  else{
   precipitationGate=result.supersaturated;
   txt('view-legend-products',result.supersaturated?'نواة راسب AgCl':'الأيونات تبقى مذابة');
