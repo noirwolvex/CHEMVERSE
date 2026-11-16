@@ -7,7 +7,7 @@ import {
  getTunnellingCurrentRelative,getObjectiveFocusingLimits
 } from './microscope-optics.mjs';
 import {createMicroscopeInstrument} from './microscope-instrument.js';
-import {loadMicroscopePhysics,runElectronTransport,runAFMInteraction,getElectronRunDefaults} from './microscope-physics.mjs';
+import {loadMicroscopePhysics,runElectronTransport,startAFMInteraction,advanceAFMInteraction,getElectronRunDefaults} from './microscope-physics.mjs';
 import {
  createSlidePreparationState,completeSlidePreparationStep,
  getSlidePreparationPlan,getSlidePreparationProgress
@@ -26,7 +26,7 @@ let mode='light',objective=10,scanValue=2;
 let sample=getMicroscopeSample('nacl-crystals');
 let slideState=createSlidePreparationState(sample.id),instrument=null;
 let physicsEngines=null,physicsLoadPromise=null,electronResult=null,afmResult=null;
-let afmScanFrame=0,afmScanIndex=0,afmAnimationRequest=0;
+let afmScanIndex=0,afmAnimationRequest=0,afmScanSession=null,afmScanGeneration=0;
 const electronCamera={yaw:-.62,pitch:.42,zoom:1};
 const afmCamera={yaw:-.72,pitch:.58,zoom:1};
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
@@ -439,9 +439,12 @@ function draw(){
  drawScaleBar(ctx,width,height,fieldWidthNm,optical);
 }
 function clearPhysicsResults(){
- electronResult=null;afmResult=null;afmScanIndex=0;
+ electronResult=null;afmResult=null;afmScanIndex=0;afmScanSession=null;afmScanGeneration++;
  if(afmAnimationRequest){cancelAnimationFrame(afmAnimationRequest);afmAnimationRequest=0}
- const play=document.getElementById('play-afm-tip-scan');if(play){play.disabled=true;play.textContent='PLAY TIP TRACE'}
+ const run=document.getElementById('run-afm-scan');if(run)run.disabled=false;
+ const play=document.getElementById('play-afm-tip-scan');if(play){play.disabled=true;play.textContent='REPLAY SCAN'}
+ const progress=document.getElementById('afm-scan-progress');if(progress)progress.value=0;
+ const progressLabel=document.getElementById('afm-scan-progress-label');if(progressLabel)progressLabel.textContent='0% · 0 / 2304 PIXELS';
  for(const id of ['electron-bse','electron-transmitted','electron-secondary','electron-secondary-escaped','electron-secondary-energy','electron-deposited','electron-depth','electron-balance',
   'afm-mean-force','afm-indentation','afm-amplitude-ratio','afm-deflection','afm-contact-fraction','afm-feedback']){
   const node=document.getElementById(id);if(node)node.textContent='—';
@@ -622,7 +625,9 @@ function drawAFMPhysicsImage(context,w,h,result){
 function drawAFMProbeTrace(result){
  const canvas=document.getElementById('afm-probe-canvas'),context=canvas?.getContext('2d');
  if(!context||!result)return;
- const w=canvas.width,h=canvas.height,grid=result.gridSize,row=Math.floor(grid/2);
+ const w=canvas.width,h=canvas.height,grid=result.gridSize,total=grid*grid;
+ const active=clamp(Math.floor(afmScanIndex),0,total-1);
+ const row=Math.floor(active/grid),index=active%grid;
  context.clearRect(0,0,w,h);
  const bg=context.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#0d2330');bg.addColorStop(1,'#08141d');
  context.fillStyle=bg;context.fillRect(0,0,w,h);
@@ -634,7 +639,7 @@ function drawAFMProbeTrace(result){
  context.lineTo(w,h-18);context.closePath();context.fillStyle='rgba(60,139,137,.28)';context.fill();
  context.beginPath();for(let x=0;x<grid;x++){const px=x/(grid-1)*w,py=mapY(points[x]);if(x===0)context.moveTo(px,py);else context.lineTo(px,py)}
  context.strokeStyle='#86d7c8';context.lineWidth=2;context.stroke();
- const index=clamp(Math.round(afmScanIndex),0,grid-1),px=index/(grid-1)*w,py=mapY(points[index]);
+ const px=index/(grid-1)*w,py=mapY(points[index]);
  const deflection=result.deflectionNm[row*grid+index],force=result.peakForceNn[row*grid+index];
  const tipTop=py-48-deflection*7;
  context.strokeStyle='rgba(224,235,223,.9)';context.lineWidth=4;
@@ -650,42 +655,55 @@ function drawAFMProbeTrace(result){
  context.beginPath();context.moveTo(px,tipTop+9);context.lineTo(px,py-9);context.stroke();
  context.beginPath();context.moveTo(px,py-9);context.lineTo(px-4,py-16);context.moveTo(px,py-9);context.lineTo(px+4,py-16);context.stroke();
  context.fillStyle='rgba(204,225,215,.9)';context.font='600 9px "Space Grotesk"';
- context.fillText('TAPPING TIP / '+index+'/'+(grid-1),14,18);
- context.fillText('DEFLECTION '+deflection.toFixed(3)+' nm',14,34);
- context.fillText('PEAK FORCE '+force.toFixed(3)+' nN',14,50);
- context.fillText('SURFACE HEIGHT '+points[index].toFixed(2)+' nm',14,66);
- context.fillStyle='rgba(119,205,188,.75)';context.fillText('SAMPLE PROFILE / '+result.scanWidthNm.toLocaleString('en-US')+' nm scan',14,h-7);
+ context.fillText((result.scanComplete?'RASTER COMPLETE':'LIVE AFM RASTER')+' / ROW '+(row+1)+' OF '+grid,14,18);
+ context.fillText('PIXEL '+(index+1)+' / '+grid+' · '+result.scannedPixels+' SOLVED',14,34);
+ context.fillText('DEFLECTION '+deflection.toFixed(3)+' nm',14,50);
+ context.fillText('PEAK FORCE '+force.toFixed(3)+' nN',14,66);
+ context.fillText('SURFACE HEIGHT '+points[index].toFixed(2)+' nm',14,82);
+ context.fillStyle='rgba(119,205,188,.75)';context.fillText('CURRENT RASTER LINE / '+result.scanWidthNm.toLocaleString('en-US')+' nm scan',14,h-7);
 }
 function drawAFM3DMap(result){
  const canvas=document.getElementById('afm-topography-3d-canvas'),context=canvas?.getContext('2d');
  if(!context||!result)return;
- const w=canvas.width,h=canvas.height,grid=result.gridSize,data=result.topographyNm;context.clearRect(0,0,w,h);
+ const w=canvas.width,h=canvas.height,grid=result.gridSize,data=result.topographyNm,total=grid*grid;
+ const scanned=clamp(result.scannedPixels??total,0,total);
+ context.clearRect(0,0,w,h);
  const bg=context.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#102b37');bg.addColorStop(1,'#07151f');context.fillStyle=bg;context.fillRect(0,0,w,h);
  let minimum=Infinity,maximum=-Infinity;for(const value of data){minimum=Math.min(minimum,value);maximum=Math.max(maximum,value)}
  const range=Math.max(1e-8,maximum-minimum),yaw=afmCamera.yaw,pitch=afmCamera.pitch,cx=w*.5,cy=h*.56,scale=Math.min(w*.39,h*.58)*afmCamera.zoom;
  const cosY=Math.cos(yaw),sinY=Math.sin(yaw),cosP=Math.cos(pitch),sinP=Math.sin(pitch);
  const project=(x,y,z)=>{const rx=x*cosY-y*sinY,ry=x*sinY+y*cosY,vertical=ry*cosP+z*sinP,depth=ry*sinP-z*cosP,perspective=1/(1-depth*.13);return {x:cx+rx*scale*perspective,y:cy+vertical*scale*perspective,d:depth}};
- const points=new Array(grid*grid);
+ const points=new Array(total);
  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){const i=y*grid+x,value=(data[i]-minimum)/range;points[i]=project(x/(grid-1)*2-1,y/(grid-1)*2-1,(value-.5)*.78)}
  const cells=[];
  for(let y=0;y<grid-1;y++)for(let x=0;x<grid-1;x++){
   const a=y*grid+x,b=a+1,d=(y+1)*grid+x,e=d+1,quad=[points[a],points[b],points[e],points[d]];
   const depth=quad.reduce((sum,p)=>sum+p.d,0)/4,avg=(data[a]+data[b]+data[d]+data[e])*.25,value=(avg-minimum)/range,rgb=afmColour(value);
   const slope=(Math.abs(data[b]-data[a])+Math.abs(data[d]-data[a]))/range,shade=clamp(.88-slope*.045,.48,1.12);
-  cells.push({quad,depth,fill:'rgb('+Math.round(rgb[0]*shade)+','+Math.round(rgb[1]*shade)+','+Math.round(rgb[2]*shade)+')'});
+  const solved=(e<scanned),visibility=solved?1:.34;
+  cells.push({quad,depth,fill:'rgb('+Math.round(rgb[0]*shade*visibility)+','+Math.round(rgb[1]*shade*visibility)+','+Math.round(rgb[2]*shade*visibility)+')'});
  }
  cells.sort((a,b)=>a.depth-b.depth);
  for(const cell of cells){context.beginPath();cell.quad.forEach((p,i)=>i?context.lineTo(p.x,p.y):context.moveTo(p.x,p.y));context.closePath();context.fillStyle=cell.fill;context.fill();context.strokeStyle='rgba(198,235,224,.13)';context.lineWidth=.5;context.stroke()}
- context.fillStyle='rgba(220,241,232,.92)';context.font='600 10px "Space Grotesk"';context.fillText('AFM / 3D HEIGHT MAP',16,20);
- context.fillStyle='rgba(144,206,194,.82)';context.font='600 8px "Space Grotesk"';context.fillText(result.scanWidthNm.toLocaleString('en-US')+' nm scan · '+grid+' × '+grid+' samples',16,36);
+ if(scanned>0){
+  const active=clamp(Math.floor(afmScanIndex),0,total-1),tip=points[active];
+  context.strokeStyle='rgba(246,193,132,.92)';context.lineWidth=2.4;
+  context.beginPath();context.moveTo(tip.x,tip.y-53);context.lineTo(tip.x,tip.y-7);context.stroke();
+  context.fillStyle='#ffd09b';context.beginPath();context.arc(tip.x,tip.y-4,5,0,Math.PI*2);context.fill();
+  context.strokeStyle='rgba(255,216,169,.32)';context.beginPath();context.arc(tip.x,tip.y,10,0,Math.PI*2);context.stroke();
+ }
+ const percent=Math.round(scanned/total*100);
+ context.fillStyle='rgba(220,241,232,.92)';context.font='600 10px "Space Grotesk"';context.fillText('AFM / 3D LIVE TOPOGRAPHY',16,20);
+ context.fillStyle='rgba(144,206,194,.82)';context.font='600 8px "Space Grotesk"';context.fillText(result.scanWidthNm.toLocaleString('en-US')+' nm scan · '+grid+' × '+grid+' pixels',16,36);
  context.fillStyle='rgba(218,238,230,.88)';context.fillText('TIP: '+result.tipGeometry.toUpperCase()+' · '+result.material.label,16,52);
  const ix=w-78,iy=55,r=25;context.strokeStyle='#a9e5d8';context.fillStyle='rgba(119,197,180,.25)';context.lineWidth=1.6;context.beginPath();
  if(result.tipGeometry==='sphere'){context.arc(ix,iy,r*.65,Math.PI,Math.PI*2);context.lineTo(ix+r*.65,iy+r*.25);context.lineTo(ix-r*.65,iy+r*.25);context.closePath()}
  else if(result.tipGeometry==='cone'){context.moveTo(ix-r*.62,iy-r*.45);context.lineTo(ix+r*.62,iy-r*.45);context.lineTo(ix,iy+r*.7);context.closePath()}
  else{context.moveTo(ix-r*.62,iy-r*.45);context.lineTo(ix+r*.62,iy-r*.45);context.lineTo(ix+r*.34,iy+r*.34);context.lineTo(ix-r*.34,iy+r*.34);context.closePath()}
  context.fill();context.stroke();
- context.fillStyle='rgba(221,239,230,.88)';context.font='600 8px "Space Grotesk"';context.fillText('MIN '+minimum.toFixed(2)+' nm',16,h-29);context.fillText('MAX '+maximum.toFixed(2)+' nm',16,h-15);
- context.fillStyle='rgba(133,209,190,.82)';context.fillText('TIP-CONVOLVED / RELATIVE HEIGHT',w-260,h-15);
+ context.fillStyle='rgba(221,239,230,.88)';context.font='600 8px "Space Grotesk"';
+ context.fillText('MIN '+minimum.toFixed(2)+' nm',16,h-29);context.fillText('MAX '+maximum.toFixed(2)+' nm',16,h-15);
+ context.fillStyle='rgba(133,209,190,.82)';context.fillText(percent+'% / '+scanned+' OF '+total+' PIXELS',w-270,h-15);
 }
 function renderAFMMetrics(result){
  const fields=[
@@ -720,13 +738,26 @@ async function executeElectronTransport(){
   if(status)status.textContent='SIMULATION ERROR';
  }finally{button.disabled=false}
 }
+function renderAFMScanProgress(result){
+ const total=result.gridSize*result.gridSize,done=result.scannedPixels||0,percent=Math.round(done/total*100);
+ const bar=document.getElementById('afm-scan-progress');if(bar)bar.value=percent;
+ const label=document.getElementById('afm-scan-progress-label');
+ if(label)label.textContent=percent+'% · '+done.toLocaleString('en-US')+' / '+total.toLocaleString('en-US')+' PIXELS';
+ return percent;
+}
 async function executeAFMScan(){
  const button=document.getElementById('run-afm-scan'),status=document.getElementById('afm-physics-status');
  if(!button||mode!=='afm')return;
- button.disabled=true;if(status)status.textContent='INTEGRATING CANTILEVER / FEEDBACK';
+ const generation=++afmScanGeneration;
+ button.disabled=true;
+ const play=document.getElementById('play-afm-tip-scan');if(play)play.disabled=true;
+ if(status)status.textContent='PREPARING LIVE C++ / WASM RASTER';
+ let animationScheduled=false;
  try{
-  const engines=await ensurePhysicsEngines(),preset=getActivePreset();
-  const result=runAFMInteraction(engines,{
+  const engines=await ensurePhysicsEngines();
+  if(generation!==afmScanGeneration||mode!=='afm')return;
+  const preset=getActivePreset();
+  const session=startAFMInteraction(engines,{
    sample,scanWidthNm:preset.fieldWidthNm,gridSize:48,
    seed:randomFor(sample.id+':AFM:'+preset.fieldWidthNm)()*4294967295,
    mode:document.getElementById('afm-interaction-mode').value,
@@ -741,25 +772,54 @@ async function executeAFMScan(){
    adhesionEnergyMilliJPerM2:undefined,contactForceSetpointNn:Number(document.getElementById('afm-force').value),
    cyclesPerPixel:6,stepsPerCycle:24
   });
-  afmResult=result;afmScanIndex=0;draw();drawAFMProbeTrace(result);drawAFM3DMap(result);renderAFMMetrics(result);
+  if(generation!==afmScanGeneration||mode!=='afm')return;
+  afmScanSession=session;afmResult=session.result;afmScanIndex=0;
   const signal=document.getElementById('afm-signal-channel');if(signal)signal.disabled=false;
-  const play=document.getElementById('play-afm-tip-scan');if(play)play.disabled=false;
-  if(status)status.textContent='SCAN COMPLETE / FEEDBACK STABLE';
+  renderAFMScanProgress(afmResult);draw();drawAFMProbeTrace(afmResult);drawAFM3DMap(afmResult);renderAFMMetrics(afmResult);
+  if(status)status.textContent='LIVE RASTER / 0% / FEEDBACK ACTIVE';
+  const tick=()=>{
+   if(afmScanSession!==session||generation!==afmScanGeneration)return;
+   try{
+    const pixelsPerFrame=Number(document.getElementById('afm-scan-speed')?.value)||12;
+    afmResult=advanceAFMInteraction(session,pixelsPerFrame);
+    const total=afmResult.gridSize*afmResult.gridSize;
+    afmScanIndex=Math.max(0,Math.min(total-1,afmResult.scannedPixels-1));
+    const percent=renderAFMScanProgress(afmResult);
+    draw();drawAFMProbeTrace(afmResult);drawAFM3DMap(afmResult);renderAFMMetrics(afmResult);
+    if(afmResult.scanComplete){
+     afmScanSession=null;afmAnimationRequest=0;button.disabled=false;
+     if(play){play.disabled=false;play.textContent='REPLAY SCAN'}
+     if(status)status.textContent='SCAN COMPLETE / 100% / FEEDBACK STABLE';
+    }else{
+     if(status)status.textContent='LIVE AFM RASTER / '+percent+'% / ROW '+(Math.floor(afmResult.scannedPixels/afmResult.gridSize)+1)+' OF '+afmResult.gridSize;
+     afmAnimationRequest=requestAnimationFrame(tick);
+    }
+   }catch(error){
+    console.error('AFM live scan step failed:',error);
+    afmScanSession=null;afmAnimationRequest=0;button.disabled=false;
+    if(status)status.textContent='SCAN ERROR / CHECK ENGINE';
+   }
+  };
+  afmAnimationRequest=requestAnimationFrame(tick);
+  animationScheduled=true;
  }catch(error){
   console.error('AFM interaction scan failed:',error);
   if(status)status.textContent='SCAN ERROR';
- }finally{button.disabled=false}
+ }finally{
+  if(!animationScheduled&&generation===afmScanGeneration)button.disabled=false;
+ }
 }
 function playAFMTipTrace(){
- if(!afmResult)return;
+ if(!afmResult?.scanComplete)return;
  if(afmAnimationRequest)cancelAnimationFrame(afmAnimationRequest);
- const button=document.getElementById('play-afm-tip-scan');if(button)button.textContent='SCANNING TIP…';
- const start=performance.now(),duration=3600,grid=afmResult.gridSize;
+ const button=document.getElementById('play-afm-tip-scan');if(button)button.textContent='REPLAYING SCAN…';
+ const start=performance.now(),duration=3600,total=afmResult.gridSize*afmResult.gridSize;
  const tick=now=>{
   const progress=clamp((now-start)/duration,0,1);
-  afmScanIndex=progress*(grid-1);drawAFMProbeTrace(afmResult);
+  afmScanIndex=Math.min(total-1,progress*(total-1));
+  drawAFMProbeTrace(afmResult);drawAFM3DMap(afmResult);
   if(progress<1)afmAnimationRequest=requestAnimationFrame(tick);
-  else{afmAnimationRequest=0;if(button)button.textContent='PLAY TIP TRACE'}
+  else{afmAnimationRequest=0;if(button)button.textContent='REPLAY SCAN'}
  };
  afmAnimationRequest=requestAnimationFrame(tick);
 }
@@ -898,6 +958,7 @@ for(const id of ['electron-voltage','electron-thickness','electron-particles','e
  const input=document.getElementById(id);input?.addEventListener('input',()=>{updatePhysicsControlReadouts();clearPhysicsResults()});
 }
 document.getElementById('afm-signal-channel')?.addEventListener('change',()=>{draw();drawAFMProbeTrace(afmResult);drawAFM3DMap(afmResult)});
+document.getElementById('afm-scan-speed')?.addEventListener('change',event=>{const status=document.getElementById('afm-physics-status');if(status&&afmScanSession)status.textContent='LIVE RASTER / '+(event.target.value)+' PIXELS PER FRAME'});
 document.getElementById('afm-tip-geometry')?.addEventListener('change',()=>clearPhysicsResults());
 document.getElementById('run-electron-transport')?.addEventListener('click',executeElectronTransport);
 document.getElementById('run-afm-scan')?.addEventListener('click',executeAFMScan);
