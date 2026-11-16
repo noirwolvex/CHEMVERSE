@@ -177,11 +177,48 @@ void buildTipConvolution(int grid_size,double scan_width_nm,double tip_radius_nm
  }
 }
 
+
+struct ScanParameters{
+ int grid_size;
+ double scan_width_nm,free_amplitude_nm,amplitude_setpoint_ratio;
+ double spring_constant_n_m,resonance_frequency_khz,quality_factor,tip_radius_nm;
+ double young_modulus_gpa,poisson_ratio,adhesion_energy_mj_m2,hamaker_constant_j;
+ int scan_mode;
+ double contact_force_setpoint_nn;
+ int cycles_per_pixel,steps_per_cycle,tip_geometry;
+ double tip_half_angle_degrees;
+};
+ScanParameters scan_parameters{};
+int scan_progress=0;
+bool scan_active=false,scan_complete=false;
+double scan_total_force=0.0,scan_max_force=0.0,scan_total_deflection=0.0;
+double scan_total_amplitude=0.0,scan_total_topography=0.0,scan_total_error=0.0;
+double scan_max_indentation=0.0,scan_previous_stage_z=0.0,scan_previous_surface=0.0;
+int scan_feedback_total=0,scan_contact_cells=0;
+
+void updateScanSummary(){
+ summary[0]=static_cast<double>(scan_parameters.grid_size);
+ if(scan_progress<=0)return;
+ const double processed=static_cast<double>(scan_progress);
+ summary[1]=scan_total_force/processed;
+ summary[2]=scan_max_force;
+ summary[3]=scan_total_deflection/processed;
+ summary[4]=scan_total_topography/processed;
+ summary[5]=scan_total_amplitude/processed;
+ summary[6]=scan_parameters.scan_mode==0?
+   summary[5]/scan_parameters.free_amplitude_nm:0.0;
+ summary[7]=scan_max_indentation;
+ summary[8]=static_cast<double>(scan_feedback_total)/processed;
+ summary[9]=scan_parameters.scan_mode==0?scan_total_error/processed:0.0;
+ summary[10]=static_cast<double>(scan_contact_cells)/processed;
+ summary[11]=static_cast<double>(scan_parameters.scan_mode);
+}
+
 }
 
 extern "C" double *cv_afm_height_input(void){return height_input;}
 
-extern "C" const double *cv_afm_scan(
+extern "C" const double *cv_afm_scan_begin(
  int grid_size,double scan_width_nm,double free_amplitude_nm,
  double amplitude_setpoint_ratio,double spring_constant_n_m,
  double resonance_frequency_khz,double quality_factor,double tip_radius_nm,
@@ -190,6 +227,7 @@ extern "C" const double *cv_afm_scan(
  int cycles_per_pixel,int steps_per_cycle,int tip_geometry,
  double tip_half_angle_degrees){
  last_error=0;
+ scan_active=false;scan_complete=false;scan_progress=0;
  for(int i=0;i<CV_AFM_SUMMARY_FIELDS;++i)summary[i]=0.0;
  for(int i=0;i<CV_AFM_MAX_CELLS*CV_AFM_OUTPUT_FIELDS;++i)output[i]=0.0;
  const bool valid=grid_size>=8&&grid_size<=CV_AFM_MAX_GRID&&
@@ -213,92 +251,131 @@ extern "C" const double *cv_afm_scan(
  if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*9>MAX_DYNAMIC_STEPS){
   last_error=ERR_STEP_LIMIT;return 0;
  }
- const int cells=grid_size*grid_size;
+ scan_parameters={grid_size,scan_width_nm,free_amplitude_nm,
+  amplitude_setpoint_ratio,spring_constant_n_m,resonance_frequency_khz,
+  quality_factor,tip_radius_nm,young_modulus_gpa,poisson_ratio,
+  adhesion_energy_mj_m2,hamaker_constant_j,scan_mode,contact_force_setpoint_nn,
+  cycles_per_pixel,steps_per_cycle,tip_geometry,tip_half_angle_degrees};
+ scan_total_force=0.0;scan_max_force=0.0;scan_total_deflection=0.0;
+ scan_total_amplitude=0.0;scan_total_topography=0.0;scan_total_error=0.0;
+ scan_max_indentation=0.0;scan_feedback_total=0;scan_contact_cells=0;
  buildTipConvolution(grid_size,scan_width_nm,tip_radius_nm,tip_geometry,tip_half_angle_degrees);
- const double frequency_hz=resonance_frequency_khz*1000.0;
- const double target_amplitude=free_amplitude_nm*amplitude_setpoint_ratio;
- const double spring=spring_constant_n_m;
- double total_force=0.0,max_force=0.0,total_deflection=0.0,total_amplitude=0.0;
- double total_topography=0.0,total_error=0.0,max_indent=0.0;
- int feedback_total=0,contact_cells=0;
- double previous_stage_z=height_input[0]+free_amplitude_nm*1.05;
- double previous_surface=convolved_height[0];
- for(int y=0;y<grid_size;++y){
-  for(int x=0;x<grid_size;++x){
-   const int index=y*grid_size+x;
-   const double surface=convolved_height[index];
-   double stage_z=previous_stage_z+(surface-previous_surface);
-   double deflection=0.0,peak_force=0.0,indentation=0.0,phase=0.0;
-   double measured_amplitude=0.0;
-   int feedback_iterations=0;
-   if(scan_mode==0){
-    stage_z=maxv(surface+0.15,stage_z);
-    for(int iteration=0;iteration<8;++iteration){
-     measured_amplitude=runTapping(surface,stage_z,free_amplitude_nm,spring,
-      frequency_hz,quality_factor,tip_radius_nm,young_modulus_gpa,
-      poisson_ratio,adhesion_energy_mj_m2,hamaker_constant_j,
-      cycles_per_pixel,steps_per_cycle,&deflection,&peak_force,&indentation,&phase);
-     if(!finite(measured_amplitude)||measured_amplitude<0.0){last_error=ERR_NUMERIC;return 0;}
-     feedback_iterations=iteration+1;
-     const double error=target_amplitude-measured_amplitude;
-     stage_z+=clamp(error*0.08,-free_amplitude_nm*0.025,free_amplitude_nm*0.025);
-     if(absd(error)<free_amplitude_nm*0.008)break;
-    }
-    /* Amplitude-feedback height is referenced to the calibrated free approach. */
-    measured_amplitude=runTapping(surface,stage_z,free_amplitude_nm,spring,
-      frequency_hz,quality_factor,tip_radius_nm,young_modulus_gpa,
-      poisson_ratio,adhesion_energy_mj_m2,hamaker_constant_j,
-      cycles_per_pixel,steps_per_cycle,&deflection,&peak_force,&indentation,&phase);
-    if(!finite(measured_amplitude)){last_error=ERR_NUMERIC;return 0;}
-    total_error+=absd(measured_amplitude-target_amplitude);
-   }else{
-    const double effective_modulus=young_modulus_gpa/(1.0-poisson_ratio*poisson_ratio);
-    const double adhesive_force=TWO_PI*tip_radius_nm*adhesion_energy_mj_m2*.001;
-    const double required_hertz=maxv(.0,contact_force_setpoint_nn+adhesive_force);
-    const double denominator=(4.0/3.0)*effective_modulus*sqrtFast(tip_radius_nm);
-    indentation=pow23(required_hertz/maxv(1.0e-18,denominator));
-    peak_force=contact_force_setpoint_nn;
-    deflection=peak_force/spring;
-    stage_z=surface-indentation-deflection;
-    measured_amplitude=0.0;
-    phase=0.0;
-    feedback_iterations=1;
-    contact_cells++;
-   }
-   const int offset=index*CV_AFM_OUTPUT_FIELDS;
-   const double measured_topography=scan_mode==1?
-     stage_z+indentation+deflection:stage_z-free_amplitude_nm*0.96;
-   output[offset]=measured_topography;
-   output[offset+1]=deflection;
-   output[offset+2]=peak_force;
-   output[offset+3]=measured_amplitude;
-   output[offset+4]=phase*180.0/PI;
-   output[offset+5]=static_cast<double>(feedback_iterations);
-   total_force+=peak_force;max_force=maxv(max_force,peak_force);
-   total_deflection+=deflection;total_amplitude+=measured_amplitude;
-   total_topography+=measured_topography;max_indent=maxv(max_indent,indentation);
-   feedback_total+=feedback_iterations;
-   if(scan_mode==0&&peak_force>0.0)contact_cells++;
-   previous_stage_z=stage_z;
-   previous_surface=surface;
-  }
- }
+ scan_previous_stage_z=height_input[0]+free_amplitude_nm*1.05;
+ scan_previous_surface=convolved_height[0];
+ scan_active=true;
  summary[0]=static_cast<double>(grid_size);
- summary[1]=total_force/static_cast<double>(cells);
- summary[2]=max_force;
- summary[3]=total_deflection/static_cast<double>(cells);
- summary[4]=total_topography/static_cast<double>(cells);
- summary[5]=total_amplitude/static_cast<double>(cells);
- summary[6]=scan_mode==0?summary[5]/free_amplitude_nm:0.0;
- summary[7]=max_indent;
- summary[8]=static_cast<double>(feedback_total)/static_cast<double>(cells);
- summary[9]=scan_mode==0?total_error/static_cast<double>(cells):0.0;
- summary[10]=static_cast<double>(contact_cells)/static_cast<double>(cells);
- summary[11]=static_cast<double>(scan_mode);
+ return output;
+}
+
+extern "C" int cv_afm_scan_advance(int max_pixels){
+ if(max_pixels<1){last_error=ERR_INVALID;return -1;}
+ if(scan_complete)return scan_progress;
+ if(!scan_active){last_error=ERR_INVALID;return -1;}
+ last_error=0;
+ const int total=scan_parameters.grid_size*scan_parameters.grid_size;
+ const int stop=scan_progress+max_pixels<total?scan_progress+max_pixels:total;
+ const double frequency_hz=scan_parameters.resonance_frequency_khz*1000.0;
+ const double target_amplitude=scan_parameters.free_amplitude_nm*
+   scan_parameters.amplitude_setpoint_ratio;
+ const double spring=scan_parameters.spring_constant_n_m;
+ while(scan_progress<stop){
+  const int index=scan_progress;
+  const int y=index/scan_parameters.grid_size;
+  const int x=index-y*scan_parameters.grid_size;
+  const double surface=convolved_height[index];
+  double stage_z=scan_previous_stage_z+(surface-scan_previous_surface);
+  double deflection=0.0,peak_force=0.0,indentation=0.0,phase=0.0;
+  double measured_amplitude=0.0;
+  int feedback_iterations=0;
+  if(scan_parameters.scan_mode==0){
+   stage_z=maxv(surface+0.15,stage_z);
+   for(int iteration=0;iteration<8;++iteration){
+    measured_amplitude=runTapping(surface,stage_z,scan_parameters.free_amplitude_nm,spring,
+     frequency_hz,scan_parameters.quality_factor,scan_parameters.tip_radius_nm,
+     scan_parameters.young_modulus_gpa,scan_parameters.poisson_ratio,
+     scan_parameters.adhesion_energy_mj_m2,scan_parameters.hamaker_constant_j,
+     scan_parameters.cycles_per_pixel,scan_parameters.steps_per_cycle,
+     &deflection,&peak_force,&indentation,&phase);
+    if(!finite(measured_amplitude)||measured_amplitude<0.0){
+     last_error=ERR_NUMERIC;scan_active=false;return -1;
+    }
+    feedback_iterations=iteration+1;
+    const double error=target_amplitude-measured_amplitude;
+    stage_z+=clamp(error*0.08,-scan_parameters.free_amplitude_nm*0.025,
+      scan_parameters.free_amplitude_nm*0.025);
+    if(absd(error)<scan_parameters.free_amplitude_nm*0.008)break;
+   }
+   measured_amplitude=runTapping(surface,stage_z,scan_parameters.free_amplitude_nm,spring,
+    frequency_hz,scan_parameters.quality_factor,scan_parameters.tip_radius_nm,
+    scan_parameters.young_modulus_gpa,scan_parameters.poisson_ratio,
+    scan_parameters.adhesion_energy_mj_m2,scan_parameters.hamaker_constant_j,
+    scan_parameters.cycles_per_pixel,scan_parameters.steps_per_cycle,
+    &deflection,&peak_force,&indentation,&phase);
+   if(!finite(measured_amplitude)){
+    last_error=ERR_NUMERIC;scan_active=false;return -1;
+   }
+   scan_total_error+=absd(measured_amplitude-target_amplitude);
+  }else{
+   const double effective_modulus=scan_parameters.young_modulus_gpa/
+     (1.0-scan_parameters.poisson_ratio*scan_parameters.poisson_ratio);
+   const double adhesive_force=TWO_PI*scan_parameters.tip_radius_nm*
+     scan_parameters.adhesion_energy_mj_m2*.001;
+   const double required_hertz=maxv(.0,scan_parameters.contact_force_setpoint_nn+adhesive_force);
+   const double denominator=(4.0/3.0)*effective_modulus*sqrtFast(scan_parameters.tip_radius_nm);
+   indentation=pow23(required_hertz/maxv(1.0e-18,denominator));
+   peak_force=scan_parameters.contact_force_setpoint_nn;
+   deflection=peak_force/spring;
+   stage_z=surface-indentation-deflection;
+   measured_amplitude=0.0;phase=0.0;feedback_iterations=1;
+   scan_contact_cells++;
+  }
+  const int offset=index*CV_AFM_OUTPUT_FIELDS;
+  const double measured_topography=scan_parameters.scan_mode==1?
+    stage_z+indentation+deflection:
+    stage_z-scan_parameters.free_amplitude_nm*0.96;
+  output[offset]=measured_topography;
+  output[offset+1]=deflection;
+  output[offset+2]=peak_force;
+  output[offset+3]=measured_amplitude;
+  output[offset+4]=phase*180.0/PI;
+  output[offset+5]=static_cast<double>(feedback_iterations);
+  scan_total_force+=peak_force;scan_max_force=maxv(scan_max_force,peak_force);
+  scan_total_deflection+=deflection;scan_total_amplitude+=measured_amplitude;
+  scan_total_topography+=measured_topography;
+  scan_max_indentation=maxv(scan_max_indentation,indentation);
+  scan_feedback_total+=feedback_iterations;
+  if(scan_parameters.scan_mode==0&&peak_force>0.0)scan_contact_cells++;
+  scan_previous_stage_z=stage_z;
+  scan_previous_surface=surface;
+  scan_progress++;
+ }
+ updateScanSummary();
+ if(scan_progress>=total){scan_active=false;scan_complete=true;}
+ return scan_progress;
+}
+
+extern "C" int cv_afm_scan_progress(void){return scan_progress;}
+extern "C" int cv_afm_scan_complete(void){return scan_complete?1:0;}
+
+extern "C" const double *cv_afm_scan(
+ int grid_size,double scan_width_nm,double free_amplitude_nm,
+ double amplitude_setpoint_ratio,double spring_constant_n_m,
+ double resonance_frequency_khz,double quality_factor,double tip_radius_nm,
+ double young_modulus_gpa,double poisson_ratio,double adhesion_energy_mj_m2,
+ double hamaker_constant_j,int scan_mode,double contact_force_setpoint_nn,
+ int cycles_per_pixel,int steps_per_cycle,int tip_geometry,
+ double tip_half_angle_degrees){
+ const double *pointer=cv_afm_scan_begin(grid_size,scan_width_nm,free_amplitude_nm,
+  amplitude_setpoint_ratio,spring_constant_n_m,resonance_frequency_khz,
+  quality_factor,tip_radius_nm,young_modulus_gpa,poisson_ratio,
+  adhesion_energy_mj_m2,hamaker_constant_j,scan_mode,contact_force_setpoint_nn,
+  cycles_per_pixel,steps_per_cycle,tip_geometry,tip_half_angle_degrees);
+ if(!pointer)return 0;
+ if(cv_afm_scan_advance(grid_size*grid_size)<0)return 0;
  return output;
 }
 
 extern "C" const double *cv_afm_summary(void){return summary;}
 extern "C" const double *cv_afm_output(void){return output;}
 extern "C" int cv_afm_last_error(void){return last_error;}
-extern "C" int cv_afm_engine_version(void){return 110;}
+extern "C" int cv_afm_engine_version(void){return 120;}
