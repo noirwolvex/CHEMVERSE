@@ -32,7 +32,7 @@ int main(){
 
  const double *track=cv_electron_tracks();
  assert(track[0]>=2.0);
- assert(near(track[3],20.0));
+ assert(near(track[2],20.0));
  const int firstPoint=CV_ELECTRON_TRACK_HEADER_FIELDS;
  assert(near(track[firstPoint+2],0.0));
  assert(near(track[firstPoint+3],20.0));
