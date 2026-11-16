@@ -57,8 +57,8 @@ ForceState tipSampleForce(double gap_nm,double velocity_nm_s,double tip_radius_n
   return {force,0.0,false};
  }
  const double indentation=-gap_nm;
- const double hertz=(4.0/3.0)*effective_modulus*
-   sqrtFast(tip_radius_nm)*pow32(indentation);
+ const double hertz=minv(120.0,(4.0/3.0)*effective_modulus*
+   sqrtFast(tip_radius_nm)*pow32(indentation));
  const double damping=clamp(-velocity_nm_s*1.0e-7,-hertz*0.25,hertz*0.25);
  return {maxv(-adhesion_nn,hertz-adhesion_nn+damping),indentation,true};
 }
@@ -165,7 +165,7 @@ extern "C" const double *cv_afm_scan(
   contact_force_setpoint_nn>=0.01&&contact_force_setpoint_nn<=100.0&&
   cycles_per_pixel>=2&&cycles_per_pixel<=40&&steps_per_cycle>=16&&steps_per_cycle<=64;
  if(!valid){last_error=ERR_INVALID;return 0;}
- if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*5>MAX_DYNAMIC_STEPS){
+ if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*9>MAX_DYNAMIC_STEPS){
   last_error=ERR_STEP_LIMIT;return 0;
  }
  const int cells=grid_size*grid_size;
@@ -187,7 +187,7 @@ extern "C" const double *cv_afm_scan(
    int feedback_iterations=0;
    if(scan_mode==0){
     stage_z=maxv(surface+0.15,stage_z);
-    for(int iteration=0;iteration<4;++iteration){
+    for(int iteration=0;iteration<8;++iteration){
      measured_amplitude=runTapping(surface,stage_z,free_amplitude_nm,spring,
       frequency_hz,quality_factor,tip_radius_nm,young_modulus_gpa,
       poisson_ratio,adhesion_energy_mj_m2,hamaker_constant_j,
@@ -195,7 +195,7 @@ extern "C" const double *cv_afm_scan(
      if(!finite(measured_amplitude)||measured_amplitude<0.0){last_error=ERR_NUMERIC;return 0;}
      feedback_iterations=iteration+1;
      const double error=target_amplitude-measured_amplitude;
-     stage_z+=clamp(error*0.7,-free_amplitude_nm*0.35,free_amplitude_nm*0.35);
+     stage_z+=clamp(error*0.08,-free_amplitude_nm*0.025,free_amplitude_nm*0.025);
      if(absd(error)<free_amplitude_nm*0.008)break;
     }
     /* Amplitude-feedback height is referenced to the calibrated free approach. */
