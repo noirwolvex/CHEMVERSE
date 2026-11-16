@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ELEMENTS,MATERIALS,REACTIONS,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,parseChemicalFormula,validateReactionBalance} from '../src/compound-reactions.mjs';
+import {ELEMENTS,MATERIALS,REACTIONS,calculateStoichiometry,findReactionsForSpecies,getBondOrder,getBondReferenceLengthAngstrom,getMaterialById,getReactionAtomBalance,getReactionById,parseChemicalFormula,validateMaterialBondModel,validateReactionBalance} from '../src/compound-reactions.mjs';
 test('the reaction explorer has twelve unique examples across six reaction classes',()=>{assert.equal(REACTIONS.length,12);assert.equal(new Set(REACTIONS.map(r=>r.id)).size,12);assert.deepEqual(new Set(REACTIONS.map(r=>r.category)),new Set(['synthesis','combustion','decomposition','displacement','precipitation','neutralization']))});
 test('every stored equation is atom-balanced and every referenced species exists',()=>{for(const r of REACTIONS){assert.equal(validateReactionBalance(r),true,r.id);for(const entry of [...r.reactants,...r.products]){assert.ok(getMaterialById(entry.species),r.id+': '+entry.species);assert.ok(Number.isSafeInteger(entry.coefficient)&&entry.coefficient>0,r.id)}}});
 test('formula parser handles multi-letter symbols and subscripts expressed as digits',()=>{assert.deepEqual(parseChemicalFormula('CuSO4'),{Cu:1,S:1,O:4});assert.deepEqual(parseChemicalFormula('BaCl2'),{Ba:1,Cl:2});assert.deepEqual(parseChemicalFormula('Na2SO4'),{Na:2,S:1,O:4});assert.equal(parseChemicalFormula('2H2O'),null);assert.equal(parseChemicalFormula(''),null)});
@@ -11,3 +11,30 @@ test('invalid inputs and unknown species do not create apparent valid reactions'
 test('model atom counts match formulas and all bond indexes are valid',()=>{for(const item of MATERIALS){const expected=parseChemicalFormula(item.formula),actual={};for(const a of item.atoms)actual[a.element]=(actual[a.element]||0)+1;assert.deepEqual(actual,expected,item.id);for(const [a,b] of item.bonds)assert.ok(a>=0&&b>=0&&a<item.atoms.length&&b<item.atoms.length&&a!==b,item.id)}});
 test('element reference covers all elements used by the models',()=>{const symbols=new Set(ELEMENTS.map(e=>e.symbol));for(const item of MATERIALS)for(const a of item.atoms)assert.ok(symbols.has(a.element),item.id+': '+a.element);assert.equal(new Set(ELEMENTS.map(e=>e.symbol)).size,ELEMENTS.length)});
 test('element and compound selections lead to related reactions',()=>{assert.ok(findReactionsForSpecies('fe').some(r=>r.id==='iron-copper-displacement'));assert.ok(findReactionsForSpecies('baso4').some(r=>r.id==='barium-sulfate-precipitation'));assert.deepEqual(findReactionsForSpecies('not-a-material'),[])});
+
+test('bond models validate order and reference length metadata',()=>{
+ for(const item of MATERIALS)assert.equal(validateMaterialBondModel(item),true,item.id);
+ const bond=(materialId,index=0)=>getMaterialById(materialId).bonds[index];
+ assert.equal(getBondOrder(bond('h2')),1);
+ assert.equal(getBondOrder(bond('o2')),2);
+ assert.equal(getBondOrder(bond('co2')),2);
+ assert.equal(getBondOrder(bond('n2')),3);
+ assert.equal(getBondOrder(bond('co')),3);
+ assert.ok(Math.abs(getBondOrder(bond('agno3'))-4/3)<1e-5);
+ assert.equal(getBondOrder(bond('cuso4')),1.5);
+ assert.equal(getBondOrder(bond('mgo')),0);
+ assert.ok(Math.abs(getBondReferenceLengthAngstrom(bond('h2'))-0.7414)<1e-9);
+ assert.ok(Math.abs(getBondReferenceLengthAngstrom(bond('o2'))-1.208)<1e-9);
+ assert.equal(getBondReferenceLengthAngstrom(bond('mgo')),null);
+});
+test('ionic formula-unit contacts are not mislabeled as covalent bond orders',()=>{
+ for(const id of ['mgo','nacl','agcl','cao','zncl2','bacl2']){
+  const item=getMaterialById(id);
+  assert.ok(item.bonds.length>0,id);
+  assert.ok(item.bonds.every(bond=>getBondOrder(bond)===0),id);
+ }
+});
+test('resonance-delocalized groups use average bond orders rather than arbitrary localized double bonds',()=>{
+ for(const id of ['agno3','nano3','caco3'])assert.ok(getBondOrder(getMaterialById(id).bonds[0])>1.3&&getBondOrder(getMaterialById(id).bonds[0])<1.34,id);
+ for(const id of ['cuso4','feso4','na2so4','baso4'])assert.equal(getBondOrder(getMaterialById(id).bonds[0]),1.5,id);
+});
