@@ -103,6 +103,34 @@ int main(){
  const double pyramidDiagonal=cv_afm_output()[(9*16+9)*CV_AFM_OUTPUT_FIELDS];
  assert(pyramidDiagonal>20.0);
 
+ /* Incremental raster batches expose solved pixels before the scan is complete.
+  * Finishing in batches must be numerically identical to the compatibility API. */
+ const double *session=cv_afm_scan_begin(16,800.0,8.0,.72,2.0,300.0,80.0,
+  10.0,70.0,.23,25.0,1.0e-19,1,3.0,8,32,0,30.0);
+ assert(session&&cv_afm_last_error()==0);
+ assert(cv_afm_scan_progress()==0&&cv_afm_scan_complete()==0);
+ int progress=cv_afm_scan_advance(13);
+ assert(progress==13&&cv_afm_scan_progress()==13&&cv_afm_scan_complete()==0);
+ output=cv_afm_output();
+ assert(output[5]>=1.0);
+ assert(output[13*CV_AFM_OUTPUT_FIELDS+5]==0.0);
+ assert(near(cv_afm_summary()[1],3.0,1e-8));
+ progress=cv_afm_scan_advance(17);
+ assert(progress==30&&cv_afm_scan_complete()==0);
+ while(progress<16*16){
+  const int next=cv_afm_scan_advance(23);
+  assert(next>progress);
+  progress=next;
+ }
+ assert(progress==16*16&&cv_afm_scan_complete()==1);
+ double staged[16*16*CV_AFM_OUTPUT_FIELDS]{};
+ output=cv_afm_output();
+ for(int i=0;i<16*16*CV_AFM_OUTPUT_FIELDS;++i)staged[i]=output[i];
+ assert(scan(1,3.0));
+ output=cv_afm_output();
+ for(int i=0;i<16*16*CV_AFM_OUTPUT_FIELDS;++i)assert(near(staged[i],output[i],1e-12));
+ assert(cv_afm_scan_progress()==16*16&&cv_afm_scan_complete()==1);
+
  /* Invalid grid and out-of-range materials are rejected. */
  assert(!cv_afm_scan(4,800.0,8.0,.72,2.0,300.0,80.0,
   10.0,70.0,.23,25.0,1e-19,0,2.0,8,32,0,30.0));
