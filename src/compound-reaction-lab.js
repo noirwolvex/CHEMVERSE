@@ -343,6 +343,9 @@ function updateDynamicEffects(value){
    if(crystalStructure)messages.push('خلية '+crystalStructure.profile[1]+' / '+crystalStructure.sites.length+' موقعاً ذرياً');
   }
   if(station04Profile[3]>0)messages.push((station04Profile[4]===1?'فقاعات ':'تحرر غاز ')+Math.round(gasRelease*100)+'%');
+  const preservedBonds=mappedBonds.filter(bond=>bond.unchanged).length;
+  const changedBonds=mappedBonds.length-preservedBonds;
+  if(mappedBonds.length)messages.push('روابط مستمرة '+preservedBonds+' / روابط يعاد ترتيبها '+changedBonds);
   readout.textContent=messages.length?messages.join('  ·  '):'تغيّر الروابط / حفظ الذرات';
  }
 }
