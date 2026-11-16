@@ -234,7 +234,7 @@ extern "C" const double *cv_afm_scan(
    total_topography+=measured_topography;max_indent=maxv(max_indent,indentation);
    feedback_total+=feedback_iterations;
    if(scan_mode==0&&peak_force>0.0)contact_cells++;
-   previous_stage_z=stage_z+(scan_mode==0?free_amplitude_nm*.96:0.0);
+   previous_stage_z=stage_z;
    previous_surface=surface;
   }
  }
