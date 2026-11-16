@@ -147,7 +147,7 @@ async function activateAtomResolvedView(reactionId){
   });
   if(reactantRoot)reactantRoot.visible=false;if(productRoot)productRoot.visible=false;if(reactionStageRoot)reactionStageRoot.visible=false;
   byId('molecule-view').classList.add('has-atom-engine');
-  if(reactionId==='silver-chloride-precipitation'){txt('view-legend-reactants','الأيونات المذابة');txt('view-legend-products','نواة راسب AgCl');txt('view-legend-hint','28 ATOMS / IONIC CONTACTS');}
+  if(reactionId==='silver-chloride-precipitation'){txt('view-legend-reactants','الأيونات المذابة');txt('view-legend-products',precipitationGate?'نواة راسب AgCl':'الأيونات تبقى مذابة');txt('view-legend-hint','28 ATOMS / IONIC CONTACTS');}
   else{txt('view-legend-reactants','الأيونات قبل انتقال البروتون');txt('view-legend-products','جزيئات الماء');txt('view-legend-hint','ATOM-MAPPED / KEYFRAMES');}
   buildAtomEngineView();updateAtomEngineFrame(progress);
   txt('atom-engine-status','C++ / WASM · '+atomEngineState.atomCount+' ATOMS · ACTIVE');
@@ -230,16 +230,17 @@ function updatePrecipitationCondition(refreshEngine=false){
   volumeMl:precipitationVolumeMl
  });
  const result=precipitationResult;
- if(!result){precipitationGate=false;txt('precipitation-q','—');txt('precipitation-ksp',AGCL_KSP_25C.toExponential(2));txt('precipitation-concentrations','—');txt('precipitation-status','أدخل كميات غير سالبة وحجماً نهائياً أكبر من صفر.');}
+ if(!result){precipitationGate=false;txt('precipitation-q','—');txt('precipitation-ksp',AGCL_KSP_25C.toExponential(2)+' M²');txt('precipitation-concentrations','—');txt('precipitation-status','أدخل كميات غير سالبة وحجماً نهائياً أكبر من صفر.');}
  else{
   precipitationGate=result.supersaturated;
-  txt('precipitation-q',result.quotient.toExponential(3));
-  txt('precipitation-ksp',result.ksp.toExponential(2));
+  txt('view-legend-products',result.supersaturated?'نواة راسب AgCl':'الأيونات تبقى مذابة');
+  txt('precipitation-q',result.quotient.toExponential(3)+' M²');
+  txt('precipitation-ksp',result.ksp.toExponential(2)+' M²');
   txt('precipitation-concentrations','[Ag⁺] = '+result.silverConcentration.toExponential(3)+' M  ·  [Cl⁻] = '+result.chlorideConcentration.toExponential(3)+' M');
   txt('precipitation-status',result.supersaturated?'Q > Ksp: المحلول فوق الإشباع؛ يبدأ تكوّن نواة AgCl في العرض الذري.':'Q ≤ Ksp: لا يتنبأ النموذج بترسيب صافٍ عند 25°C؛ تبقى الأيونات مذابة.');
  }
  if(refreshEngine&&atomEngine&&atomEngineState?.model?.id===activeReaction.id){
-  try{atomEngineState=configureAtomEngine(atomEngine,activeReaction.id,{precipitationAllowed:precipitationGate});buildAtomEngineView();updateTimeline(progress)}
+  try{const savedCamera=camera?.position.clone(),savedTarget=orbit?.target.clone();atomEngineState=configureAtomEngine(atomEngine,activeReaction.id,{precipitationAllowed:precipitationGate});buildAtomEngineView();if(savedCamera)camera.position.copy(savedCamera);if(savedTarget)orbit.target.copy(savedTarget);orbit?.update();updateTimeline(progress)}
   catch(error){txt('atom-engine-status','تعذر تحديث شرط الترسيب');txt('precipitation-status',error.message)}
  }
  return result
