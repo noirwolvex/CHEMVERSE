@@ -34,7 +34,7 @@ function makeElectronEngine(){
  };
 }
 function makeAfmEngine(){
- const memory=new WebAssembly.Memory({initial:2});
+ const memory=new WebAssembly.Memory({initial:8});
  const inputPointer=0,summaryPointer=8000,outputPointer=8200;
  const summary=new Float64Array(memory.buffer,summaryPointer,12);
  const output=new Float64Array(memory.buffer,outputPointer,96*96*6);
