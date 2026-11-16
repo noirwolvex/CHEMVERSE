@@ -312,3 +312,19 @@ The 3D map is a reconstruction of the **synthetic input height field after the s
 
 The current branch validation completed successfully: the native/JavaScript workflow job passed all 27 steps, and the WebAssembly build/validation job passed all 10 steps.
 
+
+
+## Real-time AFM probe dynamics — v1
+
+The AFM engine now supports incremental raster scans instead of requiring the browser to wait for the entire height map:
+
+- \`cv_afm_scan_begin(...)\` validates the settings, generates the tip-convolved surface and opens a scan session.
+- \`cv_afm_scan_advance(max_pixels)\` solves up to the requested number of row-major pixels. Each completed pixel immediately publishes feedback topography, cantilever deflection, peak force, oscillation amplitude, phase and feedback iteration count.
+- \`cv_afm_scan_progress()\` returns the number of solved pixels, and \`cv_afm_scan_complete()\` indicates whether the raster is finished. Partial summaries are updated after every batch.
+- The existing \`cv_afm_scan(...)\` interface remains available and internally completes the same incremental session in one call, preserving compatibility.
+- The browser requests small batches on animation frames. The probe cursor moves over the current raster line, solved and unsolved regions are visually distinguished on the 3D map, and the force / deflection / amplitude values update as each batch is computed.
+- Scan rate controls the number of pixels processed per animation frame. A completed scan can be replayed visually without recalculating the physical model.
+
+This is **incremental execution of the existing continuum AFM model**, not a separate molecular-dynamics simulation. It resolves the tip–sample feedback at each raster pixel in sequence, but does not yet model lateral cantilever modes, feedback-controller time constants between pixels, scan-line hysteresis, viscoelastic memory, atomistic surface rearrangement, or permanent sample wear. The synthetic specimen topography remains an educational input field; this stage does not create measured experimental data.
+
+The AFM WebAssembly ABI is version 120. Native parity tests verify that processing the scan in multiple batches yields the same numerical output as the compatibility one-shot call. Browser-wrapper tests verify partial output visibility and completion signalling. The CI WebAssembly smoke test validates the exported session functions and monotonic progress.
