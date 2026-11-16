@@ -264,3 +264,51 @@ The AFM surface generator creates repeatable synthetic height fields from the sp
 
 Run `bash scripts/test-native.sh` for the native C++ suite and `bash scripts/build-wasm.sh` to build the browser modules with Clang's wasm32 target. The GitHub Actions workflow publishes the validated WASM binaries to the development branch.
 
+
+## Secondary-electron histories and 3D microscopy — v1
+
+The microscope engines now expose a separate secondary-electron history stream and a 3D specimen / surface reconstruction view.
+
+### Independent secondary-electron transport
+
+- The primary-electron Monte Carlo still calculates screened angular scattering, continuous energy loss, backscattering, transmission and absorption in the homogeneous slab.
+- When the reduced near-surface inelastic-emission model releases a secondary electron, the C++ engine now starts a separate low-energy history at the emission point. Each recorded history has its own energy, three-dimensional position, scattering steps and final escape/absorption outcome.
+- Secondary tracks are returned through a separate C ABI buffer (cv_electron_secondary_tracks) rather than being mixed with the primary-electron tracks. The result also distinguishes secondaries emitted, recorded, escaped and absorbed.
+- The energy ledger includes the emitted secondary energy, the energy deposited during the secondary's motion, and the residual energy that escapes the surface. Native tests and the WebAssembly smoke test check the secondary counts and energy accounting.
+- The 3D SEM/TEM viewer draws the specimen volume and maps the saved X/Y/Z path coordinates into that volume. Primary and secondary histories use distinct colours. Drag to rotate the volume and use the mouse wheel to zoom.
+
+This is a reduced low-energy secondary-electron transport approximation coupled to the existing screened-Rutherford / continuous-stopping primary model. It is **not** a full dielectric-response cascade: it does not explicitly generate plasmons, phonons, electron–hole pairs, space-charge fields, detailed surface chemistry, or a calibrated detector response. The number of detailed secondary histories is bounded by the fixed output buffer; the summary still accounts for all secondary events and their energy.
+
+### AFM tip geometry and tip convolution
+
+The AFM ABI now accepts a tip shape and half-angle in addition to the apex radius. Before the force-feedback scan, the engine constructs an effective tip envelope and applies a morphological tip convolution to the sampled height field:
+
+- **Spherical apex:** a finite-radius spherical cap.
+- **Conical probe:** a radial cone controlled by the tip half-angle.
+- **Four-sided pyramidal probe:** a square-pyramid envelope controlled by the same half-angle.
+
+The convolved surface is the surface presented to the force solver. This reproduces the principal geometric broadening effect in which a finite-sized tip cannot enter narrow valleys or resolve features much narrower than its apex. It is a geometric tip-shape approximation, not a full finite-element contact solution or atomistic probe model.
+
+### Material-dependent AFM mechanics
+
+Each microscope specimen now provides effective mechanical inputs for Young's modulus, Poisson ratio, adhesion energy and Hamaker constant. When no manual override is supplied, these values feed the DMT/Hertz contact and van der Waals terms of the AFM solver. The AFM panel displays the actual effective values used for the selected sample. These catalogue values are **illustrative effective presets**, not certified material measurements; sample composition, porosity, humidity, substrate and preparation can materially change real probe interactions.
+
+### Interactive 3D surface reconstruction
+
+- The AFM scan output is drawn as a perspective 3D height mesh using the tip-convolved topography.
+- Drag on the 3D surface to orbit the camera; use the wheel to zoom. The same controls apply to the SEM/TEM 3D specimen volume.
+- The map colour represents relative height. The displayed minimum and maximum are reported in nanometres, and the panel identifies the selected tip geometry.
+- The animated AFM trace continues to show the cantilever and selected tip shape as it traverses the scan line.
+
+The 3D map is a reconstruction of the **synthetic input height field after the selected tip-envelope operation and force-feedback model**. It is not a measured scan, atomically resolved surface reconstruction, full three-dimensional elasticity solution, or a guarantee that real AFM tip deconvolution is unique.
+
+### ABI, source files and tests
+
+- cpp/electron_transport.h and cpp/electron_transport.cpp expose the secondary-history buffer and summary fields; wasm/electron_transport.wasm is built with the updated version-110 ABI.
+- cpp/afm_interaction.h and cpp/afm_interaction.cpp expose spherical, conical and pyramidal tip-envelope inputs; wasm/afm_interaction.wasm uses the updated version-110 ABI.
+- src/microscope-physics.mjs validates and decodes the secondary-track buffer, passes the selected tip geometry and sample-specific mechanical inputs, and returns the new channels to the browser.
+- src/microscope-lab.js, microscope.html and microscope.css provide the interactive 3D volume, 3D AFM map, orbit/zoom controls, tip-shape selection and effective material-property display.
+- tests/electron_transport_test.cpp, tests/afm_interaction_test.cpp and tests/microscope-physics.test.mjs cover secondary energy accounting, tip-shape convolution, material parameter routing and the JavaScript/WASM memory layouts.
+
+The current branch validation completed successfully: the native/JavaScript workflow job passed all 27 steps, and the WebAssembly build/validation job passed all 10 steps.
+
