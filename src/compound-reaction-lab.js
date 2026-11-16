@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
 import {loadLab04AtomEngine,configureAtomEngine,calculateAgClPrecipitationQuotient,AGCL_KSP_25C} from './lab04-atom-engine.mjs';
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
-let activeReaction=getReactionById('acid-base-neutralization'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='hcl',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,raf=0,playing=false,progress=0,lastTime=0,atomEngine=null,atomEnginePromise=null,atomEngineState=null,atomEngineRoot=null,atomEngineVisuals=null,precipitationResult=null,precipitationVolumeMl=100,precipitationGate=false;
+let activeReaction=getReactionById('acid-base-neutralization'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='hcl',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,reactionStageRoot=null,raf=0,playing=false,progress=0,lastTime=0,atomEngine=null,atomEnginePromise=null,atomEngineState=null,atomEngineRoot=null,atomEngineVisuals=null,precipitationResult=null,precipitationVolumeMl=100,precipitationGate=false;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
 const phaseArabic={gas:'غاز',liquid:'سائل',solid:'صلب',aqueous:'محلول مائي'};
@@ -134,8 +134,9 @@ function updateAtomEngineFrame(value){
 async function activateAtomResolvedView(reactionId){
  const models=['acid-base-neutralization','silver-chloride-precipitation'];
  if(!models.includes(reactionId)){
-  disposeAtomEngineView();if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;
-  txt('atom-engine-status','عرض جزيئي تخطيطي');return;
+  disposeAtomEngineView();if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;if(reactionStageRoot)reactionStageRoot.visible=true;
+  byId('molecule-view').classList.remove('has-atom-engine');
+  txt('atom-engine-status','عرض جزيئي تخطيطي');txt('view-legend-reactants','المواد المتفاعلة');txt('view-legend-products','النواتج');txt('view-legend-hint','BALL-AND-STICK / SCHEMATIC');return;
  }
  try{
   if(!atomEnginePromise)atomEnginePromise=loadLab04AtomEngine();
@@ -144,7 +145,10 @@ async function activateAtomResolvedView(reactionId){
   atomEngineState=configureAtomEngine(atomEngine,reactionId,{
    precipitationAllowed:reactionId==='silver-chloride-precipitation'?precipitationGate:true
   });
-  if(reactantRoot)reactantRoot.visible=false;if(productRoot)productRoot.visible=false;
+  if(reactantRoot)reactantRoot.visible=false;if(productRoot)productRoot.visible=false;if(reactionStageRoot)reactionStageRoot.visible=false;
+  byId('molecule-view').classList.add('has-atom-engine');
+  if(reactionId==='silver-chloride-precipitation'){txt('view-legend-reactants','الأيونات المذابة');txt('view-legend-products','نواة راسب AgCl');txt('view-legend-hint','28 ATOMS / IONIC CONTACTS');}
+  else{txt('view-legend-reactants','الأيونات قبل انتقال البروتون');txt('view-legend-products','جزيئات الماء');txt('view-legend-hint','ATOM-MAPPED / KEYFRAMES');}
   buildAtomEngineView();updateAtomEngineFrame(progress);
   txt('atom-engine-status','C++ / WASM · '+atomEngineState.atomCount+' ATOMS · ACTIVE');
   txt('view-phase',atomEngineState.model.startPhase);
@@ -153,7 +157,7 @@ async function activateAtomResolvedView(reactionId){
   atomEnginePromise=null;atomEngine=null;disposeAtomEngineView();
   txt('atom-engine-status','تعذر تحميل محرك الذرات');
   txt('ionic-note','تعذر تحميل محرك الذرات: '+error.message+' — سيبقى العرض الجزيئي التخطيطي متاحاً.');
-  if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;
+  if(reactantRoot)reactantRoot.visible=true;if(productRoot)productRoot.visible=true;if(reactionStageRoot)reactionStageRoot.visible=true;byId('molecule-view').classList.remove('has-atom-engine');
  }
 }
 function updateTimeline(value){
@@ -166,7 +170,7 @@ function updateTimeline(value){
    txt('stage-label','الأيونات تبقى مذابة');
    txt('scene-caption','Q لا يتجاوز Ksp؛ لا تنشأ روابط الترسيب في هذا الشرط، وتبقى أيونات الفضة والكلوريد متفرقة');
   }else{
-   const stage=progress<.5?'start':progress<.78?'transition':'product';
+   const stage=progress<.5?'start':progress<1?'transition':'product';
    const phase=stage==='start'?model.startPhase:stage==='transition'?model.transitionPhase:model.productPhase;
    txt('view-phase',phase);
    txt('stage-label',model.stageLabels[stage]);
@@ -198,11 +202,12 @@ function renderScene(){
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(22,12),new THREE.MeshStandardMaterial({color:0x172933,roughness:.92,metalness:.08}));
  floor.rotation.x=-Math.PI/2;floor.position.y=-.25;floor.receiveShadow=true;scene.add(floor);
  const grid=new THREE.GridHelper(22,44,0x41616a,0x29434c);grid.position.y=-.242;grid.material.transparent=true;grid.material.opacity=.25;scene.add(grid);
+ reactionStageRoot=new THREE.Group();scene.add(reactionStageRoot);
  const addStage=(x,colour)=>{
   const base=new THREE.Mesh(new THREE.CylinderGeometry(1.95,2.08,.16,64),new THREE.MeshStandardMaterial({color:0x1b3039,roughness:.38,metalness:.58}));
-  base.position.set(x,-.17,0);base.castShadow=true;base.receiveShadow=true;scene.add(base);
+  base.position.set(x,-.17,0);base.castShadow=true;base.receiveShadow=true;reactionStageRoot.add(base);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(1.78,.022,10,80),new THREE.MeshStandardMaterial({color:colour,emissive:colour,emissiveIntensity:.28,metalness:.5,roughness:.28}));
-  ring.rotation.x=Math.PI/2;ring.position.set(x,-.075,0);scene.add(ring);
+  ring.rotation.x=Math.PI/2;ring.position.set(x,-.075,0);reactionStageRoot.add(ring);
  };
  addStage(-2.85,0x6bcbbb);addStage(2.85,0xd8aa70);
  reactantRoot=new THREE.Group();productRoot=new THREE.Group();scene.add(reactantRoot,productRoot);
