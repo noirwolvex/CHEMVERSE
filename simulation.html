@@ -135,6 +135,22 @@
               <p class="mechanism-event-note">البيانات تصف تغيّرات الروابط المبرمجة في نموذج C++؛ لا تمثل مساراً جزيئياً محسوباً أو زمناً حركياً مقاساً.</p>
             </section>
           </div>
+
+          <section class="observation-panel" aria-labelledby="gas-observation-title">
+            <div class="observation-heading">
+              <div>
+                <span class="panel-kicker">03 / MACROSCOPIC OBSERVATION</span>
+                <h3 id="gas-observation-title">ملاحظة انطلاق غاز ثاني أكسيد الكربون</h3>
+                <p>مشهد نوعي يربط الفقاعات بتقدم العرض أو بكمية CO₂ المحسوبة عند تفعيل الحركية.</p>
+              </div>
+              <span class="observation-tag">QUALITATIVE VIEW</span>
+            </div>
+            <canvas id="reaction-observation" aria-label="رسم توضيحي لفقاعات ثاني أكسيد الكربون داخل وعاء تفاعل"></canvas>
+            <div class="observation-footer">
+              <span class="observation-dot"></span>
+              <span id="gas-observation-status" aria-live="polite">الفقاعات تمثيل بصري وليست قياساً لحجم الغاز أو معدل تكوّنه.</span>
+            </div>
+          </section>
         </section>
 
         <aside class="panel controls-panel">
@@ -322,6 +338,34 @@
             <div class="calculation-row"><span>ثابت السرعة الفعال</span><b id="effective-k-output">—</b></div>
             <div class="calculation-integrity" id="atom-integrity"><i></i> حفظ الذرات متحقق</div>
           </div>
+          <section class="quantities-panel" aria-labelledby="quantities-title">
+            <div class="summary-title" id="quantities-title">الحصيلة النظرية والقياسات المحسوبة</div>
+            <p class="quantity-intro">الحد الأعلى يفترض اكتمال تفاعل بنسبة مولية 1:1. القيم الحالية لا تظهر إلا عند إدخال معاملات حركية صالحة.</p>
+            <div class="quantity-grid">
+              <div class="quantity-stat"><small>مدى التفاعل النظري الأقصى</small><output id="theoretical-extent">— mmol</output></div>
+              <div class="quantity-stat"><small>أسيتات الصوديوم اللامائية</small><output id="theoretical-acetate-mass">— g</output></div>
+              <div class="quantity-stat"><small>الماء المتكوّن ستوكيومترياً</small><output id="theoretical-water-mass">— g</output></div>
+              <div class="quantity-stat"><small>كتلة ثاني أكسيد الكربون</small><output id="theoretical-co2-mass">— g</output></div>
+              <div class="quantity-stat quantity-stat-wide"><small>حجم CO₂ المثالي النظري عند الضغط والحرارة المختارين</small><output id="theoretical-co2-volume">— mL</output></div>
+            </div>
+            <label class="pressure-field" for="gas-pressure">
+              <span>ضغط الغاز المفترض للحساب</span>
+              <span class="pressure-input-wrap"><input id="gas-pressure" type="number" min="1" max="2000" step="0.001" value="101.325" inputmode="decimal"><b>kPa</b></span>
+            </label>
+            <div class="current-quantity-block">
+              <div class="current-quantity-heading">المقدار الحالي وفق محرك الحركية</div>
+              <div class="quantity-row"><span>مدى التفاعل الحالي</span><output id="current-extent">غير محسوب</output></div>
+              <div class="quantity-row"><span>كتلة أسيتات الصوديوم</span><output id="current-acetate-mass">غير محسوب</output></div>
+              <div class="quantity-row"><span>كتلة الماء المتكوّن</span><output id="current-water-mass">غير محسوب</output></div>
+              <div class="quantity-row"><span>كتلة CO₂</span><output id="current-co2-mass">غير محسوب</output></div>
+              <div class="quantity-row"><span>حجم CO₂ المثالي</span><output id="current-co2-volume">غير محسوب</output></div>
+            </div>
+            <label class="experiment-notes-label" for="experiment-notes">ملاحظات التجربة</label>
+            <textarea id="experiment-notes" rows="3" maxlength="2000" placeholder="اكتب ملاحظاتك أو وصف ما شاهدته..."></textarea>
+            <button id="export-experiment-csv" class="export-report-button" type="button">تصدير سجل التجربة CSV</button>
+            <p class="quantity-status" id="quantity-calculation-status" aria-live="polite">الحسابات النظرية جاهزة؛ القيم اللحظية تنتظر بيانات الحركية.</p>
+            <p class="quantity-science-note">تُحسب الكتل من الكميات الستوكيومترية وباستخدام الكتل المولية للمركبات اللامائية المذكورة. حجم الغاز تقدير بقانون الغاز المثالي PV = nRT، ويفترض انتقال كل CO₂ إلى الطور الغازي عند درجة الحرارة المحددة والضغط المدخل؛ لا يحسب CO₂ المذاب أو اتزان الحمض/القاعدة أو بخار الماء، لذلك لا يساوي بالضرورة الحجم الذي ستقيسه تجربة فعلية.</p>
+          </section>
           <div class="products-summary">
             <div class="summary-title">النواتج الكيميائية</div>
             <div class="product-row"><span class="product-symbol acetate">Ac</span><span><b>أسيتات الصوديوم</b><small>CH₃COONa</small></span></div>
