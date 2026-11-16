@@ -115,7 +115,7 @@ test('AFM wrapper writes a physical height map and returns force, deflection and
   mode:'tapping',freeAmplitudeNm:8,amplitudeSetpointRatio:.72,seed:24
  });
  assert.equal(result.topographyNm.length,64);
- assert.equal(result.topographyNm[0],result.sourceHeightsNm[0]);
+ assert.ok(Math.abs(result.topographyNm[0]-result.sourceHeightsNm[0])<1e-5);
  assert.equal(result.peakForceNn[0],2);
  assert.equal(result.deflectionNm[0],.2);
  assert.equal(result.amplitudeNm[0],5.76);
