@@ -58,9 +58,34 @@ export function createMicroscopeInstrument(options={}){
  function setStatus(message){if(status)status.textContent=message}
  function updateSlide(hasSample,hasMedium,hasCover,mounted){
   slide.position.x=mounted?0:1.16;droplet.visible=Boolean(hasMedium);coverslip.visible=Boolean(hasCover);grains.clear();
-  if(hasSample){let seed=sampleId.split('').reduce((v,ch)=>v+ch.charCodeAt(0),17)>>>0;const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
-   const count=sampleId==='cellulose-fibres'?11:26,colour=colours[sampleId]||0xc6d2cc;
-   for(let i=0;i<count;i++){const size=sampleId==='cellulose-fibres'?.018:.012+next()*.018,grain=new THREE.Mesh(new THREE.SphereGeometry(size,10,8),mat(colour,.3,.04));grain.position.set((next()-.5)*.32,.145+next()*.012,(next()-.5)*.24);if(sampleId==='cellulose-fibres')grain.scale.set(1,.55,3.8);grain.castShadow=true;grains.add(grain)}
+  if(hasSample){
+   let seed=sampleId.split('').reduce((value,ch)=>value+ch.charCodeAt(0),17)>>>0;
+   const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+   const colour=colours[sampleId]||0xc6d2cc;
+   const crystal=['nacl-crystals','sucrose-crystals','copper-sulfate','iodine-crystals'].includes(sampleId);
+   const fibre=sampleId==='cellulose-fibres',dropletSample=sampleId==='oil-emulsion';
+   const count=fibre?9:dropletSample?16:crystal?12:sampleId==='barium-sulfate'?38:26;
+   for(let index=0;index<count;index++){
+    let geometry,material;
+    const size=crystal?.035+next()*.055:fibre?.012+next()*.009:dropletSample?.035+next()*.035:.008+next()*.015;
+    material=mat(colour,crystal?.24:dropletSample?.08:.62,crystal?.12:.04,
+     crystal||dropletSample?{transparent:true,opacity:dropletSample?.55:.72}:{} );
+    if(crystal){
+     if(sampleId==='nacl-crystals')geometry=new RoundedBoxGeometry(size*1.8,size*1.45,size*1.55,2,size*.08);
+     else if(sampleId==='copper-sulfate')geometry=new THREE.BoxGeometry(size*.62,size*2.8,size*.68);
+     else if(sampleId==='iodine-crystals')geometry=new THREE.BoxGeometry(size*2.4,size*.32,size*1.7);
+     else geometry=new THREE.OctahedronGeometry(size,0);
+    }else if(fibre)geometry=new THREE.CylinderGeometry(size*.32,size*.42,.62+next()*.45,8);
+    else if(dropletSample)geometry=new THREE.SphereGeometry(size,18,12);
+    else if(sampleId==='barium-sulfate')geometry=new THREE.IcosahedronGeometry(size*.55,1);
+    else geometry=new THREE.DodecahedronGeometry(size,0);
+    const grain=new THREE.Mesh(geometry,material);
+    grain.position.set((next()-.5)*.54,.145+next()*.012,(next()-.5)*.34);
+    if(fibre){grain.rotation.x=Math.PI/2;grain.rotation.z=(next()-.5)*.7}
+    else if(crystal)grain.rotation.set(next()*Math.PI*.5,next()*Math.PI,next()*Math.PI*.35);
+    else if(dropletSample)grain.scale.set(1,.75+next()*.3,1);
+    grain.castShadow=true;grain.receiveShadow=true;grains.add(grain);
+   }
   }
   glassSlide.material.opacity=.34;slideState={hasSample,hasMedium,hasCover,mounted};immersionOil.visible=oilApplied&&mounted;updateControls();
  }
