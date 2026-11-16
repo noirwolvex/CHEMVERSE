@@ -80,3 +80,21 @@
 .physics-panel .physics-action-row button:disabled{opacity:.35;cursor:not-allowed}
 @media(max-width:1100px){.physics-grid{grid-template-columns:1fr}.afm-controls{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:680px){.physics-workbench{padding:11px}.physics-workbench-heading{align-items:start;flex-direction:column}.electron-controls,.afm-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.physics-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.physics-channel{width:100%;justify-content:space-between}.physics-channel select{flex:1}}
+
+
+/* Three-dimensional electron volume and interactive AFM topography controls. */
+.orbit-canvas{touch-action:none;cursor:grab;outline:none}
+.orbit-canvas:active{cursor:grabbing}
+.orbit-canvas:focus-visible{outline:1px solid rgba(128,225,207,.8);outline-offset:3px}
+.physics-orbit-hint{margin:6px 1px 0;color:#79a19b;font:700 7px "Space Grotesk";letter-spacing:.11em}
+.afm-map-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:13px 2px 7px}
+.afm-topography-3d{height:auto;min-height:220px;aspect-ratio:1200/460}
+.afm-material-properties{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:9px 0;padding:9px;border:1px solid rgba(139,206,194,.13);border-radius:5px;background:rgba(5,18,26,.4)}
+.afm-material-properties>.eyebrow{grid-column:1/-1}
+.afm-material-properties>div{min-width:0;padding:6px 7px;border-left:1px solid rgba(171,215,205,.1)}
+.afm-material-properties b{display:block;color:#c7e8dc;font:600 10px "Space Grotesk";overflow-wrap:anywhere}
+.afm-material-properties small{display:block;margin-top:4px;color:#6f9190;font:700 6px "Space Grotesk";letter-spacing:.08em}
+@media(max-width:680px){
+ .afm-map-heading{align-items:flex-start;flex-direction:column}
+ .afm-material-properties{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
