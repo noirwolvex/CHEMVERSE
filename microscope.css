@@ -42,3 +42,41 @@
 #apply-immersion-oil:disabled{opacity:.35}
 @media(max-width:900px){.optics-readout{grid-template-columns:repeat(2,minmax(0,1fr))}.optics-readout>div:nth-child(2){border-right:0}.optics-readout>div:nth-child(n+3){border-top:1px solid rgba(171,215,205,.08);padding-top:8px}}
 @media(max-width:680px){.objective-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.optics-readout b{font-size:7px}}
+
+
+/* Physics workbench: Monte Carlo electron transport and AFM force feedback. */
+.physics-workbench{margin:22px 0 5px;padding:18px;border:1px solid rgba(128,212,197,.18);border-radius:8px;background:linear-gradient(155deg,rgba(20,47,57,.94),rgba(8,21,31,.98));box-shadow:0 18px 55px rgba(3,13,20,.18)}
+.physics-workbench-heading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:14px}
+.physics-workbench-heading h2{margin:7px 0 7px;color:#e8f2ed;font:600 clamp(17px,2.2vw,24px) "Space Grotesk";letter-spacing:-.04em}
+.physics-workbench-heading h2 em{color:#82ddcd;font-style:normal}
+.physics-workbench-heading p{max-width:790px;margin:0;color:#91aaa8;font-size:10px;line-height:1.7}
+.physics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.physics-panel{min-width:0;padding:14px;border:1px solid rgba(166,215,207,.13);border-radius:6px;background:linear-gradient(160deg,rgba(20,42,53,.92),rgba(7,20,29,.97))}
+.physics-panel[hidden]{display:none}
+.physics-panel .instrument-panel-heading{margin-bottom:12px}
+.physics-panel .instrument-panel-heading h3{font-size:13px}
+.physics-controls{display:grid;gap:9px;margin:10px 0 12px}
+.electron-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+.afm-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+.physics-control{display:flex;flex-direction:column;gap:5px;min-width:0;padding:8px;border:1px solid rgba(171,215,205,.09);border-radius:4px;background:rgba(4,17,25,.34)}
+.physics-control strong{color:#d4e9e0;font:600 10px "Space Grotesk"}
+.physics-control output{color:#a1e5d7}
+.physics-control input{width:100%;margin:3px 0;accent-color:#78ddca}
+.physics-control small{color:#6f8a8c;font:600 6px "Space Grotesk";letter-spacing:.08em}
+.physics-control select,.physics-channel select{width:100%;min-width:0;padding:7px;border:1px solid rgba(132,207,192,.2);border-radius:4px;color:#cbe3db;background:#102a34;font:600 8px "DM Sans"}
+.physics-action-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+.physics-action-row button{min-height:34px;padding:8px 11px}
+.physics-run-note{color:#779392;font-size:8px;line-height:1.5}
+.physics-channel{display:flex;align-items:center;gap:7px;color:#779392;font:700 7px "Space Grotesk";letter-spacing:.1em}
+.physics-channel select{width:auto;max-width:190px}
+.physics-canvas{display:block;width:100%;height:auto;min-height:150px;border:1px solid rgba(138,196,187,.15);border-radius:5px;background:#07131c;box-shadow:inset 0 0 35px rgba(0,0,0,.28)}
+.physics-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px}
+.physics-metrics>div{min-width:0;padding:8px 7px;border:1px solid rgba(171,215,205,.08);border-radius:4px;background:rgba(4,17,25,.4)}
+.physics-metrics small{display:block;color:#708e90;font:700 6px "Space Grotesk";letter-spacing:.09em;line-height:1.4}
+.physics-metrics b{display:block;margin-top:5px;color:#cde8df;font:600 11px "Space Grotesk";overflow-wrap:anywhere}
+.physics-disclaimer{margin:9px 1px 0;color:#768f91;font-size:7px;line-height:1.65}
+.physics-panel .instrument-state{white-space:normal;text-align:right}
+.physics-panel .instrument-state b{font-size:6px}
+.physics-panel .physics-action-row button:disabled{opacity:.35;cursor:not-allowed}
+@media(max-width:1100px){.physics-grid{grid-template-columns:1fr}.afm-controls{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:680px){.physics-workbench{padding:11px}.physics-workbench-heading{align-items:start;flex-direction:column}.electron-controls,.afm-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.physics-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.physics-channel{width:100%;justify-content:space-between}.physics-channel select{flex:1}}
