@@ -88,8 +88,8 @@ const REACTION_DETAILS = Object.freeze({
   'silver-chloride-precipitation': {
     phases: { agno3: 'aq', nacl: 'aq', agcl: 's', nano3: 'aq' },
     ionicEquation: 'Ag⁺(aq) + Cl⁻(aq) → AgCl(s)↓',
-    ionicNote: 'أيونَا الصوديوم والنترات متفرجان ويبقيان في المحلول؛ ظهور الراسب مرتبط بانخفاض ذوبانية AgCl.',
-    mechanism: 'تلتقي أيونات الفضة والكلوريد في المحلول وتتكون نواة صلبة من كلوريد الفضة ثم تنمو جسيمات الراسب.',
+    ionicNote: 'Na⁺ وNO₃⁻ أيونان متفرجان ويبقيان مذابين. عند 25°C تكون Ksp لـ AgCl نحو 1.6 × 10⁻¹⁰ M²؛ يبدأ الترسيب عندما Qsp = [Ag⁺][Cl⁻] أكبر من Ksp.',
+    mechanism: 'تتجمع أيونات Ag⁺ وCl⁻ عندما يتجاوز حاصل ضرب تراكيزها Ksp، فتتكون نواة صلبة صغيرة من AgCl. العرض يوضح أربع وحدات صيغة كعينة شبكية محدودة، ولا يمثل نمواً بلورياً كاملاً أو مسار ديناميكا جزيئية.',
   },
   'acid-base-neutralization': {
     phases: { hcl: 'aq', naoh: 'aq', nacl: 'aq', h2o: 'l' },
