@@ -34,8 +34,6 @@ int main(){
   assert(std::isfinite(output[i*CV_AFM_OUTPUT_FIELDS+3]));
   assert(output[i*CV_AFM_OUTPUT_FIELDS+5]>=1.0);
  }
- const double flatMean=summary[4];
- const double flatMax=output[0];
 
  /* A 20 nm step in the upper half must appear in recovered topography. */
  for(int y=0;y<16;++y)for(int x=0;x<16;++x)input[y*16+x]=x>=8?20.0:0.0;
@@ -61,7 +59,7 @@ int main(){
  assert(summary[10]==1.0);
 
  /* Stiffer samples need less Hertz indentation at the same contact force. */
- const double *soft=scan(1,3.0);
+ assert(scan(1,3.0));
  const double softIndent=cv_afm_summary()[7];
  const int n=16*16;
  for(int i=0;i<n;++i)input[i]=0.0;
