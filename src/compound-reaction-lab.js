@@ -1,16 +1,41 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
+import {ELEMENTS,MATERIALS,REACTIONS,REACTION_CATEGORIES,calculateStoichiometry,findReactionsForSpecies,getBondOrder,getBondReferenceLengthAngstrom,getMaterialById,getReactionAtomBalance,getReactionById,validateReactionBalance} from './compound-reactions.mjs';
 import {loadStation04Engine,loadKineticsEngine,loadCrystalEngine,sampleStation04ReactionNow,sampleStation04RedoxNow,getCrystalStructureNow,simulateStation04Kinetics} from './station04-engine.mjs';
 const crystalTransform=new THREE.Object3D();
 const byId=id=>document.getElementById(id),materialById=new Map(MATERIALS.map(m=>[m.id,m])),atomColors=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.color])),atomicNumbers=Object.fromEntries(ELEMENTS.map(e=>[e.symbol,e.atomicNumber])),atomRadii={H:.2,C:.34,N:.33,O:.32,Na:.44,Mg:.43,S:.36,Cl:.42,Ca:.45,Fe:.45,Cu:.44,Zn:.43,Ag:.46,Ba:.5};
 let activeReaction=getReactionById('water-synthesis'),activeCategory='all',activeMaterialFilter='all',selectedMaterial='h2',selectedSpecies=null,initialAmounts={},renderer=null,scene=null,camera=null,orbit=null,reactantRoot=null,productRoot=null,atomRoot=null,interactionRoot=null,solidRoot=null,gasRoot=null,mappedAtoms=[],mappedBonds=[],atomMapReady=false,electronParticles=[],electronPaths=[],electronShells=[],protonParticles=[],solidParticles=[],gasParticles=[],crystalBondMeshes=[],crystalLinkObject=null,crystalStructure=null,redoxPairs=[],station04Profile=null,station04Effects=null,station04EngineReady=false,crystalEngineReady=false,kineticsEngineReady=false,kineticsResults=null,raf=0,playing=false,progress=0,lastTime=0;
 const durationMs=8200,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v)};
 const txt=(id,value)=>{const el=byId(id);if(el)el.textContent=String(value)};
+function bondStrokeLayout(rawOrder){
+ const order=clamp(Number(rawOrder)||0,0,3);
+ if(order<=0)return[];
+ const whole=Math.floor(order+1e-8),fraction=order-whole,weights=Array(whole).fill(1);
+ if(fraction>.08)weights.push(fraction);
+ const offsets=weights.length===1?[0]:weights.length===2?[-.072,.072]:[-.145,0,.145];
+ return weights.map((opacity,index)=>({opacity,offset:offsets[index]??0}));
+}
+function bondOffsetAxis(direction){
+ const axis=direction.clone().cross(new THREE.Vector3(0,0,1));
+ if(axis.lengthSq()<1e-6)axis.copy(direction).cross(new THREE.Vector3(0,1,0));
+ return axis.normalize();
+}
 function buildMolecule(parent,species){
  const group=new THREE.Group(),sphere=new THREE.SphereGeometry(1,28,20);
  const points=species.atoms.map(a=>new THREE.Vector3(a.x,a.y,a.z));
- for(const [a,b] of species.bonds){const start=points[a],end=points[b],direction=new THREE.Vector3().subVectors(end,start),bond=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,direction.length(),12),new THREE.MeshStandardMaterial({color:0x9dafb5,roughness:.35,metalness:.5,transparent:true,opacity:1}));bond.position.copy(start).add(end).multiplyScalar(.5);bond.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());group.add(bond)}
+ for(const rawBond of species.bonds){
+  const [a,b]=rawBond,order=getBondOrder(rawBond);if(order<=0)continue;
+  const start=points[a],end=points[b],direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
+  if(length<1e-6)continue;
+  const axis=bondOffsetAxis(direction.clone().normalize()),midpoint=start.clone().add(end).multiplyScalar(.5);
+  for(const stroke of bondStrokeLayout(order)){
+   const material=new THREE.MeshStandardMaterial({color:0x9dafb5,roughness:.35,metalness:.5,transparent:stroke.opacity<.999,opacity:stroke.opacity,depthWrite:stroke.opacity>.99});
+   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,length,12),material);
+   mesh.position.copy(midpoint).addScaledVector(axis,stroke.offset);
+   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());
+   group.add(mesh);
+  }
+ }
  species.atoms.forEach(a=>{const colour=atomColors[a.element]||'#b5c2c0',material=new THREE.MeshStandardMaterial({color:colour,roughness:.28,metalness:.18,emissive:colour,emissiveIntensity:.07,transparent:true,opacity:1}),mesh=new THREE.Mesh(sphere,material);mesh.position.set(a.x,a.y,a.z);mesh.scale.setScalar(atomRadii[a.element]||.34);mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh)});
  group.scale.setScalar(.78);parent.add(group);return group
 }
@@ -52,7 +77,12 @@ function expandReactionSide(entries,side){
     expanded.push({element:atom.element,position:new THREE.Vector3(center+atom.x*.78,y+atom.y*.78,z+atom.z*.78),localIndex,moleculeIndex});
     return index;
    });
-   if(!ionicOrDissociated.has(species.id)){for(const [a,b] of species.bonds)bondList.push([indices[a],indices[b]])}
+   if(!ionicOrDissociated.has(species.id)){
+    for(const rawBond of species.bonds){
+     const [a,b]=rawBond,order=getBondOrder(rawBond);
+     if(order>0)bondList.push({a:indices[a],b:indices[b],order,referenceLengthAngstrom:getBondReferenceLengthAngstrom(rawBond)});
+    }
+   }
    moleculeIndex++;
   }
  }
@@ -75,22 +105,26 @@ function buildAtomMappedScene(){
   mesh.scale.setScalar((atomRadii[atom.element]||.34)*.78);mesh.position.copy(atom.position);mesh.castShadow=true;atomRoot.add(mesh);
   mappedAtoms.push({mesh,element:atom.element,start:atom.position.clone(),end:right.atoms[targetIndex].position.clone()});
  });
- const pairKey=([a,b])=>a<b?a+':'+b:b+':'+a;
- const leftKeys=new Set(left.bonds.map(pairKey));
- const mappedRightBonds=right.bonds.map(([a,b])=>[targetToSource[a],targetToSource[b]]);
- const rightKeys=new Set(mappedRightBonds.map(pairKey));
- const addBonds=(pairs,side)=>pairs.forEach(([a,b])=>{
-  const key=pairKey([a,b]),unchanged=side==='reactants'?rightKeys.has(key):leftKeys.has(key);
-  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1,10),new THREE.MeshStandardMaterial({color:0xb4c5c9,roughness:.34,metalness:.42,transparent:true,opacity:side==='reactants'?1:0}));
-  atomRoot.add(mesh);mappedBonds.push({mesh,a,b,side,unchanged});
+ const pairKey=bond=>bond.a<bond.b?bond.a+':'+bond.b:bond.b+':'+bond.a;
+ const leftByKey=new Map(left.bonds.map(bond=>[pairKey(bond),bond]));
+ const mappedRightBonds=right.bonds.map(bond=>({...bond,a:targetToSource[bond.a],b:targetToSource[bond.b]}));
+ const rightByKey=new Map(mappedRightBonds.map(bond=>[pairKey(bond),bond]));
+ const addBonds=(pairs,side,opposite)=>pairs.forEach(bond=>{
+  const key=pairKey(bond),counterpart=opposite.get(key);
+  const unchanged=Boolean(counterpart&&Math.abs(counterpart.order-bond.order)<.025);
+  const meshes=bondStrokeLayout(bond.order).map(stroke=>{
+   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.044,.044,1,10),new THREE.MeshStandardMaterial({color:0xb4c5c9,roughness:.34,metalness:.42,transparent:true,opacity:0,depthWrite:false}));
+   mesh.userData.bondOffset=stroke.offset;mesh.userData.strokeOpacity=stroke.opacity;
+   atomRoot.add(mesh);return mesh;
+  });
+  mappedBonds.push({meshes,a:bond.a,b:bond.b,side,order:bond.order,referenceLengthAngstrom:bond.referenceLengthAngstrom,unchanged,currentFade:0,currentLength:0});
  });
- addBonds(left.bonds,'reactants');
- addBonds(mappedRightBonds,'products');
+ addBonds(left.bonds,'reactants',rightByKey);
+ addBonds(mappedRightBonds,'products',leftByKey);
  atomMapReady=mappedAtoms.length===left.atoms.length;
  updateAtomMappedScene(progress);
  return atomMapReady;
 }
-
 function reactionNumber(){return Number.parseInt(activeReaction.number,10)}
 function createParticle(parent,geometry,colour,opacity=1){
  const material=new THREE.MeshStandardMaterial({color:colour,emissive:colour,emissiveIntensity:.7,roughness:.28,metalness:.12,transparent:opacity<1,opacity,depthWrite:opacity>=1});
@@ -353,6 +387,27 @@ function updateDynamicEffects(value){
  }
 }
 
+function updateBondModelReadout(){
+ const panel=byId('bond-order-readout');if(!panel)return;
+ const active=mappedBonds.filter(bond=>bond.currentFade>.08&&bond.currentLength>0);
+ if(!active.length){panel.textContent='رتبة الرابطة · لا توجد روابط تساهمية ظاهرة';return}
+ const counts={single:0,double:0,triple:0,resonance:0};
+ active.forEach(bond=>{
+  if(Math.abs(bond.order-1)<.025)counts.single++;
+  else if(Math.abs(bond.order-2)<.025)counts.double++;
+  else if(Math.abs(bond.order-3)<.025)counts.triple++;
+  else counts.resonance++;
+ });
+ const average=active.reduce((sum,bond)=>sum+bond.currentLength,0)/active.length;
+ const delta=active.filter(bond=>bond.startLength>1e-6)
+  .map(bond=>(bond.currentLength-bond.startLength)/bond.startLength*100);
+ const meanDelta=delta.length?delta.reduce((sum,value)=>sum+value,0)/delta.length:0;
+ const references=[...new Set(active.map(bond=>bond.referenceLengthAngstrom).filter(value=>Number.isFinite(value)))].slice(0,2);
+ const referenceLabel=references.length?' · r₀ مرجعي '+references.map(value=>value.toFixed(2)+' Å').join(' / '):'';
+ panel.textContent='رتبة الروابط · أحادية '+counts.single+' / ثنائية '+counts.double+' / ثلاثية '+counts.triple+
+  (counts.resonance?' / رنين '+counts.resonance:'')+
+  ' · متوسط طول العرض '+average.toFixed(2)+' u · Δ '+(meanDelta>=0?'+':'')+meanDelta.toFixed(1)+'%'+referenceLabel;
+}
 function updateAtomMappedScene(value){
  if(!atomMapReady)return;
  const p=smooth(value),breaking=station04Effects?.[2]??smooth((value-.20)/.38),forming=station04Effects?.[3]??smooth((value-.52)/.40);
@@ -360,10 +415,20 @@ function updateAtomMappedScene(value){
  mappedBonds.forEach(bond=>{
   const a=mappedAtoms[bond.a]?.mesh.position,b=mappedAtoms[bond.b]?.mesh.position;if(!a||!b)return;
   const direction=new THREE.Vector3().subVectors(b,a),length=direction.length();
-  bond.mesh.position.copy(a).add(b).multiplyScalar(.5);bond.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());bond.mesh.scale.y=Math.max(.001,length);
+  if(length<1e-6)return;
+  const midpoint=a.clone().add(b).multiplyScalar(.5),axis=bondOffsetAxis(direction.clone().normalize());
   const fade=bond.unchanged?(bond.side==='reactants'?1:0):(bond.side==='reactants'?1-breaking:forming);
-  bond.mesh.material.opacity=fade;bond.mesh.visible=fade>.015;
+  if(!bond.startLength)bond.startLength=mappedAtoms[bond.a].start.distanceTo(mappedAtoms[bond.b].start);
+  bond.currentLength=length;bond.currentFade=fade;
+  bond.meshes.forEach(mesh=>{
+   mesh.position.copy(midpoint).addScaledVector(axis,mesh.userData.bondOffset||0);
+   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());
+   mesh.scale.y=Math.max(.001,length);
+   mesh.material.opacity=fade*(mesh.userData.strokeOpacity??1);
+   mesh.visible=mesh.material.opacity>.015;
+  });
  });
+ updateBondModelReadout();
  updateDynamicEffects(value);
 }
 function updateMechanismCopy(value){
