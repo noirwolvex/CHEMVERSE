@@ -19,6 +19,7 @@ async function instantiateChemistryModule(name) {
 }
 
 let station04Promise;
+let station04Exports = null;
 let kineticsPromise;
 
 export function loadStation04Engine() {
@@ -32,10 +33,22 @@ export function loadStation04Engine() {
       if (exports.cv_s04_engine_version() !== 100) {
         throw new Error('Unsupported Station 04 WASM engine version');
       }
+      station04Exports = exports;
       return exports;
     });
   }
   return station04Promise;
+}
+
+export function sampleStation04ReactionNow(reactionNumber, progress) {
+  if (!station04Exports) return null;
+  const id = Math.trunc(Number(reactionNumber));
+  if (!Number.isInteger(id) || station04Exports.cv_s04_validate_profile(id) !== 1) return null;
+  const profilePointer = station04Exports.cv_s04_profile(id);
+  const profile = Array.from(new Float64Array(station04Exports.memory.buffer, profilePointer, 8));
+  const effectsPointer = station04Exports.cv_s04_effects(id, Number(progress));
+  const effects = Array.from(new Float64Array(station04Exports.memory.buffer, effectsPointer, 8));
+  return { profile, effects, source: 'cpp-wasm' };
 }
 
 export async function sampleStation04Reaction(reactionNumber, progress) {
