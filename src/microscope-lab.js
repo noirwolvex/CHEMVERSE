@@ -3,7 +3,7 @@ import {
  getMicroscopeSamples,getMicroscopeZoomPreset
 } from './microscope-samples.mjs';
 import {
- getOpticalMetrics,getImagingPreset,getPhysicalScaleBar,getOpticalDefocusBlurPx,
+ OIL_REFRACTIVE_INDEX,getOpticalMetrics,getImagingPreset,getPhysicalScaleBar,getOpticalDefocusBlurPx,
  getTunnellingCurrentRelative,getObjectiveFocusingLimits
 } from './microscope-optics.mjs';
 import {createMicroscopeInstrument} from './microscope-instrument.js';
@@ -451,7 +451,7 @@ function updateDetails(){
    objectiveLine.textContent=m.objective.magnification+'× objective · NA '+m.numericalAperture.toFixed(2)+' · 10× eyepiece';
    resolutionLine.textContent='Abbe limit '+m.abbeResolutionLabel+' at 550 nm';
    fieldLine.textContent='Field '+m.fieldWidthLabel+' · FN 18';
-   workingLine.textContent='Working distance '+m.workingDistanceMm+' mm'+(m.immersion==='oil'?' · oil immersion':' · dry');
+   workingLine.textContent='Working distance '+m.workingDistanceMm+' mm'+(m.immersion==='oil'?' · oil immersion n='+OIL_REFRACTIVE_INDEX.toFixed(3):' · dry');
   }else{
    objectiveLine.textContent=mode.toUpperCase()+' · '+(mode==='sem'?'surface secondary-electron contrast':mode==='tem'?'transmission mass-thickness contrast':mode==='afm'?'probe topography':'tunnelling-current contrast');
    resolutionLine.textContent=mode==='stm'?'Graphite lattice constant 0.246 nm':mode==='afm'?'Height map · relative z contrast':'Synthetic contrast model · not measured resolution';
