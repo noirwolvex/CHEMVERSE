@@ -5,7 +5,7 @@ constexpr double kProfiles[CV_S04_REACTION_COUNT][CV_S04_PROFILE_FIELDS] = {
   /* 01 water synthesis */
   {0, 0, CV_S04_SOLID_NONE, CV_S04_GAS_NONE, 0, 0, 0, 0},
   /* 02 magnesium oxidation: 2 Mg -> 2 Mg2+ + 4 e-; O2 accepts 4 e-. */
-  {4, 0, CV_S04_SOLID_NONE, CV_S04_GAS_NONE, 0, 12, 8, 1},
+  {4, 0, CV_S04_SOLID_CRYSTAL_PRODUCT, CV_S04_GAS_NONE, 0, 12, 8, 1},
   /* 03 peroxide decomposition: oxygen release from aqueous solution. */
   {0, 0, CV_S04_SOLID_NONE, CV_S04_GAS_O2, CV_S04_GAS_BUBBLES, 0, 0, 2},
   /* 04 iron/copper redox: Fe donates two electrons to Cu2+; copper deposits. */
@@ -17,7 +17,7 @@ constexpr double kProfiles[CV_S04_REACTION_COUNT][CV_S04_PROFILE_FIELDS] = {
   /* 07 methane complete-oxidation model: gas-phase products, not solution bubbles. */
   {0, 0, CV_S04_SOLID_NONE, CV_S04_GAS_CO2, CV_S04_GAS_PLUME, 0, 0, 0},
   /* 08 thermal calcium carbonate decomposition: CO2 evolves from a solid. */
-  {0, 0, CV_S04_SOLID_NONE, CV_S04_GAS_CO2, CV_S04_GAS_PLUME, 0, 0, 8},
+  {0, 0, CV_S04_SOLID_CRYSTAL_PRODUCT, CV_S04_GAS_CO2, CV_S04_GAS_PLUME, 0, 0, 8},
   /* 09 Haber synthesis: gaseous ammonia product, not bubbles in liquid. */
   {0, 0, CV_S04_SOLID_NONE, CV_S04_GAS_NH3, CV_S04_GAS_PLUME, 0, 0, 0},
   /* 10 carbon monoxide oxidation: gas-phase CO2 product. */
@@ -29,6 +29,16 @@ constexpr double kProfiles[CV_S04_REACTION_COUNT][CV_S04_PROFILE_FIELDS] = {
 };
 
 double g_effects[CV_S04_EFFECT_FIELDS]{};
+struct RedoxPair { int reaction_id; double fields[9]; };
+constexpr RedoxPair kRedoxPairs[3] = {
+  /* 2 Mg atoms each lose 2e-; 2 O atoms each gain 2e-. */
+  {2, {12, 0, 2, 2, 8, 0, -2, 2, 4}},
+  /* Fe0 -> Fe2+ and Cu2+ -> Cu0. */
+  {4, {26, 0, 2, 1, 29, 2, 0, 1, 2}},
+  /* Zn0 -> Zn2+; two H+ ions each accept one electron. */
+  {11, {30, 0, 2, 1, 1, 1, 0, 2, 2}}
+};
+
 
 double clamp01(double value) {
   if (!(value == value)) return 0.0;
@@ -82,7 +92,7 @@ extern "C" int cv_s04_validate_profile(int reaction_id) {
 
   if (profile[0] < 0 || profile[1] < 0 || electron_count != profile[0] ||
       proton_count != profile[1] || (electron_count > 0 && (donor <= 0 || acceptor <= 0)) ||
-      solid_kind < CV_S04_SOLID_NONE || solid_kind > CV_S04_SOLID_METAL_DEPOSITION ||
+      solid_kind < CV_S04_SOLID_NONE || solid_kind > CV_S04_SOLID_CRYSTAL_PRODUCT ||
       gas_kind < CV_S04_GAS_NONE || gas_kind > CV_S04_GAS_NH3 ||
       (gas_kind == CV_S04_GAS_NONE && gas_mode != 0) ||
       (gas_kind != CV_S04_GAS_NONE &&
@@ -90,6 +100,22 @@ extern "C" int cv_s04_validate_profile(int reaction_id) {
     return 0;
   }
   return 1;
+}
+
+
+extern "C" int cv_s04_redox_pair_count(int reaction_id) {
+  for (int i = 0; i < 3; ++i) {
+    if (kRedoxPairs[i].reaction_id == reaction_id) return 1;
+  }
+  return 0;
+}
+
+extern "C" const double *cv_s04_redox_pair(int reaction_id, int pair_index) {
+  if (pair_index != 0) return nullptr;
+  for (int i = 0; i < 3; ++i) {
+    if (kRedoxPairs[i].reaction_id == reaction_id) return kRedoxPairs[i].fields;
+  }
+  return nullptr;
 }
 
 extern "C" int cv_s04_engine_version(void) {
