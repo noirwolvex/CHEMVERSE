@@ -380,11 +380,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${GITHUB_REF_NAME}"
+          remote_head="$(git rev-parse "origin/${GITHUB_REF_NAME}")"
+          if [ "$remote_head" != "$GITHUB_SHA" ]; then
+            echo "Branch advanced during WASM validation; a newer workflow owns publishing."
+            exit 0
+          fi
           git add wasm/chemistry_core.wasm wasm/kinetics_engine.wasm wasm/experimental_fit.wasm wasm/concentration_fit.wasm wasm/reaction_mechanism.wasm wasm/lab04_atom_engine.wasm wasm/electron_transport.wasm wasm/afm_interaction.wasm
           if git diff --cached --quiet; then
             echo "Validated WebAssembly binaries are already up to date."
           else
-            git commit -m "Update validated WebAssembly binaries"
+            git commit -m "Update validated WebAssembly binaries [skip ci]"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
       - name: Upload validated WebAssembly modules
