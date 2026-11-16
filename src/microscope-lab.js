@@ -378,22 +378,18 @@ function draw(){
  if(optical){ctx.beginPath();ctx.arc(cx,cy,Math.min(width-margin*2,height-margin*2)*.48,0,Math.PI*2);ctx.clip()}
  else{rounded(ctx,margin,margin,width-margin*2,height-margin*2,8);ctx.clip()}
  const gainPercent=Number(gain.value)/100;
+ ctx.filter='brightness('+gainPercent.toFixed(2)+') contrast('+(optical?95+Number(focus.value)*.12:90+Number(focus.value)*.12)+'%)';
  if(optical){
   const metrics=getOpticalMetrics(objective);
   drawOptical(ctx,width,height,fieldWidthNm,rng,metrics);
-  ctx.filter='brightness('+gainPercent.toFixed(2)+')';
  }else if(mode==='sem'){
   drawSEM(ctx,width,height,fieldWidthNm,rng);
-  ctx.filter='brightness('+gainPercent.toFixed(2)+') contrast('+(90+Number(focus.value)*.12)+'%)';
  }else if(mode==='tem'){
   drawTEM(ctx,width,height,fieldWidthNm,rng);
-  ctx.filter='brightness('+gainPercent.toFixed(2)+') contrast('+(94+Number(focus.value)*.08)+'%)';
  }else if(mode==='afm'){
   drawAFM(ctx,width,height,rng);
-  ctx.filter='brightness('+gainPercent.toFixed(2)+') contrast('+(95+Number(focus.value)*.08)+'%)';
  }else{
   drawSTM(ctx,width,height,fieldWidthNm,rng);
-  ctx.filter='brightness('+gainPercent.toFixed(2)+') contrast('+(94+Number(focus.value)*.08)+'%)';
  }
  ctx.restore();
  if(optical){
