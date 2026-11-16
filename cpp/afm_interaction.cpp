@@ -195,7 +195,7 @@ extern "C" const double *cv_afm_scan(
      if(!finite(measured_amplitude)||measured_amplitude<0.0){last_error=ERR_NUMERIC;return 0;}
      feedback_iterations=iteration+1;
      const double error=target_amplitude-measured_amplitude;
-     stage_z+=clamp(error*0.08,-free_amplitude_nm*0.025,free_amplitude_nm*0.025);
+     stage_z+=clamp(error*0.16,-free_amplitude_nm*0.05,free_amplitude_nm*0.05);
      if(absd(error)<free_amplitude_nm*0.008)break;
     }
     /* Amplitude-feedback height is referenced to the calibrated free approach. */
