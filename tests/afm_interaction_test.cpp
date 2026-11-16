@@ -25,7 +25,8 @@ int main(){
  assert(summary[1]>=-12.0&&summary[2]>=summary[1]);
  assert(summary[3]>=-20.0);
  assert(summary[5]>=0.0);
- assert(summary[6]>=0.0&&summary[6]<=1.5);
+ assert(summary[6]>=0.60&&summary[6]<=0.84);
+ assert(summary[7]<0.2);
  assert(summary[8]>=1.0&&summary[8]<=8.0);
  assert(summary[9]>=0.0);
  const double *output=cv_afm_output();
