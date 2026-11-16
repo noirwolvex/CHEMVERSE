@@ -63,7 +63,18 @@ mkdir -p "$ROOT/wasm"
   -Wl,--export=cv_s04_validate_profile -Wl,--export=cv_s04_engine_version \
   -Wl,--strip-all "$ROOT/cpp/station04_engine.cpp" -o "$ROOT/wasm/station04_engine.wasm"
 
-printf 'Built %s, %s, %s, %s, %s, and %s\\n' \
+# Crystallographic unit-cell module: Cu/FCC, MgO/CaO/AgCl/rock-salt, BaSO4/Pnma.
+"$CLANGXX" --target=wasm32-unknown-unknown -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+  -nostdlib -fno-exceptions -fno-rtti -fvisibility=hidden \
+  -Wl,--no-entry -Wl,--export-memory \
+  -Wl,--export=cv_crystal_profile -Wl,--export=cv_crystal_site_count \
+  -Wl,--export=cv_crystal_site_element -Wl,--export=cv_crystal_site_role \
+  -Wl,--export=cv_crystal_site_fractional -Wl,--export=cv_crystal_validate \
+  -Wl,--export=cv_crystal_engine_version \
+  -Wl,--strip-all "$ROOT/cpp/crystal_engine.cpp" -o "$ROOT/wasm/crystal_engine.wasm"
+
+printf 'Built %s, %s, %s, %s, %s, %s, and %s\\n' \
   "$ROOT/wasm/chemistry_core.wasm" "$ROOT/wasm/kinetics_engine.wasm" \
   "$ROOT/wasm/experimental_fit.wasm" "$ROOT/wasm/concentration_fit.wasm" \
-  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/station04_engine.wasm"
+  "$ROOT/wasm/reaction_mechanism.wasm" "$ROOT/wasm/station04_engine.wasm" \
+  "$ROOT/wasm/crystal_engine.wasm"
