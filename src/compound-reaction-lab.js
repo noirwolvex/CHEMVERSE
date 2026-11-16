@@ -252,9 +252,10 @@ function updateKineticsAvailability(){
   kineticsInput('kinetics-reference-temperature'),kineticsInput('kinetics-rate-constant'),
   kineticsInput('kinetics-order-a'),kineticsInput('kinetics-order-b')];
  const values=raw.map(Number);
- const activationRaw=kineticsInput('kinetics-activation-energy');
+ const activationRaw=kineticsInput('kinetics-activation-energy'),sourceReference=kineticsInput('kinetics-source');
  const activationValid=activationRaw===''||(Number.isFinite(Number(activationRaw))&&Number(activationRaw)>=0);
- const valid=raw.every(value=>value!=='')&&values.every(Number.isFinite)&&
+ const amountInputs=activeReaction.reactants.map(entry=>Number(initialAmounts[entry.species]));
+ const valid=sourceReference.length>0&&amountInputs.every(value=>Number.isFinite(value)&&value>0)&&raw.every(value=>value!=='')&&values.every(Number.isFinite)&&
   values[0]>0&&values[1]>-273.15&&values[2]>-273.15&&values[3]>0&&
   values[4]>=0&&values[4]<=4&&values[5]>=0&&values[5]<=4&&
   values[4]+values[5]<=6&&activationValid;
@@ -304,9 +305,9 @@ async function runKinetics(){
   const referenceTemperatureC=Number(kineticsInput('kinetics-reference-temperature'));
   const rateConstant=Number(kineticsInput('kinetics-rate-constant'));
   const orderA=Number(kineticsInput('kinetics-order-a')),orderB=Number(kineticsInput('kinetics-order-b'));
-  const activationRaw=kineticsInput('kinetics-activation-energy');
+  const activationRaw=kineticsInput('kinetics-activation-energy'),sourceReference=kineticsInput('kinetics-source');
   const hasActivationEnergy=activationRaw!=='',activationEnergyKjMol=hasActivationEnergy?Number(activationRaw):0;
-  if(![amountA,amountB,volumeMl,temperatureC,referenceTemperatureC,rateConstant,orderA,orderB,activationEnergyKjMol].every(Number.isFinite)||amountA<=0||amountB<=0)throw new Error('تحقق من كميات المتفاعلات ومدخلات الحركية.');
+  if(!sourceReference||![amountA,amountB,volumeMl,temperatureC,referenceTemperatureC,rateConstant,orderA,orderB,activationEnergyKjMol].every(Number.isFinite)||amountA<=0||amountB<=0)throw new Error('أدخل مرجع بيانات الحركية وتحقق من كميات المتفاعلات والمدخلات.');
   const result=await simulateStation04Kinetics({
    amountAMmol:amountA*1000,amountBMmol:amountB*1000,volumeMl,rateConstant,orderA,orderB,
    temperatureC,referenceTemperatureC,activationEnergyKjMol,useArrhenius:hasActivationEnergy,
@@ -323,7 +324,7 @@ async function runKinetics(){
    ' · السرعة عند النهاية = '+finalRate.toPrecision(4)+' M/s'+
    ' · [A] النهائية = '+finalA.toPrecision(4)+' M'+
    ' · [B] النهائية = '+finalB.toPrecision(4)+' M'+
-   ' · التحول = '+(last[1]*100).toFixed(2)+'%');
+   ' · التحول = '+(last[1]*100).toFixed(2)+'% · المصدر: '+sourceReference);
   txt('kinetics-status',hasActivationEnergy?
    'نجح التكامل العددي. تم تعديل k بدرجة الحرارة وفق Arrhenius وباستخدام طاقة التنشيط التي أدخلتها.':
    'نجح التكامل العددي. لم تُدخل طاقة تنشيط؛ لذلك بقي k ثابتاً عند القيمة المرجعية ولم تُنسب للحرارة زيادة سرعة مصطنعة.');
@@ -367,7 +368,7 @@ function renderLegend(){const root=byId('atom-legend');root.replaceChildren();EL
 function selectReaction(id){
  const next=getReactionById(id);if(!next)return;activeReaction=next;selectedSpecies=null;selectedMaterial=next.reactants[0].species;activeCategory='all';initialAmounts=Object.fromEntries(next.reactants.map(item=>[item.species,'0.100']));
  playing=false;progress=0;lastTime=0;renderCategories();renderReactionList();renderMaterials();updateSelectedMaterial();updateReactionDisplay();clearKineticsResults();
- ['kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>{const input=byId(id);if(input)input.value=''});
+ ['kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy','kinetics-source'].forEach(id=>{const input=byId(id);if(input)input.value=''});
  updateAmounts();updateKineticsAvailability();
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('play-reaction').textContent='▶ ابدأ المحاكاة'
@@ -383,7 +384,7 @@ async function init(){
  if(reactantRoot&&productRoot){buildSide(reactantRoot,activeReaction.reactants,'reactants');buildSide(productRoot,activeReaction.products,'products');buildAtomMappedScene();configureDynamicEffects();updateTimeline(0)}
  byId('reaction-search').addEventListener('input',renderReactionList);byId('material-search').addEventListener('input',renderMaterials);
  document.querySelectorAll('[data-material-filter]').forEach(button=>button.addEventListener('click',()=>{activeMaterialFilter=button.dataset.materialFilter;document.querySelectorAll('[data-material-filter]').forEach(b=>b.classList.toggle('is-active',b===button));renderMaterials()}));
- ['kinetics-volume','kinetics-temperature','kinetics-reference-temperature','kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy'].forEach(id=>byId(id).addEventListener('input',()=>{clearKineticsResults();updateKineticsAvailability()}));
+ ['kinetics-volume','kinetics-temperature','kinetics-reference-temperature','kinetics-rate-constant','kinetics-order-a','kinetics-order-b','kinetics-activation-energy','kinetics-source'].forEach(id=>byId(id).addEventListener('input',()=>{clearKineticsResults();updateKineticsAvailability()}));
  byId('kinetics-run').addEventListener('click',runKinetics);
  byId('play-reaction').addEventListener('click',()=>{if(playing){playing=false;byId('play-reaction').textContent='▶ استكمال';lastTime=0;return}if(progress>=1)updateTimeline(0);playing=true;lastTime=0;byId('play-reaction').textContent='Ⅱ إيقاف مؤقت'});
  byId('reset-reaction').addEventListener('click',()=>{playing=false;lastTime=0;updateTimeline(0);byId('play-reaction').textContent='▶ ابدأ المحاكاة'});byId('previous-stage').addEventListener('click',()=>seekReaction(stageStops.filter(stop=>stop<progress-1e-4).pop()??0));byId('next-stage').addEventListener('click',()=>seekReaction(stageStops.find(stop=>stop>progress+1e-4)??1));byId('reaction-scrubber').addEventListener('input',event=>seekReaction(Number(event.target.value)/1000));
