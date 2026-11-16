@@ -37,13 +37,15 @@ double cosApprox(double value){
 }
 double pow23(double value){
  if(!(value>0.0))return 0.0;
- const double root=sqrtFast(value);
- return root*sqrtFast(root);
+ double root=value>1.0?value:1.0;
+ for(int i=0;i<36;++i)root=(2.0*root+value/(root*root))/3.0;
+ return root*root;
 }
 double pow32(double value){
  if(!(value>0.0))return 0.0;
  return value*sqrtFast(value);
 }
+double expApprox(double value);
 struct State{double displacement_nm;double velocity_nm_s;};
 struct ForceState{double force_nn;double indentation_nm;bool contact;};
 
@@ -169,7 +171,7 @@ extern "C" const double *cv_afm_scan(
   contact_force_setpoint_nn>=0.01&&contact_force_setpoint_nn<=100.0&&
   cycles_per_pixel>=2&&cycles_per_pixel<=40&&steps_per_cycle>=16&&steps_per_cycle<=64;
  if(!valid){last_error=ERR_INVALID;return 0;}
- if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*4>MAX_DYNAMIC_STEPS){
+ if(scan_mode==0&&cycles_per_pixel*steps_per_cycle*grid_size*grid_size*5>MAX_DYNAMIC_STEPS){
   last_error=ERR_STEP_LIMIT;return 0;
  }
  const int cells=grid_size*grid_size;
