@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 
 namespace {
 bool near(double a,double b,double tolerance=1e-5){
@@ -130,6 +131,13 @@ int main(){
  output=cv_afm_output();
  for(int i=0;i<16*16*CV_AFM_OUTPUT_FIELDS;++i)assert(near(staged[i],output[i],1e-12));
  assert(cv_afm_scan_progress()==16*16&&cv_afm_scan_complete()==1);
+
+
+ /* Even an oversized positive batch is capped without integer overflow. */
+ assert(cv_afm_scan_begin(16,800.0,8.0,.72,2.0,300.0,80.0,
+  10.0,70.0,.23,25.0,1.0e-19,1,3.0,8,32,0,30.0));
+ assert(cv_afm_scan_advance(std::numeric_limits<int>::max())==16*16);
+ assert(cv_afm_scan_complete()==1);
 
  /* Invalid grid and out-of-range materials are rejected. */
  assert(!cv_afm_scan(4,800.0,8.0,.72,2.0,300.0,80.0,
