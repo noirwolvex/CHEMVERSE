@@ -115,7 +115,7 @@ jobs:
             const secondaryTracks = new Float64Array(e.memory.buffer,e.cv_electron_secondary_tracks(),24*243);
             if (es[16]+es[17] !== es[4] || Math.abs(es[19]+es[20]-es[21]) > 1e-7 ||
                 e.cv_electron_secondary_track_count() > 24 ||
-                (e.cv_electron_secondary_track_count()>0 && (secondaryTracks[0]<2 || secondaryTracks[4]!==6))) {
+                (e.cv_electron_secondary_track_count()>0 && (secondaryTracks[0]<2 || secondaryTracks[7]!==6))) {
               throw new Error('Secondary-electron track and energy accounting validation failed');
             }
             if (tracks[0] < 2 || Math.abs(tracks[2]-20) > 1e-9) {

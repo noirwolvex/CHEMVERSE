@@ -87,15 +87,21 @@ int main(){
  /* Finite-radius spherical, conical and pyramidal tips broaden a narrow pillar. */
  for(int i=0;i<16*16;++i)input[i]=0.0;
  input[8*16+8]=20.0;
- assert(scan(1,3.0,0,30.0));
+ const double *sphereScan=cv_afm_scan(16,64.0,8.0,.72,2.0,300.0,80.0,
+  10.0,70.0,.23,25.0,1.0e-19,1,3.0,8,32,0,30.0);
+ assert(sphereScan);
  const double sphereNeighbour=cv_afm_output()[(8*16+9)*CV_AFM_OUTPUT_FIELDS];
- assert(sphereNeighbour>0.1&&sphereNeighbour<20.0);
- assert(scan(1,3.0,1,30.0));
+ assert(sphereNeighbour>20.0&&sphereNeighbour<24.0);
+ const double *coneScan=cv_afm_scan(16,64.0,8.0,.72,2.0,300.0,80.0,
+  10.0,70.0,.23,25.0,1.0e-19,1,3.0,8,32,1,30.0);
+ assert(coneScan);
  const double coneNeighbour=cv_afm_output()[(8*16+9)*CV_AFM_OUTPUT_FIELDS];
  assert(coneNeighbour>sphereNeighbour);
- assert(scan(1,3.0,2,30.0));
+ const double *pyramidScan=cv_afm_scan(16,64.0,8.0,.72,2.0,300.0,80.0,
+  10.0,70.0,.23,25.0,1.0e-19,1,3.0,8,32,2,30.0);
+ assert(pyramidScan);
  const double pyramidDiagonal=cv_afm_output()[(9*16+9)*CV_AFM_OUTPUT_FIELDS];
- assert(pyramidDiagonal>0.1);
+ assert(pyramidDiagonal>20.0);
 
  /* Invalid grid and out-of-range materials are rejected. */
  assert(!cv_afm_scan(4,800.0,8.0,.72,2.0,300.0,80.0,
