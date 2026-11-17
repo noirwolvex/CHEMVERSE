@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101a25">
-<meta name="description" content="CHEMVERSE Microscopy Lab — explore optical, SEM, TEM, AFM and STM sample visualisations.">
+<meta name="description" content="CHEMVERSE Optical Microscopy Lab — explore prepared specimens with visible-light microscopy.">
 <title>CHEMVERSE | Microscopy Lab 03</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="./microscope.css">
@@ -10,14 +10,10 @@
 <div class="scope-app"><header class="scope-topbar">
 <a class="brand" href="./" aria-label="Return to CHEMVERSE laboratory"><span class="brand-mark"><span></span><span></span><span></span></span><span class="brand-copy"><strong>CHEMVERSE</strong><small>MICROSCOPY / MATERIALS / DISCOVERY</small></span></a>
 <div class="scope-topbar-center"><i></i> MICROSCOPE STATION <b>03</b></div><a class="back-link" href="./">← BACK TO LAB</a></header>
-<main class="scope-main"><section class="scope-intro"><div><span class="eyebrow">EXPERIMENT STATION / 03</span><h1>Look closer.<br><em>Discover structure.</em></h1><p>Choose a specimen and an imaging technique. Move from visible-light crystals to electron microscopy and atomic-scale surface maps.</p></div><div class="scope-chip"><b>05</b><span><strong>IMAGING METHODS</strong><small>LIGHT · SEM · TEM · AFM · STM</small></span></div></section>
+<main class="scope-main"><section class="scope-intro"><div><span class="eyebrow">EXPERIMENT STATION / 03</span><h1>Look closer.<br><em>Discover structure.</em></h1><p>Choose a specimen, prepare its slide and explore microscopic structures using visible-light microscopy.</p></div><div class="scope-chip"><b>01</b><span><strong>IMAGING METHOD</strong><small>OPTICAL · VISIBLE LIGHT</small></span></div></section>
 <section class="scope-layout" aria-label="Interactive microscope laboratory"><aside class="library-panel"><div class="panel-heading"><div><span class="eyebrow">IMAGING METHOD</span><h2>Choose microscope</h2></div></div>
 <div class="method-list">
 <button class="method-button is-active" type="button" data-mode="light" aria-pressed="true"><span class="method-symbol">◉</span><span><b>OPTICAL</b><small>Visible light</small></span><i>01</i></button>
-<button class="method-button" type="button" data-mode="sem" aria-pressed="false"><span class="method-symbol">▧</span><span><b>SEM</b><small>Surface electrons</small></span><i>02</i></button>
-<button class="method-button" type="button" data-mode="tem" aria-pressed="false"><span class="method-symbol">▤</span><span><b>TEM</b><small>Transmitted electrons</small></span><i>03</i></button>
-<button class="method-button" type="button" data-mode="afm" aria-pressed="false"><span class="method-symbol">⌁</span><span><b>AFM</b><small>Surface topography</small></span><i>04</i></button>
-<button class="method-button" type="button" data-mode="stm" aria-pressed="false"><span class="method-symbol">⌗</span><span><b>STM</b><small>Tunnelling current</small></span><i>05</i></button></div>
 <div class="library-heading"><span class="eyebrow">SPECIMEN LIBRARY</span><span id="sample-count">08 SAMPLES</span></div><div class="sample-list" id="sample-list"></div></aside>
 <section class="viewer-panel"><div class="viewer-heading"><div><span class="eyebrow">LIVE SPECIMEN VIEW</span><h2 id="viewer-title">Sodium chloride crystals</h2></div><span class="viewer-state"><i></i><b id="mode-status">OPTICAL / BRIGHTFIELD</b></span></div>
 <div class="scope-viewport" id="scope-viewport"><canvas id="microscope-canvas" width="1200" height="760" aria-label="Synthetic, physically scaled microscope specimen visualisation"></canvas>
